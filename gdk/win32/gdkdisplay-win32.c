@@ -395,7 +395,7 @@ inner_clipboard_window_procedure (HWND   hwnd,
         CloseClipboard ();
 
         if (_hwnd_next_viewer != NULL)
-          return SendMessage (_hwnd_next_viewer, message, wparam, lparam);
+          return PostMessage (_hwnd_next_viewer, message, wparam, lparam);  // %%BWK 140924: changed SendMessage to PostMessage: was hanging here sending msg to unresponsive QTIdle window in a separate process
 
         /* clear error to avoid confusing SetClipboardViewer() return */
         SetLastError (0);
