@@ -2126,11 +2126,11 @@ gtk_entry_set_property (GObject         *object,
 		priv->preedit_length = 0;
 		priv->preedit_cursor = 0;
 
-                gtk_style_context_remove_class (context, GTK_STYLE_CLASS_READ_ONLY);
+                gtk_style_context_add_class (context, GTK_STYLE_CLASS_READ_ONLY);  // %%BWK 141007 -- swapped add/remove with line below
 	      }
             else
               {
-                gtk_style_context_add_class (context, GTK_STYLE_CLASS_READ_ONLY);
+                gtk_style_context_remove_class (context, GTK_STYLE_CLASS_READ_ONLY);
               }
 
 	    priv->editable = new_value;
