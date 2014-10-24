@@ -1,0 +1,16 @@
+build/win32/vs10/Debug/
+build/win32/vs10/Debug_Broadway/
+build/win32/vs10/Release/
+build/win32/vs10/Release_Broadway/
+build/win32/vs10/ipch/
+config.h
+gdk/gdkconfig.h
+gtk/gtkdbusgenerated.c
+gtk/gtkdbusgenerated.h
+GDK_WIN32ONLY_BUILD
+MSVC_Debug
+MSVC_Release
+*.opensdf
+*.vcxproj.user
+*.sdf
+*.suo
