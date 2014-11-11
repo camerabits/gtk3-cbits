@@ -87,7 +87,7 @@ DIST_COMMON = $(top_srcdir)/Makefile.decl INSTALL NEWS README AUTHORS \
 	$(srcdir)/gtk-zip.sh.in $(srcdir)/gdk-3.0.pc.in \
 	$(srcdir)/gtk+-3.0.pc.in $(srcdir)/gtk+-unix-print-3.0.pc.in \
 	$(srcdir)/gail-3.0.pc.in COPYING build-aux/compile \
-	build-aux/config.guess build-aux/config.sub \
+	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
 	build-aux/install-sh build-aux/missing build-aux/ltmain.sh \
 	$(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
