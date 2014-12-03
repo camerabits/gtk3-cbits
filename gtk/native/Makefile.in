@@ -80,12 +80,11 @@ host_triplet = @host@
 subdir = gtk/native
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
-	$(top_srcdir)/m4/gtk-doc.m4 $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/m4/pkg_config_for_build.m4 \
-	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/gtk-doc.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -128,8 +127,6 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BASE_DEPENDENCIES_CFLAGS = @BASE_DEPENDENCIES_CFLAGS@
 BASE_DEPENDENCIES_LIBS = @BASE_DEPENDENCIES_LIBS@
-BUILD_EXEEXT = @BUILD_EXEEXT@
-BUILD_OBJEXT = @BUILD_OBJEXT@
 CAIRO_BACKEND_CFLAGS = @CAIRO_BACKEND_CFLAGS@
 CAIRO_BACKEND_LIBS = @CAIRO_BACKEND_LIBS@
 CAIRO_PREFIX = @CAIRO_PREFIX@
@@ -141,15 +138,11 @@ CCAS = @CCAS@
 CCASDEPMODE = @CCASDEPMODE@
 CCASFLAGS = @CCASFLAGS@
 CCDEPMODE = @CCDEPMODE@
-CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
-CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
 COLORD_CFLAGS = @COLORD_CFLAGS@
 COLORD_LIBS = @COLORD_LIBS@
 CPP = @CPP_FOR_BUILD@
 CPPFLAGS = @CPPFLAGS@
-CPPFLAGS_FOR_BUILD = @CPPFLAGS_FOR_BUILD@
-CPP_FOR_BUILD = @CPP_FOR_BUILD@
 CUPS_API_MAJOR = @CUPS_API_MAJOR@
 CUPS_API_MINOR = @CUPS_API_MINOR@
 CUPS_CFLAGS = @CUPS_CFLAGS@
@@ -255,7 +248,6 @@ JSON_GLIB_CFLAGS = @JSON_GLIB_CFLAGS@
 JSON_GLIB_LIBS = @JSON_GLIB_LIBS@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
-LDFLAGS_FOR_BUILD = @LDFLAGS_FOR_BUILD@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -293,7 +285,6 @@ PANGO_REQUIRED_VERSION = @PANGO_REQUIRED_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PERL = @PERL@
 PKG_CONFIG = @PKG_CONFIG@
-PKG_CONFIG_FOR_BUILD = @PKG_CONFIG_FOR_BUILD@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POFILES = @POFILES@
@@ -327,7 +318,6 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
-ac_ct_CC_FOR_BUILD = @ac_ct_CC_FOR_BUILD@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
