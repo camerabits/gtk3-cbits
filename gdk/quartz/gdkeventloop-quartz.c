@@ -1053,3 +1053,22 @@ _gdk_quartz_event_loop_init (void)
 
   autorelease_pool = [[NSAutoreleasePool alloc] init];
 }
+
+/* %%CBITS{ */
+extern void gdk_osx_drain_autorelease_pool ();
+void gdk_osx_drain_autorelease_pool ()
+{
+  if (current_loop_level == 0 && g_main_depth() == 0 && getting_events == 0)
+    {
+      if (autorelease_pool)
+        [autorelease_pool drain];
+      autorelease_pool = NULL;
+    }
+  else
+    {
+      g_warning ("gdk_osx_drain_autorelease_pool: skipped due to nesting: "
+		 "current_loop_level=%ld, g_main_depth=%ld, getting_events=%ld\n",
+		 (long)current_loop_level, (long)g_main_depth(), (long)getting_events);
+    }
+}
+/* }%%CBITS */
