@@ -690,7 +690,7 @@ get_home_directory_uri (void)
   if (!home)
     return NULL;
 
-  return g_strconcat ("file://", home, NULL);
+  return g_filename_to_uri (home, NULL, NULL);
 }
 
 static gchar *
@@ -706,7 +706,7 @@ get_desktop_directory_uri (void)
   if (path_is_home_dir (name))
     return NULL;
 
-  return g_strconcat ("file://", name, NULL);
+  return g_filename_to_uri (name, NULL, NULL);
 }
 
 static gboolean
@@ -2657,37 +2657,89 @@ unmount_mount_cb (GObject      *source_object,
 }
 
 static void
+notify_unmount_done (GMountOperation *op,
+                     const gchar *message)
+{
+  GApplication *application;
+  gchar *notification_id;
+
+  /* We only can support this when a default GApplication is set */
+  application = g_application_get_default ();
+  if (application == NULL)
+    return;
+
+  notification_id = g_strdup_printf ("gtk-mount-operation-%p", op);
+  g_application_withdraw_notification (application, notification_id);
+
+  if (message != NULL) {
+    GNotification *unplug;
+    GIcon *icon;
+    gchar **strings;
+
+    strings = g_strsplit (message, "\n", 0);
+    icon = g_themed_icon_new ("media-removable");
+    unplug = g_notification_new (strings[0]);
+    g_notification_set_body (unplug, strings[1]);
+    g_notification_set_icon (unplug, icon);
+
+    g_application_send_notification (application, notification_id, unplug);
+    g_object_unref (unplug);
+    g_object_unref (icon);
+    g_strfreev (strings);
+  }
+
+  g_free (notification_id);
+}
+
+static void
+notify_unmount_show (GMountOperation *op,
+                     const gchar *message)
+{
+  GApplication *application;
+  GNotification *unmount;
+  gchar *notification_id;
+  GIcon *icon;
+  gchar **strings;
+
+  /* We only can support this when a default GApplication is set */
+  application = g_application_get_default ();
+  if (application == NULL)
+    return;
+
+  strings = g_strsplit (message, "\n", 0);
+  icon = g_themed_icon_new ("media-removable");
+
+  unmount = g_notification_new (strings[0]);
+  g_notification_set_body (unmount, strings[1]);
+  g_notification_set_icon (unmount, icon);
+  g_notification_set_priority (unmount, G_NOTIFICATION_PRIORITY_URGENT);
+
+  notification_id = g_strdup_printf ("gtk-mount-operation-%p", op);
+  g_application_send_notification (application, notification_id, unmount);
+  g_object_unref (unmount);
+  g_object_unref (icon);
+  g_strfreev (strings);
+  g_free (notification_id);
+}
+
+static void
 show_unmount_progress_cb (GMountOperation *op,
                           const gchar     *message,
                           gint64           time_left,
                           gint64           bytes_left,
                           gpointer         user_data)
 {
-  /* FIXME: These are just libnotify notifications, but GTK+ doesn't do notifications right now.
-   * Should we just call D-Bus directly?
-   */
-#if 0
-  NautilusApplication *app = NAUTILUS_APPLICATION (g_application_get_default ());
-
-  if (bytes_left == 0) {
-          nautilus_application_notify_unmount_done (app, message);
-  } else {
-          nautilus_application_notify_unmount_show (app, message);
-  }
-#endif
+  if (bytes_left == 0)
+    notify_unmount_done (op, message);
+  else
+    notify_unmount_show (op, message);
 }
 
 static void
 show_unmount_progress_aborted_cb (GMountOperation *op,
                                   gpointer         user_data)
 {
-  /* FIXME: These are just libnotify notifications, but GTK+ doesn't do notifications right now.
-   * Should we just call D-Bus directly?
-   */
-#if 0
-  NautilusApplication *app = NAUTILUS_APPLICATION (g_application_get_default ());
-  nautilus_application_notify_unmount_done (app, NULL);
-#endif
+  notify_unmount_done (op, NULL);
 }
 
 static GMountOperation *
@@ -3760,6 +3812,10 @@ places_sidebar_sort_func (GtkTreeModel *model,
   else if (place_type_a == PLACES_CONNECT_TO_SERVER)
     {
       retval = 1;
+    }
+  else if (place_type_b == PLACES_CONNECT_TO_SERVER)
+    {
+      retval = -1;
     }
 
   return retval;
@@ -5071,7 +5127,7 @@ gtk_places_sidebar_remove_shortcut (GtkPlacesSidebar *sidebar,
 GSList *
 gtk_places_sidebar_list_shortcuts (GtkPlacesSidebar *sidebar)
 {
-  g_return_val_if_fail (GTK_IS_PLACES_SIDEBAR (sidebar), FALSE);
+  g_return_val_if_fail (GTK_IS_PLACES_SIDEBAR (sidebar), NULL);
 
   return g_slist_copy_deep (sidebar->shortcuts, (GCopyFunc) g_object_ref, NULL);
 }

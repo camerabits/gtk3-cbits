@@ -2022,6 +2022,13 @@ gtk_entry_class_init (GtkEntryClass *class)
   gtk_binding_entry_add_signal (binding_set, GDK_KEY_Insert, GDK_SHIFT_MASK,
 				"paste-clipboard", 0);
 
+  gtk_binding_entry_add_signal (binding_set, GDK_KEY_KP_Delete, GDK_SHIFT_MASK,
+                                "cut-clipboard", 0);
+  gtk_binding_entry_add_signal (binding_set, GDK_KEY_KP_Insert, GDK_CONTROL_MASK,
+                                "copy-clipboard", 0);
+  gtk_binding_entry_add_signal (binding_set, GDK_KEY_KP_Insert, GDK_SHIFT_MASK,
+                                "paste-clipboard", 0);
+
   /* Overwrite */
   gtk_binding_entry_add_signal (binding_set, GDK_KEY_Insert, 0,
 				"toggle-overwrite", 0);
@@ -10576,11 +10583,14 @@ gtk_entry_set_progress_fraction (GtkEntry *entry,
   gdouble          old_fraction;
   gint x, y, width, height;
   gint old_x, old_y, old_width, old_height;
+  gboolean was_pulse;
 
   g_return_if_fail (GTK_IS_ENTRY (entry));
 
   widget = GTK_WIDGET (entry);
   private = entry->priv;
+
+  was_pulse = private->progress_pulse_mode;
 
   if (private->progress_pulse_mode)
     old_fraction = -1;
@@ -10600,7 +10610,8 @@ gtk_entry_set_progress_fraction (GtkEntry *entry,
     {
       get_progress_area (widget, &x, &y, &width, &height);
 
-      if ((x != old_x) || (y != old_y) || (width != old_width) || (height != old_height))
+      if (was_pulse ||
+          x != old_x || y != old_y || width != old_width || height != old_height)
         gtk_widget_queue_draw (widget);
     }
 

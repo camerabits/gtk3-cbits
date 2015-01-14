@@ -46,7 +46,7 @@
  *
  * Certain properties on the #GtkMenuTrackerItem are mutable, and you must
  * listen for changes in the item. For more details, see the documentation
- * for #GtkMenuTrackerItem along with https://live.gnome.org/GApplication/GMenuModel.
+ * for #GtkMenuTrackerItem along with https://wiki.gnome.org/Projects/GLib/GApplication/GMenuModel.
  *
  * The idea of @with_separators is for special cases where menu models may
  * be tracked in places where separators are not available, like in toplevel
@@ -120,7 +120,7 @@ gtk_menu_tracker_section_find_model (GtkMenuTrackerSection *section,
         (*offset)++;
     }
 
-  return FALSE;
+  return NULL;
 }
 
 /* this is responsible for syncing the showing of a separator for a

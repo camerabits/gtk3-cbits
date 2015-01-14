@@ -626,7 +626,7 @@ static void
 add_arrow (GtkMenuButton *menu_button)
 {
   GtkWidget *arrow;
-  
+
   arrow = gtk_image_new ();
   set_arrow_type (GTK_IMAGE (arrow), menu_button->priv->arrow_type);
   gtk_container_add (GTK_CONTAINER (menu_button), arrow);
@@ -1155,6 +1155,8 @@ gtk_menu_button_set_popover (GtkMenuButton *menu_button,
       g_signal_handlers_disconnect_by_func (priv->popover,
                                             menu_deactivate_cb,
                                             menu_button);
+
+      gtk_popover_set_relative_to (GTK_POPOVER (priv->popover), NULL);
     }
 
   priv->popover = popover;
@@ -1176,7 +1178,7 @@ gtk_menu_button_set_popover (GtkMenuButton *menu_button,
 
   g_object_notify (G_OBJECT (menu_button), "popover");
   g_object_notify (G_OBJECT (menu_button), "menu-model");
-  g_object_freeze_notify (G_OBJECT (menu_button));
+  g_object_thaw_notify (G_OBJECT (menu_button));
 }
 
 /**

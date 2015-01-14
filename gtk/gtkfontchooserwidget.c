@@ -627,7 +627,9 @@ gtk_font_chooser_widget_load_fonts (GtkFontChooserWidget *fontchooser)
 
   qsort (families, n_families, sizeof (PangoFontFamily *), cmp_families);
 
+  g_signal_handlers_block_by_func(priv->family_face_list, cursor_changed_cb, fontchooser);
   gtk_list_store_clear (list_store);
+  g_signal_handlers_unblock_by_func (priv->family_face_list, cursor_changed_cb, fontchooser);
 
   /* Iterate over families and faces */
   for (i = 0; i < n_families; i++)
@@ -880,18 +882,18 @@ gtk_font_chooser_widget_find_font (GtkFontChooserWidget        *fontchooser,
                                    GtkTreeIter                 *iter)
 {
   GtkFontChooserWidgetPrivate *priv = fontchooser->priv;
-  PangoFontDescription *desc;
-  PangoFontFamily *family;
-  gboolean valid, found;
+  gboolean valid;
 
   if (pango_font_description_get_family (font_desc) == NULL)
     return FALSE;
 
-  found = FALSE;
   for (valid = gtk_tree_model_get_iter_first (priv->model, iter);
-       valid && !found;
+       valid;
        valid = gtk_tree_model_iter_next (priv->model, iter))
     {
+      PangoFontDescription *desc;
+      PangoFontFamily *family;
+
       gtk_tree_model_get (priv->model, iter,
                           FAMILY_COLUMN, &family,
                           -1);
@@ -903,13 +905,15 @@ gtk_font_chooser_widget_find_font (GtkFontChooserWidget        *fontchooser,
       desc = tree_model_get_font_description (priv->model, iter);
 
       pango_font_description_merge_static (desc, font_desc, FALSE);
-      if (pango_font_description_equal (desc, font_desc))
-        found = TRUE;
+      if (pango_font_description_equal (desc, font_desc)) {
+        pango_font_description_free (desc);
+        break;
+      }
 
       pango_font_description_free (desc);
     }
   
-  return found;
+  return valid;
 }
 
 static void

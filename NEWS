@@ -1,3 +1,88 @@
+Overview of Changes in GTK+ 3.14.6 to 3.14.7
+============================================
+
+* Bugs fixed:
+ 477454 libgtk crashed in gtk_notebook_button_release
+ 705582 gtk_recent_manager_init fails to check settings==NULL
+ 735122 GtkApplication: fix global menubar on Mac OS
+ 739038 gtk_recent_manager_set_filename: assertion failed: (priv->fil...
+ 739729 Bookmarks in sidebar sometimes randomly change their order
+ 741130 Entry completion with multiple cells can size wrong on first ...
+ 741652 Leaking menus when attaching to a button
+ 741702 Right margin not respected with RTL text in non-wrapping mode...
+ 741827 Typo in testsuite/reftests/Makefile.am causes build failure o...
+ 741897 documentation fix
+ 741969 GTK_STOCK_COPY
+ 742010 GtkLabel eats thumb-button clicks
+ 742170 cut/copy/paste binding entries are registered 2x
+ 742311 On cellrenderertext, notify for "size" and "size-points" prop...
+ 742343 Hide scrollbar in GtkFileChooser if appropriate
+ 742631 Left padding on File Chooser List
+ 742653 gtkfilechooserwidget: When using an extra widget, show or hid...
+ 742664 Portabilitiy issues with GTK-Inspector 32-bit and non-gnome3 ...
+        GtkFileChooser: Don't crash if invisible files are deleted
+
+* Translation updates:
+ British English
+ Kannada
+
+
+Overview of Changes in GTK+ 3.14.5 to 3.14.6
+============================================
+
+* Bugs fixed:
+ 364566 Text editing widgets should support keypad Insert/Delete...
+ 461249 gtk_icon_theme_list_contexts() documentation: What is a ...
+ 721939 Editable cells demo: Add new row at cursor
+ 722781 Foreach call on sort model fails with sort function
+ 730232 print dialog clips off left page size label on A4 landsc...
+ 739453 Home and Desktop do not link to correct place in PlacesS...
+ 739885 gtk3-3.14.5 - fail to link - undefined reference to `GTK...
+ 739977 Don't wait for ENTER to initiate search
+ 740287 GtkWindow's hide-titlebar-when-maximized no longer does ...
+ 740374 Is enum GtkCssProviderError really deprecated?
+ 740612 Cups secret service auth_info lookup fails to read auth_...
+ 740613 XConvertSelection crashes Gtk+ apps
+ 740642 Fix different height for buttons with Hebrew character
+ 740742 Don't scale before translation
+ 740770 Missing style when the GtkCellRenderer:sensitive propert...
+ 740896 GtkPlacesSidebar: add support for unmount notifications
+ 741249 gtk_menu_tracker_section_find_model returns FALSE
+ 741250 gtk_places_sidebar_list_shortcuts returns FALSE
+ 741251 gtk_widget_get_frame_clock returns 0
+ 741252 tests/variable.h header guard typo
+ 741254 Improper headers guards
+ 741314 Adwaita: draw drag hilight on treeview rows
+        Redraw problems with cairo 1.14
+        Avoid excessive redraws due to CSD shadows
+
+* Translation updates:
+ Greek
+
+
+Overview of Changes in GTK+ 3.14.4 to 3.14.5
+============================================
+
+* Bugs fixed:
+ 726316 Backdrop inconvenient on multimonitor for reading text
+ 737561 quartz: gtk+ 3.14.0 fails to build on 10.6.8, 'NSFullScreen...
+ 737891 mounting LUKS partition from nautilus takes very long
+ 738321 GtkMenu has unnecessary scroll buttons
+ 738648 gdk_window_get_content() causes creation/destruction of bac...
+ 738650 fix separator with iconic section and more
+ 738886 Out of bounds access in MyEnhancedXkbTranslateKeyCode`
+ 738955 Client-side decoration window menus appear at wrong positio...
+ 739005 gtkstatusicon.c won't build with both X11 and Quartz backen...
+ 739111 GtkFontChooserDialog fixes 
+
+* Translation updates:
+ Czech
+ German
+ Hungarian
+ Lithuanian
+ Serbian
+
+
 Overview of Changes in GTK+ 3.14.3 to 3.14.4
 ============================================
 

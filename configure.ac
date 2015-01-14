@@ -10,8 +10,8 @@
 
 m4_define([gtk_major_version], [3])
 m4_define([gtk_minor_version], [14])
-m4_define([gtk_micro_version], [4])
-m4_define([gtk_interface_age], [4])
+m4_define([gtk_micro_version], [7])
+m4_define([gtk_interface_age], [7])
 m4_define([gtk_binary_age],
           [m4_eval(100 * gtk_minor_version + gtk_micro_version)])
 m4_define([gtk_version],
@@ -476,11 +476,6 @@ else
     GTK_DEBUG_FLAGS="-DG_ENABLE_DEBUG -DG_DISABLE_CAST_CHECKS"
   fi
 fi
-
-
-AC_DEFINE_UNQUOTED(GTK_COMPILED_WITH_DEBUGGING, "${enable_debug}",
-                   [Define if debugging is enabled])
-
 
 # Build time sanity check...
 AM_SANITY_CHECK

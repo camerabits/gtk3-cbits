@@ -1469,6 +1469,9 @@ multipress_gesture_pressed_cb (GtkGestureMultiPress *gesture,
         gtk_window_titlebar_action (window, event, button, n_press);
       if (n_press == 1)
         priv->drag_possible = TRUE;
+
+      gtk_gesture_set_sequence_state (GTK_GESTURE (gesture),
+                                      sequence, GTK_EVENT_SEQUENCE_CLAIMED);
       break;
     default:
       if (!priv->maximized)
@@ -1601,10 +1604,17 @@ gtk_window_constructed (GObject *object)
 {
   GtkWindow *window = GTK_WINDOW (object);
   GtkWindowPrivate *priv = window->priv;
+  gboolean is_plug;
 
   G_OBJECT_CLASS (gtk_window_parent_class)->constructed (object);
 
-  if (priv->type == GTK_WINDOW_TOPLEVEL)
+#ifdef GDK_WINDOWING_X11
+  is_plug = GTK_IS_PLUG (window);
+#else
+  is_plug = FALSE;
+#endif
+
+  if (priv->type == GTK_WINDOW_TOPLEVEL && !is_plug)
     {
       priv->multipress_gesture = gtk_gesture_multi_press_new (GTK_WIDGET (object));
       gtk_gesture_single_set_button (GTK_GESTURE_SINGLE (priv->multipress_gesture), 0);
@@ -3700,6 +3710,21 @@ gtk_window_get_destroy_with_parent (GtkWindow *window)
   return window->priv->destroy_with_parent;
 }
 
+static void
+gtk_window_apply_hide_titlebar_when_maximized (GtkWindow *window)
+{
+#ifdef GDK_WINDOWING_X11
+  GdkWindow *gdk_window;
+  gboolean setting;
+
+  setting = window->priv->hide_titlebar_when_maximized;
+  gdk_window = gtk_widget_get_window (GTK_WIDGET (window));
+
+  if (GDK_IS_X11_WINDOW (gdk_window))
+    gdk_x11_window_set_hide_titlebar_when_maximized (gdk_window, setting);
+#endif
+}
+
 /**
  * gtk_window_set_hide_titlebar_when_maximized:
  * @window: a #GtkWindow
@@ -3727,18 +3752,9 @@ gtk_window_set_hide_titlebar_when_maximized (GtkWindow *window,
   if (window->priv->hide_titlebar_when_maximized == setting)
     return;
 
-#ifdef GDK_WINDOWING_X11
-  {
-    GdkWindow *gdk_window;
-
-    gdk_window = gtk_widget_get_window (GTK_WIDGET (window));
-
-    if (GDK_IS_X11_WINDOW (gdk_window))
-      gdk_x11_window_set_hide_titlebar_when_maximized (gdk_window, setting);
-  }
-#endif
-
   window->priv->hide_titlebar_when_maximized = setting;
+  gtk_window_apply_hide_titlebar_when_maximized (window);
+
   g_object_notify (G_OBJECT (window), "hide-titlebar-when-maximized");
 }
 
@@ -5926,8 +5942,7 @@ gtk_window_map (GtkWidget *widget)
   if (priv->type == GTK_WINDOW_TOPLEVEL)
     {
       gtk_window_set_theme_variant (window);
-      gtk_window_set_hide_titlebar_when_maximized (window,
-                                                   priv->hide_titlebar_when_maximized);
+      gtk_window_apply_hide_titlebar_when_maximized (window);
     }
 
   /* No longer use the default settings */
@@ -7704,11 +7719,17 @@ gtk_window_handle_wm_event (GtkWindow *window,
 gboolean
 _gtk_window_check_handle_wm_event (GdkEvent *event)
 {
+  GtkWindowPrivate *priv;
   GtkWidget *widget;
 
   widget = gtk_get_event_widget (event);
 
   if (!GTK_IS_WINDOW (widget))
+    return GDK_EVENT_PROPAGATE;
+
+  priv = GTK_WINDOW (widget)->priv;
+
+  if (!priv->multipress_gesture)
     return GDK_EVENT_PROPAGATE;
 
   if (event->type != GDK_BUTTON_PRESS && event->type != GDK_BUTTON_RELEASE &&
@@ -10266,6 +10287,7 @@ gtk_window_set_screen (GtkWindow *window,
   GtkWindowPrivate *priv;
   GtkWidget *widget;
   GdkScreen *previous_screen;
+  gboolean was_rgba;
   gboolean was_mapped;
 
   g_return_if_fail (GTK_IS_WINDOW (window));
@@ -10279,6 +10301,12 @@ gtk_window_set_screen (GtkWindow *window,
   widget = GTK_WIDGET (window);
 
   previous_screen = priv->screen;
+
+  if (gdk_screen_get_rgba_visual (previous_screen) == gtk_widget_get_visual (widget))
+    was_rgba = TRUE;
+  else
+    was_rgba = FALSE;
+
   was_mapped = gtk_widget_get_mapped (widget);
 
   if (was_mapped)
@@ -10311,6 +10339,15 @@ gtk_window_set_screen (GtkWindow *window,
       _gtk_widget_propagate_composited_changed (widget);
     }
   g_object_notify (G_OBJECT (window), "screen");
+
+  if (was_rgba)
+    {
+      GdkVisual *visual;
+
+      visual = gdk_screen_get_rgba_visual (screen);
+      if (visual)
+        gtk_widget_set_visual (widget, visual);
+    }
 
   if (was_mapped)
     gtk_widget_map (widget);

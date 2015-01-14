@@ -28,6 +28,7 @@
 #include "gtksettings.h"
 #include "gtkswitch.h"
 #include "gtkwindow.h"
+#include "gtkcssproviderprivate.h"
 
 #ifdef GDK_WINDOWING_X11
 #include "x11/gdkx.h"
@@ -188,7 +189,7 @@ get_data_path (const gchar *subdir)
 {
   gchar *base_datadir, *full_datadir;
 #if defined (GDK_WINDOWING_WIN32) || defined (GDK_WINDOWING_QUARTZ)
-  base_datadir = g_strdup (_gtk_get_datadir());
+  base_datadir = g_strdup (_gtk_get_datadir ());
 #else
   base_datadir = g_strdup (GTK_DATADIR);
 #endif
@@ -202,39 +203,34 @@ init_theme (GtkInspectorVisual *vis)
 {
   GHashTable *t;
   GHashTableIter iter;
-  gchar *theme, *current_theme, *path;
-  gint i, pos;
-  GSettings *settings;
-  gchar *themedir = get_data_path ("themes");
+  gchar *theme, *path;
 
   t = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
   g_hash_table_add (t, g_strdup ("Adwaita"));
   g_hash_table_add (t, g_strdup ("Raleigh"));
 
-  fill_gtk (themedir, t);
-
-  g_free (themedir);
+  path = _gtk_css_provider_get_theme_dir ();
+  fill_gtk (path, t);
+  g_free (path);
 
   path = g_build_filename (g_get_user_data_dir (), "themes", NULL);
   fill_gtk (path, t);
   g_free (path);
 
-  settings = g_settings_new ("org.gnome.desktop.interface");
-  current_theme = g_settings_get_string (settings, "gtk-theme");
-  g_object_unref (settings);
+  path = g_build_filename (g_get_home_dir (), ".themes", NULL);
+  fill_gtk (path, t);
+  g_free (path);
 
   g_hash_table_iter_init (&iter, t);
-  pos = i = 0;
   while (g_hash_table_iter_next (&iter, (gpointer *)&theme, NULL))
     {
-      gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (vis->priv->theme_combo), theme);
-      if (g_strcmp0 (theme, current_theme) == 0)
-        pos = i;
-      i++;
+      gtk_combo_box_text_append (GTK_COMBO_BOX_TEXT (vis->priv->theme_combo), theme, theme);
     }
   g_hash_table_destroy (t);
 
-  gtk_combo_box_set_active (GTK_COMBO_BOX (vis->priv->theme_combo), pos);
+  g_object_bind_property (gtk_settings_get_default (), "gtk-theme-name",
+                          vis->priv->theme_combo, "active-id",
+                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
 
   if (g_getenv ("GTK_THEME") != NULL)
     {
@@ -242,17 +238,6 @@ init_theme (GtkInspectorVisual *vis)
       gtk_widget_set_sensitive (vis->priv->theme_combo, FALSE);
       gtk_widget_set_tooltip_text (vis->priv->theme_combo , _("Theme is hardcoded by GTK_THEME"));
     }
-}
-
-static void
-theme_changed (GtkComboBox        *c,
-               GtkInspectorVisual *vis)
-{
-  gchar *theme;
-
-  theme = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT (c));
-  g_object_set (gtk_settings_get_default (), "gtk-theme-name", theme, NULL);
-  g_free (theme);
 }
 
 static void
@@ -299,46 +284,28 @@ init_icons (GtkInspectorVisual *vis)
 {
   GHashTable *t;
   GHashTableIter iter;
-  gchar *theme, *current_theme, *path;
-  gint i, pos;
-  GSettings *settings;
-  gchar *iconsdir = get_data_path ("icons");
+  gchar *theme, *path;
 
   t = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
-  fill_icons (iconsdir, t);
-
-  g_free (iconsdir);
+  path = get_data_path ("icons");
+  fill_icons (path, t);
+  g_free (path);
 
   path = g_build_filename (g_get_user_data_dir (), "icons", NULL);
   fill_icons (path, t);
   g_free (path);
 
-  settings = g_settings_new ("org.gnome.desktop.interface");
-  current_theme = g_settings_get_string (settings, "icon-theme");
-  g_object_unref (settings);
-
   g_hash_table_iter_init (&iter, t);
-  pos = i = 0;
   while (g_hash_table_iter_next (&iter, (gpointer *)&theme, NULL))
     {
-      gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (vis->priv->icon_combo), theme);
-      if (g_strcmp0 (theme, current_theme) == 0)
-        pos = i;
-      i++;
+      gtk_combo_box_text_append (GTK_COMBO_BOX_TEXT (vis->priv->icon_combo), theme, theme);
     }
   g_hash_table_destroy (t);
 
-  gtk_combo_box_set_active (GTK_COMBO_BOX (vis->priv->icon_combo), pos);
-}
-
-static void
-icons_changed (GtkComboBox        *c,
-               GtkInspectorVisual *vis)
-{
-  gchar *theme = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT (c));
-  g_object_set (gtk_settings_get_default (), "gtk-icon-theme-name", theme, NULL);
-  g_free (theme);
+  g_object_bind_property (gtk_settings_get_default (), "gtk-icon-theme-name",
+                          vis->priv->icon_combo, "active-id",
+                          G_BINDING_BIDIRECTIONAL | G_BINDING_SYNC_CREATE);
 }
 
 static void
@@ -525,8 +492,6 @@ gtk_inspector_visual_class_init (GtkInspectorVisualClass *klass)
   gtk_widget_class_bind_template_callback (widget_class, direction_changed);
   gtk_widget_class_bind_template_callback (widget_class, baselines_activate);
   gtk_widget_class_bind_template_callback (widget_class, pixelcache_activate);
-  gtk_widget_class_bind_template_callback (widget_class, theme_changed);
-  gtk_widget_class_bind_template_callback (widget_class, icons_changed);
 }
 
 // vim: set et sw=2 ts=2:
