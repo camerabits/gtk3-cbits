@@ -119,7 +119,9 @@ static CFRunLoopRef main_thread_run_loop;
  * to provide this functionality ourself. We free and replace the
  * auto-release pool in our sources prepare() function.
  */
+#ifdef GDK_QUARTZ_ENABLE_PERSISTENT_AUTORELEASE_POOL
 static NSAutoreleasePool *autorelease_pool;
+#endif
 
 /* Flag when we've called nextEventMatchingMask ourself; this triggers
  * a run loop iteration, so we need to detect that and avoid triggering
@@ -636,6 +638,7 @@ gdk_event_prepare (GSource *source,
    * to deallocated memory because autorelease_pool is static and releasing a
    * pool will cause all pools allocated inside of it to be released as well.
    */
+#ifdef GDK_QUARTZ_ENABLE_PERSISTENT_AUTORELEASE_POOL
   if (current_loop_level == 0 && g_main_depth() == 0 && getting_events == 0)
     {
       if (autorelease_pool)
@@ -643,6 +646,7 @@ gdk_event_prepare (GSource *source,
 
       autorelease_pool = [[NSAutoreleasePool alloc] init];
     }
+#endif
 
   *timeout = -1;
 
@@ -1049,12 +1053,14 @@ _gdk_quartz_event_loop_init (void)
 				     
   CFRunLoopAddObserver (main_thread_run_loop, observer, kCFRunLoopCommonModes);
   
+#ifdef GDK_QUARTZ_ENABLE_PERSISTENT_AUTORELEASE_POOL
   /* Initialize our autorelease pool */
-
   autorelease_pool = [[NSAutoreleasePool alloc] init];
+#endif
 }
 
 /* %%CBITS{ */
+#ifdef GDK_QUARTZ_ENABLE_PERSISTENT_AUTORELEASE_POOL
 extern void gdk_osx_drain_autorelease_pool ();
 void gdk_osx_drain_autorelease_pool ()
 {
@@ -1071,4 +1077,5 @@ void gdk_osx_drain_autorelease_pool ()
 		 (long)current_loop_level, (long)g_main_depth(), (long)getting_events);
     }
 }
+#endif
 /* }%%CBITS */
