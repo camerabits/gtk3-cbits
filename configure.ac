@@ -1870,16 +1870,6 @@ testsuite/css/parser/Makefile
 testsuite/gdk/Makefile
 testsuite/gtk/Makefile
 testsuite/reftests/Makefile
-docs/Makefile
-docs/reference/Makefile
-docs/reference/gdk/Makefile
-docs/reference/gdk/version.xml
-docs/reference/gtk/Makefile
-docs/reference/gtk/gtk3.types
-docs/reference/gtk/version.xml
-docs/reference/libgail-util/Makefile
-docs/reference/libgail-util/version.xml
-docs/tools/Makefile
 build/Makefile
 build/gtk-introspection-msvc.mak
 build/win32/Makefile
