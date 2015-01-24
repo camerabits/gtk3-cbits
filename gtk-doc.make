@@ -1,1 +1,0 @@
-/usr/local/homebrew-native/Cellar/gtk-doc/1.20/share/gtk-doc/data/gtk-doc.notmpl.make

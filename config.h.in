@@ -9,9 +9,6 @@
 /* Disable deprecation warnings from glib */
 #undef GLIB_DISABLE_DEPRECATION_WARNINGS
 
-/* Define if debugging is enabled */
-#undef GTK_COMPILED_WITH_DEBUGGING
-
 /* Define the location where the catalogs will be installed */
 #undef GTK_LOCALEDIR
 
