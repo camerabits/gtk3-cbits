@@ -212,6 +212,8 @@ apply_system_font (GtkInspectorCssEditor *ce)
   GSettingsSchemaSource *source;
   GSettingsSchema *schema;
   GSettings *s;
+  gchar *font_name;
+  PangoFontDescription *font_desc;
 
   source = g_settings_schema_source_get_default ();
   schema = g_settings_schema_source_lookup (source, "org.gnome.desktop.interace", FALSE);
@@ -220,8 +222,8 @@ apply_system_font (GtkInspectorCssEditor *ce)
 
   s = g_settings_new_full (schema, NULL, NULL);
 
-  gchar *font_name = g_settings_get_string (s, "monospace-font-name");
-  PangoFontDescription *font_desc = pango_font_description_from_string (font_name);
+  font_name = g_settings_get_string (s, "monospace-font-name");
+  font_desc = pango_font_description_from_string (font_name);
 
   gtk_widget_override_font (ce->priv->view, font_desc);
 
