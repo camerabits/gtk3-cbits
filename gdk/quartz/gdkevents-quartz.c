@@ -1718,3 +1718,40 @@ _gdk_quartz_display_event_data_free (GdkDisplay *display,
       priv->windowing_data = NULL;
     }
 }
+
+/* %%CBITS{ */
+gboolean
+gdk_osx_handle_cocoa_event (NSEvent * nsevent)
+{
+  gboolean handled = false;
+
+  if (nsevent)
+    {
+      GdkEvent *event;
+      GList *node;
+
+      event = gdk_event_new (GDK_NOTHING);
+
+      event->any.window = NULL;
+      event->any.send_event = FALSE;
+
+      ((GdkEventPrivate *)event)->flags |= GDK_EVENT_PENDING;
+
+      node = _gdk_event_queue_append (_gdk_display, event);
+
+      if (gdk_event_translate (event, nsevent))
+        {
+	  ((GdkEventPrivate *)event)->flags &= ~GDK_EVENT_PENDING;
+          _gdk_windowing_got_event (_gdk_display, node, event, 0);
+          handled = true;
+        }
+      else
+        {
+	  _gdk_event_queue_remove_link (_gdk_display, node);
+	  g_list_free_1 (node);
+	  gdk_event_free (event);
+        }
+    }
+  return handled;
+}
+/* }%%CBITS */

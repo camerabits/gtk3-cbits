@@ -622,12 +622,12 @@ gdk_event_prepare (GSource *source,
   gdk_threads_enter ();
 
   /* The prepare stage is the stage before the main loop starts polling
-   * and dispatching events. The autorelease poll is drained here for
+   * and dispatching events. The autorelease pool is drained here for
    * the preceding main loop iteration or, in case of the first iteration,
    * for the operations carried out between event loop initialization and
    * this first iteration.
    *
-   * The autorelease poll must only be drained when the following conditions
+   * The autorelease pool must only be drained when the following conditions
    * apply:
    *  - We are at the base CFRunLoop level (indicated by current_loop_level),
    *  - We are at the base g_main_loop level (indicated by
@@ -688,7 +688,9 @@ gdk_event_dispatch (GSource     *source,
 
   gdk_threads_enter ();
 
+#ifdef GDK_QUARTZ_INTERNAL_EVENTS_IMPL
   _gdk_quartz_display_queue_events (_gdk_display);
+#endif
 
   event = _gdk_event_unqueue (_gdk_display);
 
@@ -1023,8 +1025,9 @@ void
 _gdk_quartz_event_loop_init (void)
 {
   GSource *source;
+#ifdef GDK_QUARTZ_INTERNAL_EVENTS_IMPL
   CFRunLoopObserverRef observer;
-
+#endif
   /* Hook into the GLib main loop */
 
   event_poll_fd.events = G_IO_IN;
@@ -1037,6 +1040,7 @@ _gdk_quartz_event_loop_init (void)
   g_source_set_can_recurse (source, TRUE);
   g_source_attach (source, NULL);
 
+#ifdef GDK_QUARTZ_INTERNAL_EVENTS_IMPL
   old_poll_func = g_main_context_get_poll_func (NULL);
   g_main_context_set_poll_func (NULL, poll_func);
   
@@ -1052,6 +1056,7 @@ _gdk_quartz_event_loop_init (void)
 				      NULL);
 				     
   CFRunLoopAddObserver (main_thread_run_loop, observer, kCFRunLoopCommonModes);
+#endif
   
 #ifdef GDK_QUARTZ_ENABLE_PERSISTENT_AUTORELEASE_POOL
   /* Initialize our autorelease pool */
