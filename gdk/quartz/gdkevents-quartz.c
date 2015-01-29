@@ -1720,10 +1720,15 @@ _gdk_quartz_display_event_data_free (GdkDisplay *display,
 }
 
 /* %%CBITS{ */
+GDK_AVAILABLE_IN_ALL gboolean	gdk_osx_handle_cocoa_event (NSEvent * nsevent);
+
 gboolean
 gdk_osx_handle_cocoa_event (NSEvent * nsevent)
 {
   gboolean handled = false;
+
+  if (_gdk_display == NULL)
+    return false;
 
   if (nsevent)
     {
