@@ -1284,8 +1284,9 @@ gdk_event_translate (GdkEvent *event,
                      NSEvent  *nsevent)
 {
   NSEventType event_type;
-  NSWindow *nswindow;
-  GdkWindow *window;
+  NSWindow *nswindow = nil;
+  GdkQuartzNSWindow * gdkQuartzWindow = nil;
+  GdkWindow *window = NULL;
   int x, y;
   int x_root, y_root;
   gboolean return_val;
@@ -1323,9 +1324,32 @@ gdk_event_translate (GdkEvent *event,
 
   nswindow = [nsevent window];
 
-  /* Ignore events for windows not created by GDK. */
-  if (nswindow && ![[nswindow contentView] isKindOfClass:[GdkQuartzView class]])
-    return FALSE;
+  /* Ignore events for views not created by GDK. */
+  if (nswindow)
+    {
+      if ([nswindow isKindOfClass:[GdkQuartzNSWindow class]])
+        gdkQuartzWindow = (GdkQuartzNSWindow *)nswindow;
+      /* Check view hierarchy for event for any GdkQuartzViews */
+      NSView * viewHit = [[nswindow contentView] hitTest:[nsevent locationInWindow]];
+ 
+      if (![viewHit isKindOfClass:[GdkQuartzView class]])
+        {
+          NSView * upView = [viewHit superView];
+          gboolean foundSuitableView = FALSE;
+
+          /* check back up the hierarchy */
+          while (upView != nil)
+            {
+              if ([upView isKindOfClass::[GdkQuartzView class]])
+                {
+                  foundSuitableView = TRUE;
+                  break;
+                }
+            }
+          if (!foundSuitableView)
+            return FALSE;
+        }
+    }
 
   /* Ignore events for ones with no windows */
   if (!nswindow)
@@ -1354,7 +1378,7 @@ gdk_event_translate (GdkEvent *event,
    * dragged. This is a workaround for the window getting events for
    * the window title.
    */
-  if ([(GdkQuartzNSWindow *)nswindow isInMove])
+  if (gdkQuartzWindow != nil && [gdkQuartzWindow isInMove])
     {
       _gdk_quartz_events_break_all_grabs (get_time_from_ns_event (nsevent));
       return FALSE;
@@ -1363,7 +1387,7 @@ gdk_event_translate (GdkEvent *event,
   /* Also when in a manual resize or move , we ignore events so that
    * these are pushed to GdkQuartzNSWindow's sendEvent handler.
    */
-  if ([(GdkQuartzNSWindow *)nswindow isInManualResizeOrMove])
+  if (gdkQuartzWindow != nil && [gdkQuartzWindow isInManualResizeOrMove])
     return FALSE;
 
   /* Find the right GDK window to send the event to, taking grabs and
