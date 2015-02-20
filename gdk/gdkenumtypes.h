@@ -1,12 +1,12 @@
 
 /* Generated data (by glib-mkenums) */
 
+#ifndef __GDK_ENUM_TYPES_H__
+#define __GDK_ENUM_TYPES_H__
+
 #if !defined (__GDK_H_INSIDE__) && !defined (GDK_COMPILATION)
 #error "Only <gdk/gdk.h> can be included directly."
 #endif
-
-#ifndef __GDK_ENUM_TYPES_H__
-#define __GDK_ENUM_TYPES_H__
 
 #include <glib-object.h>
 #include <gdk/gdkversionmacros.h>

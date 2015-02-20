@@ -358,7 +358,7 @@ am__libgtk_3_la_SOURCES_DIST = a11y/gtkaccessibility.c \
 	gtkapplication-dbus.c gtkwin32embed.c gtkwin32embedwidget.c \
 	gtkmountoperation-stub.c gtksearchenginequartz.c \
 	gtkapplication-quartz.c gtkapplication-quartz-menu.c \
-	gtkquartz.c
+	gtkquartzembedwidget.c gtkquartz.c
 am__objects_1 = libgtk_3_la-gtkaccessibility.lo \
 	libgtk_3_la-gtkaccessibilitymisc.lo \
 	libgtk_3_la-gtkaccessibilityutil.lo \
@@ -671,7 +671,7 @@ am__objects_17 = libgtk_3_la-gtksearchenginequartz.lo \
 	libgtk_3_la-gtkmountoperation-stub.lo \
 	libgtk_3_la-gtkapplication-quartz.lo \
 	libgtk_3_la-gtkapplication-quartz-menu.lo \
-	libgtk_3_la-gtkquartz.lo
+	libgtk_3_la-gtkquartzembedwidget.lo libgtk_3_la-gtkquartz.lo
 @USE_QUARTZ_TRUE@am__objects_18 = $(am__objects_17)
 am__objects_19 = libgtk_3_la-gtkmountoperation-stub.lo
 @USE_QUARTZ_FALSE@@USE_WIN32_FALSE@@USE_X11_FALSE@am__objects_20 = $(am__objects_19)
@@ -1093,12 +1093,12 @@ EXTRA_DIST = $(gtk_all_private_h_sources) $(gtk_extra_sources) \
 	$(resource_files) $(adwaita_sources) $(Raleigh_sources) \
 	$(win32_theme_sources) $(gsettings_SCHEMAS) \
 	$(template_headers) libgtk3.manifest.in gtk-win32.rc.in \
-	gtkwin32embed.h gtkwin32embedwidget.h gtkwin32embedwidget.c \
-	gtkprint-win32.h gtkprint-win32.c gtksearchenginequartz.h \
-	gtkdbusinterfaces.xml gtk-keys.css.default gtk-keys.css.emacs \
-	gtk-keys.css.mac makefile.msc makefile.msc.in \
-	gtktypebuiltins.c.template gtktypebuiltins.h.template \
-	gtkprivatetypebuiltins.c.template \
+	gtkquartzembedwidget.h gtkquartzembedwidget.c gtkwin32embed.h \
+	gtkwin32embedwidget.h gtkwin32embedwidget.c gtkprint-win32.h \
+	gtkprint-win32.c gtksearchenginequartz.h gtkdbusinterfaces.xml \
+	gtk-keys.css.default gtk-keys.css.emacs gtk-keys.css.mac \
+	makefile.msc makefile.msc.in gtktypebuiltins.c.template \
+	gtktypebuiltins.h.template gtkprivatetypebuiltins.c.template \
 	gtkprivatetypebuiltins.h.template
 TEST_PROGS = 
 
@@ -2091,6 +2091,7 @@ gtk_use_quartz_c_sources = \
 	gtkmountoperation-stub.c \
 	gtkapplication-quartz.c \
 	gtkapplication-quartz-menu.c \
+	gtkquartzembedwidget.c	\
 	gtkquartz.c
 
 gtk_use_stub_c_sources = \
@@ -2107,6 +2108,7 @@ gtk_use_win32_private_h_sources = \
 
 gtk_use_quartz_private_h_sources = \
 	gtksearchenginequartz.h	\
+	gtkquartzembedwidget.h \
 	gtkquartz.h
 
 @USE_QUARTZ_TRUE@libgtk_3_la_CFLAGS = "-xobjective-c"
@@ -2785,6 +2787,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkprogressbar.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkprogressbaraccessible.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkquartz.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkquartzembedwidget.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkquery.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkradioaction.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgtk_3_la-gtkradiobutton.Plo@am__quote@
@@ -6000,6 +6003,13 @@ libgtk_3_la-gtkapplication-quartz-menu.lo: gtkapplication-quartz-menu.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='gtkapplication-quartz-menu.c' object='libgtk_3_la-gtkapplication-quartz-menu.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtk_3_la_CFLAGS) $(CFLAGS) -c -o libgtk_3_la-gtkapplication-quartz-menu.lo `test -f 'gtkapplication-quartz-menu.c' || echo '$(srcdir)/'`gtkapplication-quartz-menu.c
+
+libgtk_3_la-gtkquartzembedwidget.lo: gtkquartzembedwidget.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtk_3_la_CFLAGS) $(CFLAGS) -MT libgtk_3_la-gtkquartzembedwidget.lo -MD -MP -MF $(DEPDIR)/libgtk_3_la-gtkquartzembedwidget.Tpo -c -o libgtk_3_la-gtkquartzembedwidget.lo `test -f 'gtkquartzembedwidget.c' || echo '$(srcdir)/'`gtkquartzembedwidget.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgtk_3_la-gtkquartzembedwidget.Tpo $(DEPDIR)/libgtk_3_la-gtkquartzembedwidget.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='gtkquartzembedwidget.c' object='libgtk_3_la-gtkquartzembedwidget.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtk_3_la_CFLAGS) $(CFLAGS) -c -o libgtk_3_la-gtkquartzembedwidget.lo `test -f 'gtkquartzembedwidget.c' || echo '$(srcdir)/'`gtkquartzembedwidget.c
 
 libgtk_3_la-gtkquartz.lo: gtkquartz.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgtk_3_la_CFLAGS) $(CFLAGS) -MT libgtk_3_la-gtkquartz.lo -MD -MP -MF $(DEPDIR)/libgtk_3_la-gtkquartz.Tpo -c -o libgtk_3_la-gtkquartz.lo `test -f 'gtkquartz.c' || echo '$(srcdir)/'`gtkquartz.c
