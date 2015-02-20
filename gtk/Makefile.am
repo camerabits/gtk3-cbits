@@ -1164,6 +1164,7 @@ gtk_use_quartz_c_sources = 	\
 	gtkmountoperation-stub.c \
 	gtkapplication-quartz.c \
 	gtkapplication-quartz-menu.c \
+	gtkquartzembedwidget.c	\
 	gtkquartz.c
 gtk_use_stub_c_sources = 	\
 	gtkmountoperation-stub.c
@@ -1201,6 +1202,7 @@ endif
 
 gtk_use_quartz_private_h_sources = 	\
 	gtksearchenginequartz.h	\
+	gtkquartzembedwidget.h \
 	gtkquartz.h
 if USE_QUARTZ
 gtk_c_sources += $(gtk_use_quartz_c_sources)
@@ -1723,6 +1725,8 @@ EXTRA_DIST +=                   \
 	$(template_headers)	\
 	libgtk3.manifest.in	\
 	gtk-win32.rc.in		\
+	gtkquartzembedwidget.h	\
+	gtkquartzembedwidget.c	\
 	gtkwin32embed.h		\
 	gtkwin32embedwidget.h	\
 	gtkwin32embedwidget.c	\

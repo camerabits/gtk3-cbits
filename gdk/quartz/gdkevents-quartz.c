@@ -1340,7 +1340,7 @@ gdk_event_translate (GdkEvent *event,
           /* check back up the hierarchy */
           while (upView != nil)
             {
-              if ([upView isKindOfClass::[GdkQuartzView class]])
+              if ([upView isKindOfClass:[GdkQuartzView class]])
                 {
                   foundSuitableView = TRUE;
                   break;
