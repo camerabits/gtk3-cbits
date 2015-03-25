@@ -22,6 +22,7 @@
 #include <gdk/gdk.h>
 #include <gdk/gdkdeviceprivate.h>
 #include <gdk/gdkdisplayprivate.h>
+#include <gdk/gdkvisualprivate.h>
 
 #include "gdkwindowimpl.h"
 #include "gdkprivate-quartz.h"
@@ -830,6 +831,95 @@ get_nsscreen_for_point (gint x, gint y)
   return screen;
 }
 
+GdkWindow *
+gdk_quartz_window_foreign_new_for_display (GdkDisplay      *display,
+                                           void            *anid)
+{
+  GdkWindow *window = NULL;
+  GdkWindowImplQuartz *impl = nil;
+  GdkQuartzView *embed_view = nil;
+  NSObject * nsobj = (NSObject *)anid;
+  NSView * q_view = nil;
+  NSWindow * q_window = nil;
+  NSRect rect;
+  gboolean is_visible = false;
+  gboolean is_toplevel = false;
+
+  g_return_val_if_fail (display == _gdk_display, NULL);
+
+  GDK_QUARTZ_ALLOC_POOL;
+
+  if ([nsobj isKindOfClass:[NSView class]])
+    {
+      q_view = (NSView *) nsobj;
+      rect = [q_view frame];
+      is_visible = ![q_view isHidden];
+    }
+  else if ([nsobj isKindOfClass:[NSWindow class]])
+    {
+      q_window = (NSWindow *) nsobj;
+      rect = [[q_window contentView] frame];
+      is_visible = [q_window isVisible];
+      if ([q_window isKindOfClass:[NSPanel class]])
+        is_toplevel = [(NSPanel *) q_window isFloatingPanel];
+    }
+  else goto out;  /* unsupported type */
+  
+  window = _gdk_display_create_window (display);
+  window->visual = gdk_screen_get_system_visual (_gdk_screen);
+  window->impl = g_object_new (GDK_TYPE_WINDOW_IMPL_QUARTZ, NULL);
+  window->impl_window = window;
+  impl = GDK_WINDOW_IMPL_QUARTZ (window->impl);
+  impl->wrapper = window;
+  
+  window->parent = _gdk_root;
+  
+  window->parent->children = g_list_prepend (window->parent->children, window);
+  window->parent->impl_window->native_children =
+    g_list_prepend (window->parent->impl_window->native_children, window);
+
+  window->x = rect.origin.x;
+  window->y = rect.origin.y;
+  window->width = rect.size.width;
+  window->height = rect.size.height;
+  window->window_type = GDK_WINDOW_FOREIGN;
+  window->destroyed = FALSE;
+  window->event_mask = GDK_ALL_EVENTS_MASK;
+  if (is_visible)
+    window->state &= (~GDK_WINDOW_STATE_WITHDRAWN);
+  else
+    window->state |= GDK_WINDOW_STATE_WITHDRAWN;
+  if (is_toplevel)
+    window->state |= GDK_WINDOW_STATE_ABOVE;
+  else
+    window->state &= (~GDK_WINDOW_STATE_ABOVE);
+  window->state &= (~GDK_WINDOW_STATE_BELOW);
+  window->viewable = TRUE;
+
+  window->depth = gdk_visual_get_system ()->depth;
+  if (q_window != nil)
+    impl->toplevel = q_window;
+  else
+    impl->toplevel = [q_view window];
+  impl->view = [[GdkQuartzView alloc] initWithFrame:rect];
+  [impl->view setGdkWindow:window];
+  if (q_window = nil)
+    [impl->toplevel setContentView:impl->view];
+  else
+    [q_view addSubview:impl->view];
+  [impl->view release];
+
+  g_object_ref (window);
+
+  GDK_NOTE (MISC, g_print ("gdk_quartz_window_foreign_new_for_display: %p:@%+d%+d\n",
+			   anid,
+			   window->x, window->y));
+out:
+  GDK_QUARTZ_RELEASE_POOL;
+
+  return window;
+}
+
 void
 _gdk_quartz_display_create_window_impl (GdkDisplay    *display,
                                         GdkWindow     *window,
@@ -1069,7 +1159,21 @@ gdk_quartz_window_destroy (GdkWindow *window,
 static void
 gdk_quartz_window_destroy_foreign (GdkWindow *window)
 {
-  /* Foreign windows aren't supported in OSX. */
+  GdkWindowImplQuartz *impl;
+  GdkWindow *parent;
+
+  impl = GDK_WINDOW_IMPL_QUARTZ (window->impl);
+
+  /* It's somebody else's window, but in our hierarchy, so reparent it
+   * to the desktop, and then try to close it.
+   */
+  gdk_window_hide (window);
+  gdk_window_reparent (window, NULL, 0, 0);
+  
+  GDK_QUARTZ_ALLOC_POOL;
+  if (impl->toplevel)
+    [impl->toplevel performClose:nil];
+  GDK_QUARTZ_RELEASE_POOL;
 }
 
 /* FIXME: This might be possible to simplify with client-side windows. Also
