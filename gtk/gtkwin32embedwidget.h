@@ -65,6 +65,7 @@ struct _GtkWin32EmbedWidgetClass
 
 
 GType      gtk_win32_embed_widget_get_type (void) G_GNUC_CONST;
+GDK_AVAILABLE_IN_ALL  // %%CBITS: we want to use the win32 embed widget externally
 GtkWidget* _gtk_win32_embed_widget_new              (HWND parent);
 BOOL       _gtk_win32_embed_widget_dialog_procedure (GtkWin32EmbedWidget *embed_widget,
 						     HWND wnd, UINT message, WPARAM wparam, LPARAM lparam);
