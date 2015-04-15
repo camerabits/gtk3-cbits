@@ -1,5 +1,6 @@
 /* GTK - The GIMP Toolkit
  * Copyright (C) 1995-1997 Peter Mattis, Spencer Kimball and Josh MacDonald
+ * Copyright (C) 2015 Kirk A. Baker/Bill W. Kelly, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,6 +29,7 @@
 #include "gtkmarshalers.h"
 #include "gtksizerequest.h"
 #include "gtkquartzembedwidget.h"
+#include "gtkdebug.h"
 #include "gtkintl.h"
 #include "gtkprivate.h"
 #include "gtkwindowprivate.h"
@@ -95,7 +97,8 @@ _gtk_quartz_embed_widget_new (void *parent)
   embed_widget->parent_window =
       gdk_quartz_window_foreign_new_for_display (gdk_display_get_default (),
 						 parent);
-  
+  gtk_widget_register_window (embed_widget, embed_widget->parent_window);
+
   return GTK_WIDGET (embed_widget);
 }
 
@@ -171,6 +174,9 @@ gtk_quartz_embed_widget_realize (GtkWidget *widget)
 
   gdk_window = gdk_window_new (embed_widget->parent_window,
                                &attributes, attributes_mask);
+
+  GTK_NOTE (MISC,
+	    g_print ("gtk_quartz_embed_widget_realize() window: %p for widget: %p\n", gdk_window, widget));
   gtk_widget_set_window (widget, gdk_window);
   gtk_widget_register_window (widget, gdk_window);
 

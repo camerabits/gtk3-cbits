@@ -3,6 +3,7 @@
  * Copyright (C) 1995-1997 Peter Mattis, Spencer Kimball and Josh MacDonald
  * Copyright (C) 1998-2002 Tor Lillqvist
  * Copyright (C) 2005 Imendio AB
+ * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -175,13 +176,15 @@ _gdk_quartz_display_text_property_to_utf8_list (GdkDisplay    *display,
 GdkAtom
 gdk_quartz_pasteboard_type_to_atom_libgtk_only (NSString *type)
 {
-  if ([type isEqualToString:NSStringPboardType])
+  if ([type isEqualToString:kUTTypeUTF8PlainText])
     return gdk_atom_intern_static_string ("UTF8_STRING");
-  else if ([type isEqualToString:NSTIFFPboardType])
+  else if ([type isEqualToString:NSPasteboardTypeTIFF])
     return gdk_atom_intern_static_string ("image/tiff");
-  else if ([type isEqualToString:NSColorPboardType])
+  else if ([type isEqualToString:@"org.gnome.compound-text"])
+    return gdk_atom_intern_static_string ("COMPOUND_TEXT");
+  else if ([type isEqualToString:NSPasteboardTypeColor])
     return gdk_atom_intern_static_string ("application/x-color");
-  else if ([type isEqualToString:NSURLPboardType])
+  else if ([type isEqualToString:kUTTypeURL])
     return gdk_atom_intern_static_string ("text/uri-list");
   else
     return gdk_atom_intern ([type UTF8String], FALSE);
@@ -191,13 +194,25 @@ NSString *
 gdk_quartz_target_to_pasteboard_type_libgtk_only (const char *target)
 {
   if (strcmp (target, "UTF8_STRING") == 0)
-    return NSStringPboardType;
+    return kUTTypeUTF8PlainText;
+  else if (strcmp (target, "text/plain;charset=utf-8") == 0)
+    return kUTTypeUTF8PlainText;
+  else if (strcmp (target, "text/plain;charset=ASCII") == 0)
+    return kUTTypePlainText;
+  else if (strcmp (target, "text/plain") == 0)
+    return kUTTypePlainText;
+  else if (strcmp (target, "TEXT") == 0)
+    return kUTTypePlainText;
+  else if (strcmp (target, "STRING") == 0)
+    return kUTTypePlainText;
+  else if (strcmp (target, "COMPOUND_TEXT") == 0)
+    return @"org.gnome.compound-text";
   else if (strcmp (target, "image/tiff") == 0)
-    return NSTIFFPboardType;
+    return NSPasteboardTypeTIFF;
   else if (strcmp (target, "application/x-color") == 0)
-    return NSColorPboardType;
+    return NSPasteboardTypeColor;
   else if (strcmp (target, "text/uri-list") == 0)
-    return NSURLPboardType;
+    return kUTTypeURL;
   else
     return [NSString stringWithUTF8String:target];
 }

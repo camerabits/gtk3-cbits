@@ -55,9 +55,6 @@ struct _GdkWindowImplQuartz
 
   GdkWindow *transient_for;
 
-  /* Sorted by z-order */
-  GList *sorted_children;
-
   cairo_region_t *needs_display_region;
 
   cairo_surface_t *cairo_surface;
@@ -106,6 +103,7 @@ struct _GdkRootWindowImplQuartzClass
 };
 
 GType _gdk_root_window_impl_quartz_get_type (void);
+GdkWindow * find_gdk_window_containing_nspoint (NSPoint pt, gboolean get_toplevel);
 
 
 G_END_DECLS

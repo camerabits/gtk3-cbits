@@ -1,6 +1,7 @@
 /* GdkQuartzWindow.m
  *
  * Copyright (C) 2005-2007 Imendio AB
+ * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,7 +19,6 @@
 
 #import "GdkQuartzNSWindow.h"
 #include "gdkquartzwindow.h"
-#include "gdkdnd-quartz.h"
 #include "gdkprivate-quartz.h"
 
 @implementation GdkQuartzNSWindow
@@ -141,38 +141,6 @@
   return inMove;
 }
 
--(void)checkSendEnterNotify
-{
-  GdkWindow *window = [[self contentView] gdkWindow];
-  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ (window->impl);
-
-  /* When a new window has been created, and the mouse
-   * is in the window area, we will not receive an NSMouseEntered
-   * event.  Therefore, we synthesize an enter notify event manually.
-   */
-  if (!initialPositionKnown)
-    {
-      initialPositionKnown = YES;
-
-      if (NSPointInRect ([NSEvent mouseLocation], [self frame]))
-        {
-          NSEvent *event;
-
-          event = [NSEvent enterExitEventWithType: NSMouseEntered
-                                         location: [self mouseLocationOutsideOfEventStream]
-                                    modifierFlags: 0
-                                        timestamp: [[NSApp currentEvent] timestamp]
-                                     windowNumber: [impl->toplevel windowNumber]
-                                          context: NULL
-                                      eventNumber: 0
-                                   trackingNumber: [impl->view trackingRect]
-                                         userData: nil];
-
-          [NSApp postEvent:event atStart:NO];
-        }
-    }
-}
-
 -(void)windowDidMove:(NSNotification *)aNotification
 {
   GdkWindow *window = [[self contentView] gdkWindow];
@@ -189,8 +157,6 @@
   event->configure.height = window->height;
 
   _gdk_event_queue_append (gdk_display_get_default (), event);
-
-  [self checkSendEnterNotify];
 }
 
 -(void)windowDidResize:(NSNotification *)aNotification
@@ -220,8 +186,6 @@
   event->configure.height = window->height;
 
   _gdk_event_queue_append (gdk_display_get_default (), event);
-
-  [self checkSendEnterNotify];
 }
 
 -(id)initWithContentRect:(NSRect)contentRect styleMask:(NSUInteger)styleMask backing:(NSBackingStoreType)backingType defer:(BOOL)flag screen:(NSScreen *)screen
@@ -319,8 +283,6 @@
     [impl->toplevel orderFront:nil];
 
   inShowOrHide = NO;
-
-  [self checkSendEnterNotify];
 }
 
 - (void)hide
@@ -443,215 +405,6 @@
   initialResizeLocation = [self convertBaseToScreen:[self mouseLocationOutsideOfEventStream]];
   initialResizeLocation.x -= initialResizeFrame.origin.x;
   initialResizeLocation.y -= initialResizeFrame.origin.y;
-}
-
-
-
-static GdkDragContext *current_context = NULL;
-
-static GdkDragAction
-drag_operation_to_drag_action (NSDragOperation operation)
-{
-  GdkDragAction result = 0;
-
-  /* GDK and Quartz drag operations do not map 1:1.
-   * This mapping represents about the best that we
-   * can come up.
-   *
-   * Note that NSDragOperationPrivate and GDK_ACTION_PRIVATE
-   * have almost opposite meanings: the GDK one means that the
-   * destination is solely responsible for the action; the Quartz
-   * one means that the source and destination will agree
-   * privately on the action. NSOperationGeneric is close in meaning
-   * to GDK_ACTION_PRIVATE but there is a problem: it will be
-   * sent for any ordinary drag, and likely not understood
-   * by any intra-widget drag (since the source & dest are the
-   * same).
-   */
-
-  if (operation & NSDragOperationGeneric)
-    result |= GDK_ACTION_MOVE;
-  if (operation & NSDragOperationCopy)
-    result |= GDK_ACTION_COPY;
-  if (operation & NSDragOperationMove)
-    result |= GDK_ACTION_MOVE;
-  if (operation & NSDragOperationLink)
-    result |= GDK_ACTION_LINK;
-
-  return result;
-}
-
-static NSDragOperation
-drag_action_to_drag_operation (GdkDragAction action)
-{
-  NSDragOperation result = 0;
-
-  if (action & GDK_ACTION_COPY)
-    result |= NSDragOperationCopy;
-  if (action & GDK_ACTION_LINK)
-    result |= NSDragOperationLink;
-  if (action & GDK_ACTION_MOVE)
-    result |= NSDragOperationMove;
-
-  return result;
-}
-
-static void
-update_context_from_dragging_info (id <NSDraggingInfo> sender)
-{
-  g_assert (current_context != NULL);
-
-  GDK_QUARTZ_DRAG_CONTEXT (current_context)->dragging_info = sender;
-  current_context->suggested_action = drag_operation_to_drag_action ([sender draggingSourceOperationMask]);
-  current_context->actions = current_context->suggested_action;
-}
-
-- (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
-{
-  GdkDeviceManager *device_manager;
-  GdkEvent *event;
-  GdkWindow *window;
-
-  if (current_context)
-    g_object_unref (current_context);
-  
-  current_context = g_object_new (GDK_TYPE_QUARTZ_DRAG_CONTEXT, NULL);
-  update_context_from_dragging_info (sender);
-
-  window = [[self contentView] gdkWindow];
-
-  device_manager = gdk_display_get_device_manager (gdk_display_get_default ());
-  gdk_drag_context_set_device (current_context,
-                               gdk_device_manager_get_client_pointer (device_manager));
-
-  event = gdk_event_new (GDK_DRAG_ENTER);
-  event->dnd.window = g_object_ref (window);
-  event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
-  event->dnd.time = GDK_CURRENT_TIME;
-
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
-
-  _gdk_event_emit (event);
-
-  gdk_event_free (event);
-
-  return NSDragOperationNone;
-}
-
-- (void)draggingEnded:(id <NSDraggingInfo>)sender
-{
-  /* leave a note for the source about what action was taken */
-  if (_gdk_quartz_drag_source_context && current_context)
-   _gdk_quartz_drag_source_context->action = current_context->action;
-
-  if (current_context)
-    g_object_unref (current_context);
-  current_context = NULL;
-}
-
-- (void)draggingExited:(id <NSDraggingInfo>)sender
-{
-  GdkEvent *event;
-  
-  event = gdk_event_new (GDK_DRAG_LEAVE);
-  event->dnd.window = g_object_ref ([[self contentView] gdkWindow]);
-  event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
-  event->dnd.time = GDK_CURRENT_TIME;
-
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
-
-  _gdk_event_emit (event);
-
-  gdk_event_free (event);
-  
-  g_object_unref (current_context);
-  current_context = NULL;
-}
-
-- (NSDragOperation)draggingUpdated:(id <NSDraggingInfo>)sender
-{
-  NSPoint point = [sender draggingLocation];
-  NSPoint screen_point = [self convertBaseToScreen:point];
-  GdkEvent *event;
-  int gx, gy;
-
-  update_context_from_dragging_info (sender);
-  _gdk_quartz_window_nspoint_to_gdk_xy (screen_point, &gx, &gy);
-
-  event = gdk_event_new (GDK_DRAG_MOTION);
-  event->dnd.window = g_object_ref ([[self contentView] gdkWindow]);
-  event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
-  event->dnd.time = GDK_CURRENT_TIME;
-  event->dnd.x_root = gx;
-  event->dnd.y_root = gy;
-
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
-
-  _gdk_event_emit (event);
-
-  gdk_event_free (event);
-
-  return drag_action_to_drag_operation (current_context->action);
-}
-
-- (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
-{
-  NSPoint point = [sender draggingLocation];
-  NSPoint screen_point = [self convertBaseToScreen:point];
-  GdkEvent *event;
-  int gy, gx;
-
-  update_context_from_dragging_info (sender);
-  _gdk_quartz_window_nspoint_to_gdk_xy (screen_point, &gx, &gy);
-
-  event = gdk_event_new (GDK_DROP_START);
-  event->dnd.window = g_object_ref ([[self contentView] gdkWindow]);
-  event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
-  event->dnd.time = GDK_CURRENT_TIME;
-  event->dnd.x_root = gx;
-  event->dnd.y_root = gy;
-
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
-
-  _gdk_event_emit (event);
-
-  gdk_event_free (event);
-
-  g_object_unref (current_context);
-  current_context = NULL;
-
-  return YES;
-}
-
-- (BOOL)wantsPeriodicDraggingUpdates
-{
-  return NO;
-}
-
-- (void)draggedImage:(NSImage *)anImage endedAt:(NSPoint)aPoint operation:(NSDragOperation)operation
-{
-  GdkEvent *event;
-
-  g_assert (_gdk_quartz_drag_source_context != NULL);
-
-  event = gdk_event_new (GDK_DROP_FINISHED);
-  event->dnd.window = g_object_ref ([[self contentView] gdkWindow]);
-  event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (_gdk_quartz_drag_source_context);
-
-  gdk_event_set_device (event,
-                        gdk_drag_context_get_device (_gdk_quartz_drag_source_context));
-
-  _gdk_event_emit (event);
-
-  gdk_event_free (event);
-
-  g_object_unref (_gdk_quartz_drag_source_context);
-  _gdk_quartz_drag_source_context = NULL;
 }
 
 #ifdef AVAILABLE_MAC_OS_X_VERSION_10_7_AND_LATER

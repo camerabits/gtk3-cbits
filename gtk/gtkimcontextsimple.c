@@ -1,5 +1,6 @@
 /* GTK - The GIMP Toolkit
  * Copyright (C) 2000 Red Hat, Inc.
+ * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -379,7 +380,12 @@ check_quartz_special_cases (GtkIMContextSimple *context_simple,
             case GDK_KEY_dead_doubleacute:
             case GDK_KEY_space:
               value = GDK_KEY_quotedbl; break;
+            }
+          break;
 
+        case GDK_KEY_dead_diaeresis:
+          switch (priv->compose_buffer[1])
+            {
             case 'a': value = GDK_KEY_adiaeresis; break;
             case 'A': value = GDK_KEY_Adiaeresis; break;
             case 'e': value = GDK_KEY_ediaeresis; break;

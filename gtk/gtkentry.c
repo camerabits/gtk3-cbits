@@ -4,6 +4,7 @@
  * Copyright (C) 2004-2006 Christian Hammond
  * Copyright (C) 2008 Cody Russell
  * Copyright (C) 2008 Red Hat, Inc.
+ * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -4669,7 +4670,11 @@ gtk_entry_drag_gesture_update (GtkGestureDrag *gesture,
           button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gesture));
           context = gtk_drag_begin_with_coordinates (widget, target_list, actions,
                                                      button, (GdkEvent*) event,
+#ifdef GDK_WINDOWING_QUARTZ
+                                                     priv->drag_start_x - priv->scroll_offset,
+#else
                                                      priv->drag_start_x + ranges[0],
+#endif
                                                      priv->drag_start_y);
           g_free (ranges);
 

@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2005 Imendio AB
  * Copyright (C) 2009,2010  Kristian Rietveld  <kris@gtk.org>
+ * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -72,11 +73,12 @@ static void
 gdk_quartz_screen_init (GdkQuartzScreen *quartz_screen)
 {
   GdkScreen *screen = GDK_SCREEN (quartz_screen);
-  NSScreen *nsscreen;
 
-  nsscreen = [[NSScreen screens] objectAtIndex:0];
-  _gdk_screen_set_resolution (screen,
-                              72.0 * [nsscreen userSpaceScaleFactor]);
+  _gdk_screen_set_resolution (screen, 72.0f); /* %%KAB was: [screen userSpaceScaleFactor] * 72.0;
+    userSpaceScaleFactor is deprecated as of Mac OS X 10.7 and appears to always return 1.0, even
+    on a Retina Display-equipped MacBook Pro.  The new methods like NSScreen's convertRectToBacking scale
+    at 2.0 on a Retina Display.  Scaling 'dpi' to 144.0 causes the fonts to be really large in GTK.
+  */
 
   gdk_quartz_screen_calculate_layout (quartz_screen);
 
@@ -327,11 +329,11 @@ get_mm_from_pixels (NSScreen *screen, int pixels)
    * 72 is the number of points per inch, 
    * and 25.4 is the number of millimeters per inch.
    */
-#if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_3
-  float dpi = [screen userSpaceScaleFactor] * 72.0;
-#else
-  float dpi = 96.0 / 72.0;
-#endif
+  float dpi = 72.0f; /* %%KAB was: [screen userSpaceScaleFactor] * 72.0;
+    userSpaceScaleFactor is deprecated as of Mac OS X 10.7 and appears to always return 1.0, even
+    on a Retina Display-equipped MacBook Pro.  The new methods like NSScreen's convertRectToBacking scale
+    at 2.0 on a Retina Display.  Scaling 'dpi' to 144.0 causes the fonts to be really large in GTK.
+  */
 
   return (pixels / dpi) * 25.4;
 }

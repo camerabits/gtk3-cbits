@@ -32,18 +32,21 @@
 #define GIC_FILTER_PASSTHRU	0
 #define GIC_FILTER_FILTERED	1
 
-@interface GdkQuartzView : NSView <NSTextInputClient>
+@interface GdkQuartzView : NSView <NSTextInputClient, NSDraggingDestination, NSDraggingSource>
 {
   GdkWindow *gdk_window;
-  NSTrackingRectTag trackingRect;
   BOOL needsInvalidateShadow;
+  BOOL shouldTrackCursor;
+  BOOL cursorIsInside;
+  BOOL haveBeenAddedToWindow;
   NSRange markedRange;
   NSRange selectedRange;
 }
 
 - (void)setGdkWindow: (GdkWindow *)window;
+- (void)setShouldTrackCursor: (BOOL)flag;
 - (GdkWindow *)gdkWindow;
-- (NSTrackingRectTag)trackingRect;
 - (void)setNeedsInvalidateShadow: (BOOL)invalidate;
+- (void)trackMouseMovement:(NSPoint)screen_pt event:(NSEvent *)nsevent hitView:(NSView *)hit_view;
 
 @end

@@ -1,5 +1,6 @@
 /* GTK - The GIMP Toolkit
  * Copyright (C) 1995-1999 Peter Mattis, Spencer Kimball and Josh MacDonald
+ * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -129,14 +130,16 @@ struct _GtkDragFindData
 };
 
 
-@interface GtkDragSourceOwner : NSObject {
+@interface GtkDragSourceOwner : NSObject <NSPasteboardItemDataProvider> {
   GtkDragSourceInfo *info;
 }
 
 @end
 
 @implementation GtkDragSourceOwner
--(void)pasteboard:(NSPasteboard *)sender provideDataForType:(NSString *)type
+
+/* NSPasteboardItemDataProvider protocol implementation (begin) */
+-(void)pasteboard:(NSPasteboard *)sender item:(NSPasteboardItem *)item provideDataForType:(NSString *)type
 {
   guint target_info;
   GtkSelectionData selection_data;
@@ -163,6 +166,12 @@ struct _GtkDragFindData
       g_free (selection_data.data);
     }
 }
+
+- (void)pasteboardFinishedWithDataProvider:(NSPasteboard *)pasteboard
+{
+}
+/* NSPasteboardItemDataProvider protocol implementation (begin) */
+
 
 - (id)initWithInfo:(GtkDragSourceInfo *)anInfo
 {
@@ -424,9 +433,21 @@ get_toplevel_nswindow (GtkWidget *widget)
 {
   GtkWidget *toplevel = gtk_widget_get_toplevel (widget);
   GdkWindow *window = gtk_widget_get_window (toplevel);
-  
+
   if (gtk_widget_is_toplevel (toplevel) && window)
     return [gdk_quartz_window_get_nsview (window) window];
+  else
+    return NULL;
+}
+
+static NSView *
+get_toplevel_nsview (GtkWidget *widget)
+{
+  GtkWidget *toplevel = gtk_widget_get_toplevel (widget);
+  GdkWindow *window = gtk_widget_get_window (toplevel);
+
+  if (gtk_widget_is_toplevel (toplevel) && window)
+    return gdk_quartz_window_get_nsview(window);
   else
     return NULL;
 }
@@ -436,17 +457,17 @@ register_types (GtkWidget *widget, GtkDragDestSite *site)
 {
   if (site->target_list)
     {
-      NSWindow *nswindow = get_toplevel_nswindow (widget);
+      NSView *nsview = get_toplevel_nsview (widget);
       NSSet *types;
       NSAutoreleasePool *pool;
 
-      if (!nswindow)
+      if (!nsview)
 	return;
 
       pool = [[NSAutoreleasePool alloc] init];
       types = _gtk_quartz_target_list_to_pasteboard_types (site->target_list);
 
-      [nswindow registerForDraggedTypes:[types allObjects]];
+      [nsview registerForDraggedTypes:[types allObjects]];
 
       [types release];
       [pool release];
@@ -1010,6 +1031,7 @@ _gtk_drag_dest_handle_event (GtkWidget *toplevel,
       {
 	GtkDragFindData data;
 	gint tx, ty;
+	GdkWindow * window = gtk_widget_get_window (toplevel);
 
 	if (event->type == GDK_DROP_START)
 	  {
@@ -1024,8 +1046,11 @@ _gtk_drag_dest_handle_event (GtkWidget *toplevel,
 	      }
 	  }
 
-	gdk_window_get_position (gtk_widget_get_window (toplevel), &tx, &ty);
-	
+        if (gdk_window_get_window_type (window) == GDK_WINDOW_CHILD)
+	  gdk_window_get_origin (window, &tx, &ty);
+        else
+	  gdk_window_get_position (window, &tx, &ty);
+
 	data.x = event->dnd.x_root - tx;
 	data.y = event->dnd.y_root - ty;
  	data.context = context;
@@ -1121,39 +1146,51 @@ gtk_drag_dest_find_target (GtkWidget      *widget,
   return GDK_NONE;
 }
 
+/* Fake protocol to let us call GdkQuartzView's gdkWindow method without including
+ * gdk/GdkQuartzView.h (which we can’t because it pulls in the internal-only
+ * gdkwindow.h).
+ */
+@protocol GdkNSView
+- (void)adjustDragLocation:(NSPoint *)point;
+- (GdkWindow *)gdkWindow;
+@end
+
 static gboolean
 gtk_drag_begin_idle (gpointer arg)
 {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   GdkDragContext* context = (GdkDragContext*) arg;
   GtkDragSourceInfo* info = gtk_drag_get_source_info (context, FALSE);
-  NSWindow *nswindow;
-  NSPasteboard *pasteboard;
+  NSView *nsview;
+  NSPasteboardItem *pasteboardItem;
+  NSDraggingItem *dragItem;
   GtkDragSourceOwner *owner;
   NSPoint point;
   NSSet *types;
+  NSRect draggingRect;
+  NSDraggingSession *draggingSession;
   NSImage *drag_image;
+  NSPoint dragOffset;
+  NSSize dragImageSize;
 
   g_assert (info != NULL);
 
-  pasteboard = [NSPasteboard pasteboardWithName:NSDragPboard];
+  pasteboardItem = [NSPasteboardItem new];
+
   owner = [[GtkDragSourceOwner alloc] initWithInfo:info];
-
   types = _gtk_quartz_target_list_to_pasteboard_types (info->target_list);
-
-  [pasteboard declareTypes:[types allObjects] owner:owner];
-
-  [owner release];
+  [pasteboardItem setDataProvider:owner forTypes:[types allObjects]];
   [types release];
+  [owner release];
 
-  if ((nswindow = get_toplevel_nswindow (info->source_widget)) == NULL)
+  dragItem = [[NSDraggingItem alloc] initWithPasteboardWriter:pasteboardItem];
+  [pasteboardItem release];
+
+  if ((nsview = get_toplevel_nsview (info->source_widget)) == NULL)
      return G_SOURCE_REMOVE;
-  
+
   /* Ref the context. It's unreffed when the drag has been aborted */
   g_object_ref (info->context);
-
-  /* FIXME: If the event isn't a mouse event, use the global cursor position instead */
-  point = [info->nsevent locationInWindow];
 
   drag_image = _gtk_quartz_create_image_from_pixbuf (info->icon_pixbuf);
   if (drag_image == NULL)
@@ -1162,31 +1199,27 @@ gtk_drag_begin_idle (gpointer arg)
       return G_SOURCE_REMOVE;
     }
 
-  point.x -= info->hot_x;
-  point.y -= info->hot_y;
+  /* needs to be offset to location of drag start in nsview local coordinate system. */
+  draggingRect = [drag_image alignmentRect];
+  dragImageSize = [drag_image size];
+  dragOffset = [info->nsevent locationInWindow];
+  dragOffset = [nsview convertPoint:dragOffset fromView:nil];
+  draggingRect = NSOffsetRect(draggingRect, dragOffset.x, dragOffset.y);
+  draggingRect = NSOffsetRect(draggingRect, -dragImageSize.width/2.0f, -dragImageSize.height/2.0f);
+  [dragItem setDraggingFrame:draggingRect contents:drag_image];
 
-  [nswindow dragImage:drag_image
-                   at:point
-               offset:NSZeroSize
-                event:info->nsevent
-           pasteboard:pasteboard
-               source:nswindow
-            slideBack:YES];
+  draggingSession = [nsview beginDraggingSessionWithItems:[NSArray arrayWithObject:[dragItem autorelease]] event:info->nsevent source:nsview];
+  draggingSession.animatesToStartingPositionsOnCancelOrFail = YES;
+  draggingSession.draggingFormation - NSDraggingFormationNone;
 
   [info->nsevent release];
+  info->nsevent = nil;
   [drag_image release];
 
   [pool release];
 
   return G_SOURCE_REMOVE;
 }
-/* Fake protocol to let us call GdkNSView gdkWindow without including
- * gdk/GdkNSView.h (which we can’t because it pulls in the internal-only
- * gdkwindow.h).
- */
-@protocol GdkNSView
-- (GdkWindow *)gdkWindow;
-@end
 
 static GdkDragContext *
 gtk_drag_begin_internal (GtkWidget         *widget,
@@ -1202,25 +1235,27 @@ gtk_drag_begin_internal (GtkWidget         *widget,
   GdkDevice *pointer;
   GdkWindow *window;
   GdkDragContext *context;
+  NSView *nsview = get_toplevel_nsview (widget);
   NSWindow *nswindow = get_toplevel_nswindow (widget);
-  NSPoint point = {0, 0};
+  NSPoint point = {0, 0}, point2;
   double time = (double)g_get_real_time ();
   NSEvent *nsevent;
   NSTimeInterval nstime;
 
   if ((x != -1 && y != -1) || event)
     {
-      GdkWindow *window;
       gdouble dx, dy;
       if (x != -1 && y != -1)
 	{
+          gint rx, ry;
+
 	  GtkWidget *toplevel = gtk_widget_get_toplevel (widget);
 	  window = gtk_widget_get_window (toplevel);
 	  gtk_widget_translate_coordinates (widget, toplevel, x, y, &x, &y);
 	  gdk_window_get_root_coords (gtk_widget_get_window (toplevel), x, y,
-							     &x, &y);
-	  dx = (gdouble)x;
-	  dy = (gdouble)y;
+							     &rx, &ry);
+	  dx = (gdouble)rx;
+	  dy = (gdouble)ry;
 	}
       else if (event)
 	{
@@ -1246,12 +1281,19 @@ gtk_drag_begin_internal (GtkWidget         *widget,
 	  time = (double)gdk_event_get_time (event);
 	}
       point.x = dx;
-      point.y = gdk_window_get_height (window) - dy;
+      point.y = dy;
     }
 
+  /* point needs to be in the nswindow's coordinates. */
+  point2 = point;
+  point = [nswindow mouseLocationOutsideOfEventStream];
+  if ([nsview respondsToSelector:@selector(adjustDragLocation:)])
+    [nsview adjustDragLocation:&point2];
+  else
+    point2 = [nswindow mouseLocationOutsideOfEventStream];
   nstime = [[NSDate dateWithTimeIntervalSince1970: time / 1000] timeIntervalSinceReferenceDate];
   nsevent = [NSEvent mouseEventWithType: NSLeftMouseDown
-                      location: point
+                      location: point2
                       modifierFlags: 0
                       timestamp: nstime
                       windowNumber: [nswindow windowNumber]
@@ -1259,8 +1301,11 @@ gtk_drag_begin_internal (GtkWidget         *widget,
                       eventNumber: 0
                       clickCount: 1
                       pressure: 0.0 ];
+  window = NULL;
 
-  window = [(id<GdkNSView>)[nswindow contentView] gdkWindow];
+  if ([nsview respondsToSelector:@selector(gdkWindow)])
+    window = [(id<GdkNSView>)nsview gdkWindow];
+  g_return_val_if_fail (window != NULL, NULL);
   g_return_val_if_fail (nsevent != NULL, NULL);
 
   context = gdk_drag_begin (window, g_list_copy (target_list->list));

@@ -6778,6 +6778,9 @@ update_cursor (GdkDisplay *display,
       cursor_window = pointer_window;
     }
 
+  if (cursor_window == NULL)
+    return;
+
   /* Find the first window with the cursor actually set, as
      the cursor is inherited from the parent */
   while (cursor_window->cursor == NULL &&
@@ -7344,6 +7347,8 @@ send_crossing_event (GdkDisplay                 *display,
   gboolean block_event = FALSE;
   GdkEventSequence *sequence;
 
+//  GDK_NOTE (MISC, g_message ("send_crossing_event: tl:%p win:%p type:%d mode:%d ntype:%d", toplevel, window, (int) type, (int) mode, (int) notify_type));
+
   grab = _gdk_display_has_device_grab (display, device, serial);
   pointer_info = _gdk_display_get_pointer_info (display, device);
 
@@ -7407,7 +7412,10 @@ send_crossing_event (GdkDisplay                 *display,
     }
 
   if (block_event)
-    return;
+    {
+      GDK_NOTE (MISC, g_message ("send_crossing_event: blocked!"));
+      return;
+    }
 
   if (window_event_mask & type_event_mask)
     {
@@ -7430,6 +7438,7 @@ send_crossing_event (GdkDisplay                 *display,
       event->crossing.detail = notify_type;
       event->crossing.focus = FALSE;
       event->crossing.state = mask;
+//      GDK_NOTE (MISC, g_message ("send_crossing_event: making for win:%p dev:%p type:%d mode:%d ntype:%d", window, device, (int) type, (int) mode, (int) notify_type));
     }
 }
 
@@ -7619,12 +7628,18 @@ get_pointer_window (GdkDisplay *display,
   pointer_info = _gdk_display_get_pointer_info (display, device);
 
   if (event_window == pointer_info->toplevel_under_pointer)
-    pointer_window =
-      _gdk_window_find_descendant_at (event_window,
-				      toplevel_x, toplevel_y,
-				      NULL, NULL);
+    {
+      pointer_window =
+        _gdk_window_find_descendant_at (event_window,
+				        toplevel_x, toplevel_y,
+				        NULL, NULL);
+      GDK_NOTE (MISC, g_message ("get_pointer_window: tlup:%p descendant:%p", pointer_info->toplevel_under_pointer, pointer_window));
+    }
   else
-    pointer_window = NULL;
+    {
+      GDK_NOTE (MISC, g_message ("get_pointer_window: tlup:%p != event_window:%p", pointer_info->toplevel_under_pointer, event_window));
+      pointer_window = NULL;
+    }
 
   grab = _gdk_display_has_device_grab (display, device, serial);
   if (grab != NULL &&
@@ -8903,13 +8918,13 @@ _gdk_windowing_got_event (GdkDisplay *display,
                           GdkEvent   *event,
                           gulong      serial)
 {
-  GdkWindow *event_window;
-  gdouble x, y;
+  GdkWindow *event_window = NULL;
+  gdouble x = 0.0, y = 0.0;
   gboolean unlink_event = FALSE;
-  GdkDeviceGrabInfo *button_release_grab;
+  GdkDeviceGrabInfo *button_release_grab = NULL;
   GdkPointerWindowInfo *pointer_info = NULL;
-  GdkDevice *device, *source_device;
-  gboolean is_toplevel;
+  GdkDevice *device = NULL, *source_device = NULL;
+  gboolean is_toplevel = FALSE;
 
   if (gdk_event_get_time (event) != GDK_CURRENT_TIME)
     display->last_event_time = gdk_event_get_time (event);

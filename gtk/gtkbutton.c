@@ -1476,6 +1476,8 @@ gtk_button_clicked (GtkButton *button)
 {
   g_return_if_fail (GTK_IS_BUTTON (button));
 
+  GTK_NOTE (MISC, g_print ("EventLoop: gtk button clicked\n"));
+
   g_signal_emit (button, button_signals[CLICKED], 0);
 }
 
@@ -1879,6 +1881,8 @@ gtk_button_do_release (GtkButton *button,
 {
   GtkButtonPrivate *priv = button->priv;
 
+  GTK_NOTE (MISC, g_print ("EventLoop: gtk_button_do_release\n"));
+
   if (priv->button_down)
     {
       priv->button_down = FALSE;
@@ -2093,6 +2097,8 @@ gtk_button_finish_activate (GtkButton *button,
   priv->button_down = FALSE;
 
   gtk_button_update_state (button);
+
+  GTK_NOTE (MISC, g_print ("EventLoop: gtk_button_finish_activate\n"));
 
   if (do_it)
     gtk_button_clicked (button);
