@@ -50,7 +50,7 @@
  * use filename matching instead. This doesn’t use the content of the
  * file however.
  */
-#undef FTS_MATCHING
+#define FTS_MATCHING
 
 /*
  * GtkSearchEngineTracker object
@@ -245,7 +245,8 @@ sparql_escape_string (const gchar *literal)
 
 static void
 sparql_append_string_literal (GString     *sparql,
-                              const gchar *str)
+                              const gchar *str,
+                              gboolean     glob)
 {
   gchar *s;
 
@@ -253,6 +254,9 @@ sparql_append_string_literal (GString     *sparql,
 
   g_string_append_c (sparql, '"');
   g_string_append (sparql, s);
+
+  if (glob)
+    g_string_append_c (sparql, '*');
   g_string_append_c (sparql, '"');
 
   g_free (s);
@@ -265,7 +269,7 @@ sparql_append_string_literal_lower_case (GString     *sparql,
   gchar *s;
 
   s = g_utf8_strdown (str, -1);
-  sparql_append_string_literal (sparql, s);
+  sparql_append_string_literal (sparql, s, FALSE);
   g_free (s);
 }
 
@@ -283,8 +287,6 @@ query_callback (GObject      *object,
   GError *error = NULL;
   gint i, n;
 
-  gdk_threads_enter ();
-
   tracker = GTK_SEARCH_ENGINE_TRACKER (user_data);
 
   tracker->priv->query_pending = FALSE;
@@ -294,14 +296,14 @@ query_callback (GObject      *object,
     {
       _gtk_search_engine_error (GTK_SEARCH_ENGINE (tracker), error->message);
       g_error_free (error);
-      gdk_threads_leave ();
+      g_object_unref (tracker);
       return;
     }
 
   if (!reply)
     {
       _gtk_search_engine_finished (GTK_SEARCH_ENGINE (tracker));
-      gdk_threads_leave ();
+      g_object_unref (tracker);
       return;
     }
 
@@ -329,7 +331,7 @@ query_callback (GObject      *object,
   g_variant_unref (reply);
   g_variant_unref (r);
 
-  gdk_threads_leave ();
+  g_object_unref (tracker);
 }
 
 static void
@@ -337,9 +339,7 @@ gtk_search_engine_tracker_start (GtkSearchEngine *engine)
 {
   GtkSearchEngineTracker *tracker;
   gchar *search_text;
-#ifdef FTS_MATCHING
   gchar *location_uri;
-#endif
   GString *sparql;
 
   tracker = GTK_SEARCH_ENGINE_TRACKER (engine);
@@ -357,42 +357,41 @@ gtk_search_engine_tracker_start (GtkSearchEngine *engine)
     }
 
   search_text = _gtk_query_get_text (tracker->priv->query);
-
-#ifdef FTS_MATCHING
   location_uri = _gtk_query_get_location (tracker->priv->query);
-  /* Using FTS: */
+
   sparql = g_string_new ("SELECT nie:url(?urn) "
                          "WHERE {"
                          "  ?urn a nfo:FileDataObject ;"
-                         "  tracker:available true ; "
-                         "  fts:match ");
-  sparql_append_string_literal (sparql, search_text);
+                         "  tracker:available true ; ");
+
+#ifdef FTS_MATCHING
+  /* Using FTS: */
+  g_string_append (sparql, "fts:match ");
+  sparql_append_string_literal (sparql, search_text, TRUE);
+#endif
+
+  g_string_append (sparql, ". FILTER (fn:contains(fn:lower-case(nfo:fileName(?urn)),");
+  sparql_append_string_literal_lower_case (sparql, search_text);
 
   if (location_uri)
     {
-      g_string_append (sparql, " . FILTER (fn:starts-with(nie:url(?urn),");
-      sparql_append_string_literal (sparql, location_uri);
-      g_string_append (sparql, "))");
+      g_string_append (sparql, ") && fn:starts-with(nie:url(?urn),");
+      sparql_append_string_literal (sparql, location_uri, FALSE);
     }
 
-  g_string_append (sparql, " } ORDER BY DESC(fts:rank(?urn)) ASC(nie:url(?urn))");
-#else  /* FTS_MATCHING */
-  /* Using filename matching: */
-  sparql = g_string_new ("SELECT nie:url(?urn) "
-                         "WHERE {"
-                         "  ?urn a nfo:FileDataObject ;"
-                         "    tracker:available true ."
-                         "  FILTER (fn:contains(fn:lower-case(nfo:fileName(?urn)),");
-  sparql_append_string_literal_lower_case (sparql, search_text);
+  g_string_append (sparql, "))");
 
-  g_string_append (sparql,
-                   "))"
-                   "} ORDER BY DESC(nie:url(?urn)) DESC(nfo:fileName(?urn))");
+#ifdef FTS_MATCHING
+  g_string_append (sparql, " } ORDER BY DESC(fts:rank(?urn)) DESC(nie:url(?urn))");
+#else  /* FTS_MATCHING */
+  g_string_append (sparql, "} ORDER BY DESC(nie:url(?urn)) DESC(nfo:fileName(?urn))");
 #endif /* FTS_MATCHING */
 
   tracker->priv->query_pending = TRUE;
 
-  get_query_results (tracker, sparql->str, query_callback, tracker);
+  g_debug ("SearchEngineTracker: query: %s", sparql->str);
+
+  get_query_results (tracker, sparql->str, query_callback, g_object_ref (tracker));
 
   g_string_free (sparql, TRUE);
   g_free (search_text);

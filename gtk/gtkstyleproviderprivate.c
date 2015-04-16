@@ -84,7 +84,8 @@ _gtk_style_provider_private_get_keyframes (GtkStyleProviderPrivate *provider,
 void
 _gtk_style_provider_private_lookup (GtkStyleProviderPrivate *provider,
                                     const GtkCssMatcher     *matcher,
-                                    GtkCssLookup            *lookup)
+                                    GtkCssLookup            *lookup,
+                                    GtkCssChange            *out_change)
 {
   GtkStyleProviderPrivateInterface *iface;
 
@@ -92,29 +93,15 @@ _gtk_style_provider_private_lookup (GtkStyleProviderPrivate *provider,
   g_return_if_fail (matcher != NULL);
   g_return_if_fail (lookup != NULL);
 
+  if (out_change)
+    *out_change = 0;
+
   iface = GTK_STYLE_PROVIDER_PRIVATE_GET_INTERFACE (provider);
 
   if (!iface->lookup)
     return;
 
-  iface->lookup (provider, matcher, lookup);
-}
-
-GtkCssChange
-_gtk_style_provider_private_get_change (GtkStyleProviderPrivate *provider,
-                                        const GtkCssMatcher     *matcher)
-{
-  GtkStyleProviderPrivateInterface *iface;
-
-  g_return_val_if_fail (GTK_IS_STYLE_PROVIDER_PRIVATE (provider), GTK_CSS_CHANGE_ANY);
-  g_return_val_if_fail (matcher != NULL, GTK_CSS_CHANGE_ANY);
-
-  iface = GTK_STYLE_PROVIDER_PRIVATE_GET_INTERFACE (provider);
-
-  if (!iface->get_change)
-    return GTK_CSS_CHANGE_ANY;
-
-  return iface->get_change (provider, matcher);
+  iface->lookup (provider, matcher, lookup, out_change);
 }
 
 void
@@ -140,3 +127,17 @@ _gtk_style_provider_private_get_settings (GtkStyleProviderPrivate *provider)
   return iface->get_settings (provider);
 }
 
+int
+_gtk_style_provider_private_get_scale (GtkStyleProviderPrivate *provider)
+{
+  GtkStyleProviderPrivateInterface *iface;
+
+  g_return_val_if_fail (GTK_IS_STYLE_PROVIDER_PRIVATE (provider), 1);
+
+  iface = GTK_STYLE_PROVIDER_PRIVATE_GET_INTERFACE (provider);
+
+  if (!iface->get_scale)
+    return 1;
+
+  return iface->get_scale (provider);
+}

@@ -26,6 +26,7 @@
 #include "gdkwayland.h"
 #include "gdkprivate-wayland.h"
 #include "gdkdisplay-wayland.h"
+#include "gdkdndprivate.h"
 #include "gdkselection.h"
 #include "gdkproperty.h"
 #include "gdkprivate.h"
@@ -63,7 +64,8 @@ struct _DataSourceData
   GdkAtom selection;
 };
 
-struct _AsyncWriteData {
+struct _AsyncWriteData
+{
   GOutputStream *stream;
   GdkWaylandSelection *selection;
   gsize index;
@@ -267,8 +269,9 @@ gdk_wayland_selection_new (void)
   atoms[ATOM_DND] = gdk_atom_intern_static_string ("GdkWaylandSelection");
 
   selection = g_new0 (GdkWaylandSelection, 1);
-  selection->selection_buffers = g_hash_table_new_full (NULL, NULL, NULL,
-                                                        (GDestroyNotify) selection_buffer_cancel_and_unref);
+  selection->selection_buffers =
+      g_hash_table_new_full (NULL, NULL, NULL,
+                             (GDestroyNotify) selection_buffer_cancel_and_unref);
   return selection;
 }
 
@@ -320,9 +323,9 @@ static const struct wl_data_offer_listener data_offer_listener = {
 };
 
 void
-gdk_wayland_selection_set_offer (struct wl_data_offer *wl_offer)
+gdk_wayland_selection_set_offer (GdkDisplay           *display,
+                                 struct wl_data_offer *wl_offer)
 {
-  GdkDisplay *display = gdk_display_get_default ();
   GdkWaylandSelection *selection = gdk_wayland_display_get_selection (display);
 
   if (selection->offer == wl_offer)
@@ -345,18 +348,16 @@ gdk_wayland_selection_set_offer (struct wl_data_offer *wl_offer)
 }
 
 struct wl_data_offer *
-gdk_wayland_selection_get_offer (void)
+gdk_wayland_selection_get_offer (GdkDisplay *display)
 {
-  GdkDisplay *display = gdk_display_get_default ();
   GdkWaylandSelection *selection = gdk_wayland_display_get_selection (display);
 
   return selection->offer;
 }
 
 GList *
-gdk_wayland_selection_get_targets (void)
+gdk_wayland_selection_get_targets (GdkDisplay *display)
 {
-  GdkDisplay *display = gdk_display_get_default ();
   GdkWaylandSelection *selection = gdk_wayland_display_get_selection (display);
 
   return selection->targets;
@@ -415,9 +416,11 @@ async_write_data_cb (GObject      *object,
                                                 res, &error);
   if (error)
     {
-      g_warning ("Error writing selection data: %s", error->message);
-      g_error_free (error);
+      if (error->domain != G_IO_ERROR ||
+          error->code != G_IO_ERROR_CANCELLED)
+        g_warning ("Error writing selection data: %s", error->message);
 
+      g_error_free (error);
       async_write_data_free (write_data);
       return;
     }
@@ -476,7 +479,7 @@ gdk_wayland_selection_store (GdkWindow    *window,
                              const guchar *data,
                              gint          len)
 {
-  GdkDisplay *display = gdk_display_get_default ();
+  GdkDisplay *display = gdk_window_get_display (window);
   GdkWaylandSelection *selection = gdk_wayland_display_get_selection (display);
   GArray *array;
 
@@ -526,7 +529,7 @@ gdk_wayland_selection_store (GdkWindow    *window,
 static SelectionBuffer *
 gdk_wayland_selection_lookup_requestor_buffer (GdkWindow *requestor)
 {
-  GdkDisplay *display = gdk_display_get_default ();
+  GdkDisplay *display = gdk_window_get_display (requestor);
   GdkWaylandSelection *selection = gdk_wayland_display_get_selection (display);
   SelectionBuffer *buffer_data;
   GHashTableIter iter;
@@ -557,11 +560,11 @@ gdk_wayland_selection_request_target (GdkWaylandSelection *wayland_selection,
   else
     return FALSE;
 
-  if (fd >= 0)
-    wayland_selection->stored_selection.fd = fd;
-
-  if (wayland_selection->source_requested_target == target)
+  if (wayland_selection->stored_selection.fd == fd &&
+      wayland_selection->source_requested_target == target)
     return FALSE;
+
+  wayland_selection->stored_selection.fd = fd;
 
   wayland_selection->source_requested_target = target;
 
@@ -662,19 +665,24 @@ data_source_cancelled (void                  *data,
 {
   GdkWaylandSelection *wayland_selection = data;
   GdkDragContext *context;
+  GdkDisplay *display;
 
   g_debug (G_STRLOC ": %s source = %p",
            G_STRFUNC, source);
 
-  context = gdk_wayland_drag_context_lookup_by_data_source (source);
+  display = gdk_display_get_default ();
 
   if (source == wayland_selection->dnd_source)
-    gdk_wayland_selection_unset_data_source (atoms[ATOM_DND]);
-  else if (source == wayland_selection->clipboard_source)
-    gdk_wayland_selection_unset_data_source (atoms[ATOM_CLIPBOARD]);
+    {
+      gdk_wayland_selection_unset_data_source (display, atoms[ATOM_DND]);
 
-  if (context)
-    gdk_wayland_drag_context_undo_grab (context);
+      context = gdk_wayland_drag_context_lookup_by_data_source (source);
+
+      if (context)
+        gdk_wayland_drag_context_undo_grab (context);
+    }
+  else if (source == wayland_selection->clipboard_source)
+    gdk_wayland_selection_unset_data_source (display, atoms[ATOM_CLIPBOARD]);
 }
 
 static const struct wl_data_source_listener data_source_listener = {
@@ -687,7 +695,7 @@ struct wl_data_source *
 gdk_wayland_selection_get_data_source (GdkWindow *owner,
                                        GdkAtom    selection)
 {
-  GdkDisplay *display = gdk_display_get_default ();
+  GdkDisplay *display = gdk_window_get_display (owner);
   GdkWaylandSelection *wayland_selection = gdk_wayland_display_get_selection (display);
   struct wl_data_source *source = NULL;
   GdkWaylandDisplay *display_wayland;
@@ -741,18 +749,16 @@ gdk_wayland_selection_get_data_source (GdkWindow *owner,
 }
 
 void
-gdk_wayland_selection_unset_data_source (GdkAtom selection)
+gdk_wayland_selection_unset_data_source (GdkDisplay *display,
+                                         GdkAtom     selection)
 {
-  GdkDisplay *display = gdk_display_get_default ();
   GdkWaylandSelection *wayland_selection = gdk_wayland_display_get_selection (display);
 
   if (selection == atoms[ATOM_CLIPBOARD])
     {
       GdkDeviceManager *device_manager;
-      GdkDisplay *display;
       GdkDevice *device;
 
-      display = gdk_display_get_default ();
       device_manager = gdk_display_get_device_manager (display);
       device = gdk_device_manager_get_client_pointer (device_manager);
 
@@ -774,7 +780,7 @@ gdk_wayland_selection_unset_data_source (GdkAtom selection)
 
 GdkWindow *
 _gdk_wayland_display_get_selection_owner (GdkDisplay *display,
-					  GdkAtom     selection)
+                                          GdkAtom     selection)
 {
   GdkWaylandSelection *wayland_selection = gdk_wayland_display_get_selection (display);
 
@@ -788,10 +794,10 @@ _gdk_wayland_display_get_selection_owner (GdkDisplay *display,
 
 gboolean
 _gdk_wayland_display_set_selection_owner (GdkDisplay *display,
-					  GdkWindow  *owner,
-					  GdkAtom     selection,
-					  guint32     time,
-					  gboolean    send_event)
+                                          GdkWindow  *owner,
+                                          GdkAtom     selection,
+                                          guint32     time,
+                                          gboolean    send_event)
 {
   GdkWaylandSelection *wayland_selection = gdk_wayland_display_get_selection (display);
 
@@ -811,20 +817,20 @@ _gdk_wayland_display_set_selection_owner (GdkDisplay *display,
 
 void
 _gdk_wayland_display_send_selection_notify (GdkDisplay *dispay,
-					    GdkWindow        *requestor,
-					    GdkAtom          selection,
-					    GdkAtom          target,
-					    GdkAtom          property,
-					    guint32          time)
+                                            GdkWindow  *requestor,
+                                            GdkAtom     selection,
+                                            GdkAtom     target,
+                                            GdkAtom     property,
+                                            guint32     time)
 {
 }
 
 gint
 _gdk_wayland_display_get_selection_property (GdkDisplay  *display,
-					     GdkWindow   *requestor,
-					     guchar     **data,
-					     GdkAtom     *ret_type,
-					     gint        *ret_format)
+                                             GdkWindow   *requestor,
+                                             guchar     **data,
+                                             GdkAtom     *ret_type,
+                                             gint        *ret_format)
 {
   SelectionBuffer *buffer_data;
   gsize len;
@@ -866,10 +872,10 @@ _gdk_wayland_display_get_selection_property (GdkDisplay  *display,
 
 void
 _gdk_wayland_display_convert_selection (GdkDisplay *display,
-					GdkWindow  *requestor,
-					GdkAtom     selection,
-					GdkAtom     target,
-					guint32     time)
+                                        GdkWindow  *requestor,
+                                        GdkAtom     selection,
+                                        GdkAtom     target,
+                                        guint32     time)
 {
   GdkWaylandSelection *wayland_selection = gdk_wayland_display_get_selection (display);
   SelectionBuffer *buffer_data;
@@ -892,9 +898,10 @@ _gdk_wayland_display_convert_selection (GdkDisplay *display,
       return;
     }
 
-  wl_data_offer_accept (wayland_selection->offer,
-                        _gdk_wayland_display_get_serial (GDK_WAYLAND_DISPLAY (display)),
-                        gdk_atom_name (target));
+  if (target != gdk_atom_intern_static_string ("TARGETS"))
+    wl_data_offer_accept (wayland_selection->offer,
+                          _gdk_wayland_display_get_serial (GDK_WAYLAND_DISPLAY (display)),
+                          gdk_atom_name (target));
 
   buffer_data = g_hash_table_lookup (wayland_selection->selection_buffers,
                                      target);
@@ -952,11 +959,11 @@ _gdk_wayland_display_convert_selection (GdkDisplay *display,
 
 gint
 _gdk_wayland_display_text_property_to_utf8_list (GdkDisplay    *display,
-						 GdkAtom        encoding,
-						 gint           format,
-						 const guchar  *text,
-						 gint           length,
-						 gchar       ***list)
+                                                 GdkAtom        encoding,
+                                                 gint           format,
+                                                 const guchar  *text,
+                                                 gint           length,
+                                                 gchar       ***list)
 {
   GPtrArray *array;
   const gchar *ptr;
@@ -993,7 +1000,7 @@ _gdk_wayland_display_text_property_to_utf8_list (GdkDisplay    *display,
 
 gchar *
 _gdk_wayland_display_utf8_to_string_target (GdkDisplay  *display,
-					    const gchar *str)
+                                            const gchar *str)
 {
   return NULL;
 }
@@ -1023,7 +1030,7 @@ gdk_wayland_selection_add_targets (GdkWindow *window,
       GdkDisplay *display;
       GdkDevice *device;
 
-      display = gdk_display_get_default ();
+      display = gdk_window_get_display (window);
       device_manager = gdk_display_get_device_manager (display);
       device = gdk_device_manager_get_client_pointer (device_manager);
       gdk_wayland_device_set_selection (device, data_source);
@@ -1031,7 +1038,8 @@ gdk_wayland_selection_add_targets (GdkWindow *window,
 }
 
 void
-gdk_wayland_selection_clear_targets (GdkAtom selection)
+gdk_wayland_selection_clear_targets (GdkDisplay *display,
+                                     GdkAtom     selection)
 {
-  gdk_wayland_selection_unset_data_source (selection);
+  gdk_wayland_selection_unset_data_source (display, selection);
 }

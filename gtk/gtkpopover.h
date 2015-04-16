@@ -79,7 +79,7 @@ void            gtk_popover_set_pointing_to (GtkPopover            *popover,
                                              const GdkRectangle    *rect);
 GDK_AVAILABLE_IN_3_12
 gboolean        gtk_popover_get_pointing_to (GtkPopover            *popover,
-                                             GdkRectangle *rect);
+                                             GdkRectangle          *rect);
 GDK_AVAILABLE_IN_3_12
 void            gtk_popover_set_position    (GtkPopover            *popover,
                                              GtkPositionType        position);
@@ -96,6 +96,12 @@ GDK_AVAILABLE_IN_3_12
 void            gtk_popover_bind_model      (GtkPopover            *popover,
                                              GMenuModel            *model,
                                              const gchar           *action_namespace);
+
+GDK_AVAILABLE_IN_3_16
+void            gtk_popover_set_transitions_enabled (GtkPopover *popover,
+                                                     gboolean    transitions_enabled);
+GDK_AVAILABLE_IN_3_16
+gboolean        gtk_popover_get_transitions_enabled (GtkPopover *popover);
 
 G_END_DECLS
 

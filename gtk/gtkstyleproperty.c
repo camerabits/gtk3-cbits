@@ -27,7 +27,6 @@
 #include "gtkcsstypesprivate.h"
 #include "gtkintl.h"
 #include "gtkprivatetypebuiltins.h"
-#include "gtkstylepropertiesprivate.h"
 
 enum {
   PROP_0,
@@ -180,7 +179,9 @@ _gtk_style_property_assign (GtkStyleProperty   *property,
   GtkStylePropertyClass *klass;
 
   g_return_if_fail (GTK_IS_STYLE_PROPERTY (property));
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
   g_return_if_fail (GTK_IS_STYLE_PROPERTIES (props));
+G_GNUC_END_IGNORE_DEPRECATIONS;
   g_return_if_fail (value != NULL);
 
   klass = GTK_STYLE_PROPERTY_GET_CLASS (property);

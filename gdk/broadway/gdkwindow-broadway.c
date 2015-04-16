@@ -28,6 +28,8 @@
 #include "gdkwindow-broadway.h"
 #include "gdkscreen-broadway.h"
 
+#include "gdkbroadwaydisplay.h"
+#include "gdkdisplay.h"
 #include "gdkwindow.h"
 #include "gdkwindowimpl.h"
 #include "gdkdisplay-broadway.h"
@@ -81,6 +83,28 @@ G_DEFINE_TYPE (GdkWindowImplBroadway,
 	       gdk_window_impl_broadway,
 	       GDK_TYPE_WINDOW_IMPL)
 
+static GdkDisplay *
+find_broadway_display (void)
+{
+  GdkDisplay *display;
+  GSList *list, *l;
+
+  display = NULL;
+
+  list = gdk_display_manager_list_displays (gdk_display_manager_get ());
+  for (l = list; l; l = l->next)
+    {
+      if (GDK_IS_BROADWAY_DISPLAY (l->data))
+        {
+          display = l->data;
+          break; 
+        }
+    }
+  g_slist_free (list);
+
+  return display;
+}
+
 static void
 update_dirty_windows_and_sync (void)
 {
@@ -88,7 +112,8 @@ update_dirty_windows_and_sync (void)
   GdkBroadwayDisplay *display;
   gboolean updated_surface;
 
-  display = GDK_BROADWAY_DISPLAY (gdk_display_get_default ());
+  display = GDK_BROADWAY_DISPLAY (find_broadway_display ());
+  g_assert (display != NULL);
 
   updated_surface = FALSE;
   for (l = display->toplevels; l != NULL; l = l->next)
@@ -120,7 +145,7 @@ flush_idle (gpointer data)
 {
   flush_id = 0;
 
-  gdk_display_flush (gdk_display_get_default ());
+  gdk_display_flush (find_broadway_display ());
 
   return FALSE;
 }
@@ -987,13 +1012,6 @@ gdk_broadway_window_end_paint (GdkWindow *window)
   impl->dirty = TRUE;
 }
 
-static gboolean
-gdk_window_broadway_set_static_gravities (GdkWindow *window,
-					  gboolean   use_static)
-{
-  return TRUE;
-}
-
 typedef struct _MoveResizeData MoveResizeData;
 
 struct _MoveResizeData
@@ -1129,12 +1147,7 @@ finish_drag (MoveResizeData *mv_resize)
   mv_resize->moveresize_emulation_window = NULL;
   g_object_unref (mv_resize->moveresize_window);
   mv_resize->moveresize_window = NULL;
-
-  if (mv_resize->moveresize_pending_event)
-    {
-      g_free (mv_resize->moveresize_pending_event);
-      mv_resize->moveresize_pending_event = NULL;
-    }
+  g_clear_pointer (&mv_resize->moveresize_pending_event, g_free);
 }
 
 static gboolean
@@ -1514,7 +1527,6 @@ gdk_window_impl_broadway_class_init (GdkWindowImplBroadwayClass *klass)
   impl_class->get_device_state = gdk_window_broadway_get_device_state;
   impl_class->shape_combine_region = gdk_window_broadway_shape_combine_region;
   impl_class->input_shape_combine_region = gdk_window_broadway_input_shape_combine_region;
-  impl_class->set_static_gravities = gdk_window_broadway_set_static_gravities;
   impl_class->destroy = _gdk_broadway_window_destroy;
   impl_class->destroy_foreign = gdk_broadway_window_destroy_foreign;
   impl_class->get_shape = gdk_broadway_window_get_shape;

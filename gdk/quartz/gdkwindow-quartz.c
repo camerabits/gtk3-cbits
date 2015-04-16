@@ -58,6 +58,9 @@ static FullscreenSavedGeometry *get_fullscreen_geometry (GdkWindow *window);
 
 #define FULLSCREEN_DATA "fullscreen-data"
 
+static void update_toplevel_order (void);
+static void clear_toplevel_order  (void);
+
 #define WINDOW_IS_TOPLEVEL(window)		     \
   (GDK_WINDOW_TYPE (window) != GDK_WINDOW_CHILD &&   \
    GDK_WINDOW_TYPE (window) != GDK_WINDOW_FOREIGN && \
@@ -208,9 +211,6 @@ gdk_window_impl_quartz_finalize (GObject *object)
 
   check_grab_destroy (GDK_WINDOW_IMPL_QUARTZ (object)->wrapper);
 
-  if (impl->paint_clip_region)
-    cairo_region_destroy (impl->paint_clip_region);
-
   if (impl->transient_for)
     g_object_unref (impl->transient_for);
 
@@ -342,61 +342,9 @@ gdk_window_impl_quartz_init (GdkWindowImplQuartz *impl)
 }
 
 static gboolean
-gdk_window_impl_quartz_begin_paint_region (GdkWindow       *window,
-					   const cairo_region_t *region)
+gdk_window_impl_quartz_begin_paint (GdkWindow *window)
 {
-  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ (window->impl);
-  cairo_region_t *clipped_and_offset_region;
-  cairo_t *cr;
-
-  clipped_and_offset_region = cairo_region_copy (region);
-
-  cairo_region_intersect (clipped_and_offset_region,
-                        window->clip_region);
-  cairo_region_translate (clipped_and_offset_region,
-                     window->abs_x, window->abs_y);
-
-  impl->paint_clip_region = cairo_region_reference (clipped_and_offset_region);
-
-  if (cairo_region_is_empty (clipped_and_offset_region))
-    goto done;
-
-  cr = gdk_cairo_create (window);
-
-  cairo_translate (cr, -window->abs_x, -window->abs_y);
-
-  gdk_cairo_region (cr, clipped_and_offset_region);
-  cairo_clip (cr);
-
-  while (window->background == NULL && window->parent)
-    {
-      cairo_translate (cr, -window->x, window->y);
-      window = window->parent;
-    }
-  
-  if (window->background)
-    cairo_set_source (cr, window->background);
-  else
-    cairo_set_source_rgba (cr, 0, 0, 0, 0);
-
-  /* Can use cairo_paint() here, we clipped above */
-  cairo_paint (cr);
-
-  cairo_destroy (cr);
-
-done:
-  cairo_region_destroy (clipped_and_offset_region);
-
   return FALSE;
-}
-
-static void
-gdk_window_impl_quartz_end_paint (GdkWindow *window)
-{
-  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ (window->impl);
-
-  cairo_region_destroy (impl->paint_clip_region);
-  impl->paint_clip_region = NULL;
 }
 
 static void
@@ -2061,18 +2009,6 @@ gdk_quartz_window_set_accept_focus (GdkWindow *window,
   window->accept_focus = accept_focus != FALSE;
 }
 
-static gboolean 
-gdk_window_quartz_set_static_gravities (GdkWindow *window,
-                                        gboolean   use_static)
-{
-  if (GDK_WINDOW_DESTROYED (window) ||
-      !WINDOW_IS_TOPLEVEL (window))
-    return FALSE;
-
-  /* FIXME: Implement */
-  return FALSE;
-}
-
 static void
 gdk_quartz_window_set_focus_on_map (GdkWindow *window,
                                     gboolean focus_on_map)
@@ -2928,8 +2864,8 @@ gdk_quartz_window_get_scale_factor (GdkWindow *window)
 
   impl = GDK_WINDOW_IMPL_QUARTZ (window->impl);
 
-  if (gdk_quartz_osx_version() >= GDK_OSX_LION)
-    scale_factor = [(id <ScaleFactor>) impl->toplevel backingScaleFactor];
+  if (impl->toplevel != NULL && gdk_quartz_osx_version() >= GDK_OSX_LION)
+    return [(id <ScaleFactor>) impl->toplevel backingScaleFactor];
 
   return scale_factor;
 }
@@ -2963,13 +2899,11 @@ gdk_window_impl_quartz_class_init (GdkWindowImplQuartzClass *klass)
   impl_class->get_device_state = gdk_window_quartz_get_device_state;
   impl_class->shape_combine_region = gdk_window_quartz_shape_combine_region;
   impl_class->input_shape_combine_region = gdk_window_quartz_input_shape_combine_region;
-  impl_class->set_static_gravities = gdk_window_quartz_set_static_gravities;
   impl_class->destroy = gdk_quartz_window_destroy;
   impl_class->destroy_foreign = gdk_quartz_window_destroy_foreign;
   impl_class->get_shape = gdk_quartz_window_get_shape;
   impl_class->get_input_shape = gdk_quartz_window_get_input_shape;
-  impl_class->begin_paint_region = gdk_window_impl_quartz_begin_paint_region;
-  impl_class->end_paint = gdk_window_impl_quartz_end_paint;
+  impl_class->begin_paint = gdk_window_impl_quartz_begin_paint;
   impl_class->get_scale_factor = gdk_quartz_window_get_scale_factor;
 
   impl_class->focus = gdk_quartz_window_focus;

@@ -28,21 +28,95 @@
 #include "gtkimage.h"
 #include "gtklabel.h"
 #include "gtkbox.h"
+#include "gtkrender.h"
 #include "gtkstylecontext.h"
 #include "gtktypebuiltins.h"
+#include "gtkstack.h"
+#include "gtkpopover.h"
+#include "gtkintl.h"
+
+/**
+ * SECTION:gtkmodelbutton
+ * @Short_description: A button that uses a GAction as model
+ * @Title: GtkModelButton
+ *
+ * GtkModelButton is a button class that can use a #GAction as its model.
+ * In contrast to #GtkToggleButton or #GtkRadioButton, which can also
+ * be backed by a #GAction via the #GtkActionable:action-name property,
+ * GtkModelButton will adapt its appearance according to the kind of
+ * action it is backed by, and appear either as a plain, check or
+ * radio button.
+ *
+ * Model buttons are used when popovers from a menu model with
+ * gtk_popover_new_from_model(); they can also be used manually in
+ * a #GtkPopoverMenu.
+ *
+ * When the action is specified via the #GtkActionable:action-name
+ * and #GtkActionable:action-target properties, the role of the button
+ * (i.e. whether it is a plain, check or radio button) is determined by
+ * the type of the action and doesn't have to be explicitly specified
+ * with the #GtkModelButton:role property.
+ *
+ * The content of the button is specified by the #GtkModelButton:text
+ * and #GtkModelButton:icon properties.
+ *
+ * The appearance of model buttons can be influenced with the
+ * #GtkModelButton:centered and #GtkModelButton:iconic properties.
+ *
+ * Model buttons have built-in support for submenus in #GtkPopoverMenu.
+ * To make a GtkModelButton that opens a submenu when activated, set
+ * the #GtkModelButton:menu-name property. To make a button that goes
+ * back to the parent menu, you should set the #GtkModelButton:inverted
+ * property to place the submenu indicator at the opposite side.
+ *
+ * # Example
+ *
+ * |[
+ * <object class="GtkPopoverMenu">
+ *   <child>
+ *     <object class="GtkBox">
+ *       <property name="visible">True</property>
+ *       <property name="margin">10</property>
+ *       <child>
+ *         <object class="GtkModelButton">
+ *           <property name="visible">True</property>
+ *           <property name="action-name">view.cut</property>
+ *           <property name="text" translatable="yes">Cut</property>
+ *         </object>
+ *       </child>
+ *       <child>
+ *         <object class="GtkModelButton">
+ *           <property name="visible">True</property>
+ *           <property name="action-name">view.copy</property>
+ *           <property name="text" translatable="yes">Copy</property>
+ *         </object>
+ *       </child>
+ *       <child>
+ *         <object class="GtkModelButton">
+ *           <property name="visible">True</property>
+ *           <property name="action-name">view.paste</property>
+ *           <property name="text" translatable="yes">Paste</property>
+ *         </object>
+ *       </child>
+ *     </object>
+ *   </child>
+ * </object>
+ * ]|
+ */
 
 struct _GtkModelButton
 {
   GtkButton parent_instance;
+
   GtkWidget *box;
   GtkWidget *image;
   GtkWidget *label;
-  gboolean toggled;
-  gboolean has_submenu;
+  gboolean active;
   gboolean centered;
   gboolean inverted;
   gboolean iconic;
-  GtkMenuTrackerItemRole role;
+  gchar *menu_name;
+  GtkButtonRole role;
 };
 
 typedef GtkButtonClass GtkModelButtonClass;
@@ -52,20 +126,41 @@ G_DEFINE_TYPE (GtkModelButton, gtk_model_button, GTK_TYPE_BUTTON)
 enum
 {
   PROP_0,
-  PROP_ACTION_ROLE,
+  PROP_ROLE,
   PROP_ICON,
   PROP_TEXT,
-  PROP_TOGGLED,
-  PROP_ACCEL,
-  PROP_HAS_SUBMENU,
+  PROP_ACTIVE,
+  PROP_MENU_NAME,
   PROP_INVERTED,
   PROP_CENTERED,
-  PROP_ICONIC
+  PROP_ICONIC,
+  LAST_PROPERTY
 };
 
+static GParamSpec *properties[LAST_PROPERTY] = { NULL, };
+
 static void
-gtk_model_button_set_action_role (GtkModelButton         *button,
-                                  GtkMenuTrackerItemRole  role)
+gtk_model_button_update_state (GtkModelButton *button)
+{
+  GtkStateFlags state;
+
+  if (button->role == GTK_BUTTON_ROLE_NORMAL)
+    return;
+
+  state = gtk_widget_get_state_flags (GTK_WIDGET (button));
+
+  state &= ~GTK_STATE_FLAG_CHECKED;
+
+  if (button->active && !button->menu_name)
+    state |= GTK_STATE_FLAG_CHECKED;
+
+  gtk_widget_set_state_flags (GTK_WIDGET (button), state, TRUE);
+}
+
+
+static void
+gtk_model_button_set_role (GtkModelButton *button,
+                           GtkButtonRole   role)
 {
   AtkObject *accessible;
   AtkRole a11y_role;
@@ -74,20 +169,19 @@ gtk_model_button_set_action_role (GtkModelButton         *button,
     return;
 
   button->role = role;
-  gtk_widget_queue_draw (GTK_WIDGET (button));
 
   accessible = gtk_widget_get_accessible (GTK_WIDGET (button));
   switch (role)
     {
-    case GTK_MENU_TRACKER_ITEM_ROLE_NORMAL:
+    case GTK_BUTTON_ROLE_NORMAL:
       a11y_role = ATK_ROLE_PUSH_BUTTON;
       break;
 
-    case GTK_MENU_TRACKER_ITEM_ROLE_CHECK:
+    case GTK_BUTTON_ROLE_CHECK:
       a11y_role = ATK_ROLE_CHECK_BOX;
       break;
 
-    case GTK_MENU_TRACKER_ITEM_ROLE_RADIO:
+    case GTK_BUTTON_ROLE_RADIO:
       a11y_role = ATK_ROLE_RADIO_BUTTON;
       break;
 
@@ -96,6 +190,10 @@ gtk_model_button_set_action_role (GtkModelButton         *button,
     }
 
   atk_object_set_role (accessible, a11y_role);
+
+  gtk_model_button_update_state (button);
+  gtk_widget_queue_draw (GTK_WIDGET (button));
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_ROLE]);
 }
 
 static void
@@ -107,7 +205,7 @@ update_visibility (GtkModelButton *button)
   has_icon = gtk_image_get_storage_type (GTK_IMAGE (button->image)) != GTK_IMAGE_EMPTY;
   has_text = gtk_label_get_text (GTK_LABEL (button->label))[0] != '\0';
 
-  gtk_widget_set_visible (button->image, has_icon);
+  gtk_widget_set_visible (button->image, has_icon && (button->iconic || !has_text));
   gtk_widget_set_visible (button->label, has_text && (!button->iconic || !has_icon));
 }
 
@@ -117,6 +215,7 @@ gtk_model_button_set_icon (GtkModelButton *button,
 {
   gtk_image_set_from_gicon (GTK_IMAGE (button->image), icon, GTK_ICON_SIZE_MENU);
   update_visibility (button);
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_ICON]);
 }
 
 static void
@@ -125,49 +224,56 @@ gtk_model_button_set_text (GtkModelButton *button,
 {
   gtk_label_set_text_with_mnemonic (GTK_LABEL (button->label), text);
   update_visibility (button);
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_TEXT]);
 }
 
 static void
-gtk_model_button_set_accel (GtkModelButton *button,
-                            const gchar    *accel)
+gtk_model_button_set_active (GtkModelButton *button,
+                             gboolean        active)
 {
-  /* ignore */
-}
+  if (button->active == active)
+    return;
 
-static void gtk_model_button_update_state (GtkModelButton *button);
-
-static void
-gtk_model_button_set_toggled (GtkModelButton *button,
-                              gboolean        toggled)
-{
-  button->toggled = toggled;
+  button->active = active;
   gtk_model_button_update_state (button);
   gtk_widget_queue_draw (GTK_WIDGET (button));
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_ACTIVE]);
 }
 
 static void
-gtk_model_button_set_has_submenu (GtkModelButton *button,
-                                  gboolean        has_submenu)
+gtk_model_button_set_menu_name (GtkModelButton *button,
+                                const gchar    *menu_name)
 {
-  button->has_submenu = has_submenu;
+  g_free (button->menu_name);
+  button->menu_name = g_strdup (menu_name);
+  gtk_model_button_update_state (button);
   gtk_widget_queue_resize (GTK_WIDGET (button));
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_MENU_NAME]);
 }
 
 static void
 gtk_model_button_set_inverted (GtkModelButton *button,
                                gboolean        inverted)
 {
+  if (button->inverted == inverted)
+    return;
+
   button->inverted = inverted;
   gtk_widget_queue_resize (GTK_WIDGET (button));
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_INVERTED]);
 }
 
 static void
 gtk_model_button_set_centered (GtkModelButton *button,
                                gboolean        centered)
 {
+  if (button->centered == centered)
+    return;
+
   button->centered = centered;
   gtk_widget_set_halign (button->box, button->centered ? GTK_ALIGN_CENTER : GTK_ALIGN_FILL);
   gtk_widget_queue_draw (GTK_WIDGET (button));
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_CENTERED]);
 }
 
 static void
@@ -175,6 +281,9 @@ gtk_model_button_set_iconic (GtkModelButton *button,
                              gboolean        iconic)
 {
   GtkStyleContext *context;
+
+  if (button->iconic == iconic)
+    return;
 
   button->iconic = iconic;
 
@@ -194,6 +303,58 @@ gtk_model_button_set_iconic (GtkModelButton *button,
 
   update_visibility (button);
   gtk_widget_queue_resize (GTK_WIDGET (button));
+  g_object_notify_by_pspec (G_OBJECT (button), properties[PROP_ICONIC]);
+}
+
+static void
+gtk_model_button_get_property (GObject    *object,
+                               guint       prop_id,
+                               GValue     *value,
+                               GParamSpec *pspec)
+{
+  GtkModelButton *button = GTK_MODEL_BUTTON (object);
+
+  switch (prop_id)
+    {
+    case PROP_ROLE:
+      g_value_set_enum (value, button->role);
+      break;
+
+    case PROP_ICON:
+      {
+        GIcon *icon;
+        gtk_image_get_gicon (GTK_IMAGE (button->image), &icon, NULL);
+        g_value_set_object (value, icon);
+      }
+      break;
+
+    case PROP_TEXT:
+      g_value_set_string (value, gtk_label_get_text (GTK_LABEL (button->label)));
+      break;
+
+    case PROP_ACTIVE:
+      g_value_set_boolean (value, button->active);
+      break;
+
+    case PROP_MENU_NAME:
+      g_value_set_string (value, button->menu_name);
+      break;
+
+    case PROP_INVERTED:
+      g_value_set_boolean (value, button->inverted);
+      break;
+
+    case PROP_CENTERED:
+      g_value_set_boolean (value, button->centered);
+      break;
+
+    case PROP_ICONIC:
+      g_value_set_boolean (value, button->iconic);
+      break;
+
+    default:
+      g_assert_not_reached ();
+    }
 }
 
 static void
@@ -206,8 +367,8 @@ gtk_model_button_set_property (GObject      *object,
 
   switch (prop_id)
     {
-    case PROP_ACTION_ROLE:
-      gtk_model_button_set_action_role (button, g_value_get_enum (value));
+    case PROP_ROLE:
+      gtk_model_button_set_role (button, g_value_get_enum (value));
       break;
 
     case PROP_ICON:
@@ -218,16 +379,12 @@ gtk_model_button_set_property (GObject      *object,
       gtk_model_button_set_text (button, g_value_get_string (value));
       break;
 
-    case PROP_TOGGLED:
-      gtk_model_button_set_toggled (button, g_value_get_boolean (value));
+    case PROP_ACTIVE:
+      gtk_model_button_set_active (button, g_value_get_boolean (value));
       break;
 
-    case PROP_ACCEL:
-      gtk_model_button_set_accel (button, g_value_get_string (value));
-      break;
-
-    case PROP_HAS_SUBMENU:
-      gtk_model_button_set_has_submenu (button, g_value_get_boolean (value));
+    case PROP_MENU_NAME:
+      gtk_model_button_set_menu_name (button, g_value_get_string (value));
       break;
 
     case PROP_INVERTED:
@@ -295,7 +452,7 @@ has_sibling_with_indicator (GtkWidget *button)
         continue;
 
       if (!sibling->centered &&
-          (sibling->has_submenu || sibling->role != GTK_MENU_TRACKER_ITEM_ROLE_NORMAL))
+          (sibling->menu_name || sibling->role != GTK_BUTTON_ROLE_NORMAL))
         {
           has_indicator = TRUE;
           break;
@@ -310,7 +467,7 @@ has_sibling_with_indicator (GtkWidget *button)
 static gboolean
 needs_indicator (GtkModelButton *button)
 {
-  if (button->role != GTK_MENU_TRACKER_ITEM_ROLE_NORMAL)
+  if (button->role != GTK_BUTTON_ROLE_NORMAL)
     return TRUE;
 
   return has_sibling_with_indicator (GTK_WIDGET (button));
@@ -372,12 +529,12 @@ gtk_model_button_get_preferred_width (GtkWidget *widget,
 }
 
 static void
-gtk_model_button_get_preferred_height_and_baseline_for_width (GtkWidget          *widget,
-                                                              gint                width,
-                                                              gint               *minimum,
-                                                              gint               *natural,
-                                                              gint               *minimum_baseline,
-                                                              gint               *natural_baseline)
+gtk_model_button_get_preferred_height_and_baseline_for_width (GtkWidget *widget,
+                                                              gint       width,
+                                                              gint      *minimum,
+                                                              gint      *natural,
+                                                              gint      *minimum_baseline,
+                                                              gint      *natural_baseline)
 {
   GtkModelButton *button = GTK_MODEL_BUTTON (widget);
   GtkWidget *child;
@@ -539,38 +696,6 @@ gtk_model_button_size_allocate (GtkWidget     *widget,
   pango_font_metrics_unref (metrics);
 }
 
-static GtkStateFlags
-get_button_state (GtkModelButton *model_button)
-{
-  GtkButton *button = GTK_BUTTON (model_button);
-  GtkStateFlags state;
-
-  state = gtk_widget_get_state_flags (GTK_WIDGET (model_button));
-
-  state &= ~(GTK_STATE_FLAG_INCONSISTENT |
-             GTK_STATE_FLAG_ACTIVE |
-             GTK_STATE_FLAG_CHECKED |
-             GTK_STATE_FLAG_PRELIGHT);
-
-  if (model_button->toggled && !model_button->has_submenu)
-    state |= GTK_STATE_FLAG_CHECKED;
-
-  if (button->priv->activate_timeout ||
-      (button->priv->button_down && button->priv->in_button))
-    state |= GTK_STATE_FLAG_ACTIVE;
-
-  if (button->priv->in_button)
-    state |= GTK_STATE_FLAG_PRELIGHT;
-
-  return state;
-}
-
-static void
-gtk_model_button_update_state (GtkModelButton *button)
-{
-  gtk_widget_set_state_flags (GTK_WIDGET (button), get_button_state (button), TRUE);
-}
-
 static gint
 gtk_model_button_draw (GtkWidget *widget,
                        cairo_t   *cr)
@@ -579,25 +704,16 @@ gtk_model_button_draw (GtkWidget *widget,
   GtkButton *button = GTK_BUTTON (widget);
   GtkWidget *child;
   GtkStyleContext *context;
-  GtkStateFlags state;
   gint border_width;
   gint x, y;
   gint width, height;
   gint indicator_size, indicator_spacing;
   gint baseline;
 
-  state = get_button_state (model_button);
+  if (model_button->iconic)
+    return GTK_WIDGET_CLASS (gtk_model_button_parent_class)->draw (widget, cr);
 
   context = gtk_widget_get_style_context (widget);
-  gtk_style_context_save (context);
-  gtk_style_context_set_state (context, state);
-
-  if (model_button->iconic)
-    {
-      GTK_WIDGET_CLASS (gtk_model_button_parent_class)->draw (widget, cr);
-      goto out;
-    }
-
   width = gtk_widget_get_allocated_width (widget);
   height = gtk_widget_get_allocated_height (widget);
   border_width = gtk_container_get_border_width (GTK_CONTAINER (widget));
@@ -626,8 +742,12 @@ gtk_model_button_draw (GtkWidget *widget,
                     width - 2 * border_width,
                     height - 2 * border_width);
 
-  if (model_button->has_submenu)
+  if (model_button->menu_name)
     {
+      GtkStateFlags state;
+
+      gtk_style_context_save (context);
+      state = gtk_style_context_get_state (context);
       state = state & ~(GTK_STATE_FLAG_DIR_LTR|GTK_STATE_FLAG_DIR_RTL);
       if (indicator_is_left (widget))
         state = state | GTK_STATE_FLAG_DIR_RTL;
@@ -637,23 +757,28 @@ gtk_model_button_draw (GtkWidget *widget,
       gtk_style_context_set_state (context, state);
       gtk_style_context_add_class (context, GTK_STYLE_CLASS_EXPANDER);
       gtk_render_expander (context, cr, x, y, indicator_size, indicator_size);
+      gtk_style_context_restore (context);
     }
-  else if (model_button->role == GTK_MENU_TRACKER_ITEM_ROLE_CHECK)
+  else if (model_button->role == GTK_BUTTON_ROLE_CHECK)
     {
+      gtk_style_context_save (context);
       gtk_style_context_add_class (context, GTK_STYLE_CLASS_CHECK);
       gtk_render_check (context, cr, x, y, indicator_size, indicator_size);
+      gtk_style_context_restore (context);
     }
-  else if (model_button->role == GTK_MENU_TRACKER_ITEM_ROLE_RADIO)
+  else if (model_button->role == GTK_BUTTON_ROLE_RADIO)
     {
+      gtk_style_context_save (context);
       gtk_style_context_add_class (context, GTK_STYLE_CLASS_RADIO);
       gtk_render_option (context, cr, x, y, indicator_size, indicator_size);
+      gtk_style_context_restore (context);
     }
 
   if (gtk_widget_has_visible_focus (widget))
     {
       GtkBorder border;
  
-      gtk_style_context_get_border (context, state, &border);
+      gtk_style_context_get_border (context, gtk_style_context_get_state (context), &border);
 
       gtk_render_focus (context, cr,
                         border_width + border.left,
@@ -666,33 +791,29 @@ gtk_model_button_draw (GtkWidget *widget,
   if (child)
     gtk_container_propagate_draw (GTK_CONTAINER (widget), child, cr);
 
-out:
-  gtk_style_context_restore (context);
-
   return FALSE;
 }
 
 static void
-gtk_model_button_pressed (GtkButton *button)
+gtk_model_button_clicked (GtkButton *button)
 {
-  GTK_BUTTON_CLASS (gtk_model_button_parent_class)->pressed (button);
+  GtkModelButton *model_button = GTK_MODEL_BUTTON (button);
+  if (model_button->menu_name != NULL)
+    {
+      GtkWidget *stack;
 
-  gtk_model_button_update_state (GTK_MODEL_BUTTON (button));
-}
+      stack = gtk_widget_get_ancestor (GTK_WIDGET (button), GTK_TYPE_STACK);
+      if (stack != NULL)
+        gtk_stack_set_visible_child_name (GTK_STACK (stack), model_button->menu_name);
+    }
+  else if (model_button->role == GTK_BUTTON_ROLE_NORMAL)
+    {
+      GtkWidget *popover;
 
-static void
-gtk_model_button_released (GtkButton *button)
-{
-  GTK_BUTTON_CLASS (gtk_model_button_parent_class)->released (button);
-
-  gtk_model_button_update_state (GTK_MODEL_BUTTON (button));
-}
-
-static void
-gtk_model_button_enter_leave (GtkButton *button)
-{
-  gtk_model_button_update_state (GTK_MODEL_BUTTON (button));
-  gtk_widget_queue_draw (GTK_WIDGET (button));
+      popover = gtk_widget_get_ancestor (GTK_WIDGET (button), GTK_TYPE_POPOVER);
+      if (popover != NULL)
+        gtk_widget_hide (popover);
+    }
 }
 
 static void
@@ -702,6 +823,7 @@ gtk_model_button_class_init (GtkModelButtonClass *class)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (class);
   GtkButtonClass *button_class = GTK_BUTTON_CLASS (class);
 
+  object_class->get_property = gtk_model_button_get_property;
   object_class->set_property = gtk_model_button_set_property;
 
   widget_class->get_preferred_width = gtk_model_button_get_preferred_width;
@@ -712,41 +834,131 @@ gtk_model_button_class_init (GtkModelButtonClass *class)
   widget_class->size_allocate = gtk_model_button_size_allocate;
   widget_class->draw = gtk_model_button_draw;
 
-  button_class->pressed = gtk_model_button_pressed;
-  button_class->released = gtk_model_button_released;
-  button_class->enter = gtk_model_button_enter_leave;
-  button_class->leave = gtk_model_button_enter_leave;
+  button_class->clicked = gtk_model_button_clicked;
 
-  g_object_class_install_property (object_class, PROP_ACTION_ROLE,
-                                   g_param_spec_enum ("action-role", "", "",
-                                                      GTK_TYPE_MENU_TRACKER_ITEM_ROLE,
-                                                      GTK_MENU_TRACKER_ITEM_ROLE_NORMAL,
-                                                      G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_ICON,
-                                   g_param_spec_object ("icon", "", "", G_TYPE_ICON,
-                                                        G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_TEXT,
-                                   g_param_spec_string ("text", "", "", NULL,
-                                                        G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_TOGGLED,
-                                   g_param_spec_boolean ("toggled", "", "", FALSE,
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_ACCEL,
-                                   g_param_spec_string ("accel", "", "", NULL,
-                                                        G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_HAS_SUBMENU,
-                                   g_param_spec_boolean ("has-submenu", "", "", FALSE,
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_INVERTED,
-                                   g_param_spec_boolean ("inverted", "", "", FALSE,
+  /**
+   * GtkModelButton:role:
+   *
+   * Specifies whether the button is a plain, check or radio button.
+   * When #GtkActionable:action-name is set, the role will be determined
+   * from the action and does not have to be set explicitly.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_ROLE] =
+    g_param_spec_enum ("role",
+                       P_("Role"),
+                       P_("The role of this button"),
+                       GTK_TYPE_BUTTON_ROLE,
+                       GTK_BUTTON_ROLE_NORMAL,
+                       G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
 
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_CENTERED,
-                                   g_param_spec_boolean ("centered", "", "", FALSE,
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_ICONIC,
-                                   g_param_spec_boolean ("iconic", "", "", TRUE,
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+  /**
+   * GtkModelButton:icon:
+   *
+   * A #GIcon that will be used if iconic appearance for the button is
+   * desired.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_ICON] = 
+    g_param_spec_object ("icon",
+                         P_("Icon"),
+                         P_("The icon"),
+                         G_TYPE_ICON,
+                         G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * GtkModelButton:text:
+   *
+   * The label for the button.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_TEXT] =
+    g_param_spec_string ("text",
+                         P_("Text"),
+                         P_("The text"),
+                         "",
+                         G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * GtkModelButton:active:
+   *
+   * The state of the button. This is reflecting the state of the associated
+   * #GAction.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_ACTIVE] =
+    g_param_spec_boolean ("active",
+                          P_("Active"),
+                          P_("Active"),
+                          FALSE,
+                          G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * GtkModelButton:menu-name:
+   *
+   * The name of a submenu to open when the button is activated.
+   * If this is set, the button should not have an action associated with it.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_MENU_NAME] =
+    g_param_spec_string ("menu-name",
+                         P_("Menu name"),
+                         P_("The name of the menu to open"),
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * GtkModelButton:inverted:
+   *
+   * Whether to show the submenu indicator at the opposite side than normal.
+   * This property should be set for model buttons that 'go back' to a parent
+   * menu.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_INVERTED] =
+    g_param_spec_boolean ("inverted",
+                          P_("Inverted"),
+                          P_("Whether the menu is a parent"),
+                          FALSE,
+                          G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * GtkModelButton:centered:
+   *
+   * Wether to render the button contents centered instead of left-aligned.
+   * This property should be set for title-like items.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_CENTERED] =
+    g_param_spec_boolean ("centered",
+                          P_("Centered"),
+                          P_("Whether to center the contents"),
+                          FALSE,
+                          G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * GtkModelButton:iconic:
+   *
+   * If this property is set, the button will show an icon if one is set.
+   * If no icon is set, the text will be used. This is typically used for
+   * horizontal sections of linked buttons.
+   *
+   * Since: 3.16
+   */
+  properties[PROP_ICONIC] =
+    g_param_spec_boolean ("iconic",
+                          P_("Iconic"),
+                          P_("Whether to prefer the icon over text"),
+                          FALSE,
+                          G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS);
+  g_object_class_install_properties (object_class, LAST_PROPERTY, properties);
 
   gtk_widget_class_set_accessible_role (GTK_WIDGET_CLASS (class), ATK_ROLE_PUSH_BUTTON);
 }
@@ -756,17 +968,17 @@ gtk_model_button_init (GtkModelButton *button)
 {
   gtk_button_set_relief (GTK_BUTTON (button), GTK_RELIEF_NONE);
   button->box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 6);
-  g_object_set (button->box,
-                "margin-start", 12,
-                "margin-end", 12,
-                "margin-top", 3,
-                "margin-bottom", 3,
-                NULL);
+  gtk_widget_set_margin_start (button->box, 12);
+  gtk_widget_set_margin_end (button->box, 12);
+  gtk_widget_set_margin_top (button->box, 3);
+  gtk_widget_set_margin_bottom (button->box, 3);
   gtk_widget_set_halign (button->box, GTK_ALIGN_FILL);
   gtk_widget_show (button->box);
   button->image = gtk_image_new ();
+  gtk_widget_set_no_show_all (button->image, TRUE);
   g_object_set (button->image, "margin", 4, NULL);
   button->label = gtk_label_new ("");
+  gtk_widget_set_no_show_all (button->label, TRUE);
   gtk_container_add (GTK_CONTAINER (button->box), button->image);
   gtk_container_add (GTK_CONTAINER (button->box), button->label);
   gtk_container_add (GTK_CONTAINER (button), button->box);
@@ -774,6 +986,15 @@ gtk_model_button_init (GtkModelButton *button)
                                GTK_STYLE_CLASS_MENUITEM);
 }
 
+/**
+ * gtk_model_button_new:
+ *
+ * Creates a new GtkModelButton.
+ *
+ * Returns: the newly created #GtkModelButton widget
+ *
+ * Since: 3.16
+ */
 GtkWidget *
 gtk_model_button_new (void)
 {

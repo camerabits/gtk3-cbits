@@ -39,8 +39,12 @@
 #include "gdkmarshalers.h"
 #include "gdkframeclockidle.h"
 #include "gdkwindowimpl.h"
+#include "gdkglcontextprivate.h"
+#include "gdk-private.h"
 
 #include <math.h>
+
+#include <epoxy/gl.h>
 
 /* for the use of round() */
 #include "fallback-c89.c"
@@ -184,6 +188,11 @@ static cairo_surface_t *gdk_window_ref_impl_surface (GdkWindow *window);
 
 static void gdk_window_set_frame_clock (GdkWindow      *window,
                                         GdkFrameClock  *clock);
+
+static void draw_ugly_color (GdkWindow       *window,
+                             const cairo_region_t *region,
+                             int color);
+
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
@@ -1024,9 +1033,35 @@ recompute_visible_regions (GdkWindow *private,
 				      recalculate_children);
 }
 
+static void
+gdk_window_clear_old_updated_area (GdkWindow *window)
+{
+  int i;
+
+  for (i = 0; i < 2; i++)
+    {
+      if (window->old_updated_area[i])
+        {
+          cairo_region_destroy (window->old_updated_area[i]);
+          window->old_updated_area[i] = NULL;
+        }
+    }
+}
+
+static void
+gdk_window_append_old_updated_area (GdkWindow *window,
+                                    cairo_region_t *region)
+{
+  if (window->old_updated_area[1])
+    cairo_region_destroy (window->old_updated_area[1]);
+  window->old_updated_area[1] = window->old_updated_area[0];
+  window->old_updated_area[0] = cairo_region_reference (region);
+}
+
 void
 _gdk_window_update_size (GdkWindow *window)
 {
+  gdk_window_clear_old_updated_area (window);
   recompute_visible_regions (window, FALSE);
 }
 
@@ -1074,6 +1109,9 @@ find_native_sibling_above (GdkWindow *parent,
 			   GdkWindow *child)
 {
   GdkWindow *w;
+
+  if (!parent)
+    return NULL;
 
   w = find_native_sibling_above_helper (parent, child);
   if (w)
@@ -1335,8 +1373,7 @@ gdk_window_new (GdkWindow     *parent,
       window->input_only = TRUE;
     }
 
-  if (window->parent)
-    window->parent->children = g_list_prepend (window->parent->children, window);
+  window->parent->children = g_list_prepend (window->parent->children, window);
 
   if (window->parent->window_type == GDK_WINDOW_ROOT)
     {
@@ -1362,8 +1399,7 @@ gdk_window_new (GdkWindow     *parent,
       _gdk_display_create_window_impl (display, window, real_parent, screen, event_mask, attributes, attributes_mask);
       window->impl_window = window;
 
-      if (parent)
-        parent->impl_window->native_children = g_list_prepend (parent->impl_window->native_children, window);
+      parent->impl_window->native_children = g_list_prepend (parent->impl_window->native_children, window);
 
       /* This will put the native window topmost in the native parent, which may
        * be wrong wrt other native windows in the non-native hierarchy, so restack */
@@ -1385,6 +1421,18 @@ gdk_window_new (GdkWindow     *parent,
   device_manager = gdk_display_get_device_manager (gdk_window_get_display (parent));
   g_signal_connect (device_manager, "device-removed",
                     G_CALLBACK (device_removed_cb), window);
+
+
+  if ((_gdk_gl_flags & (GDK_GL_ALWAYS | GDK_GL_DISABLE)) == GDK_GL_ALWAYS)
+    {
+      GError *error = NULL;
+
+      if (gdk_window_get_paint_gl_context (window, &error) == NULL)
+        {
+          g_warning ("Unable to force GL enabled: %s\n", error->message);
+          g_error_free (error);
+        }
+    }
 
   return window;
 }
@@ -1712,9 +1760,8 @@ gdk_window_ensure_native (GdkWindow *window)
                                    NULL, 0);
   new_impl = window->impl;
 
-  if (parent)
-    parent->impl_window->native_children =
-      g_list_prepend (parent->impl_window->native_children, window);
+  parent->impl_window->native_children =
+    g_list_prepend (parent->impl_window->native_children, window);
 
   window->impl = old_impl;
   change_impl (window, window, new_impl);
@@ -1838,6 +1885,12 @@ gdk_window_free_current_paint (GdkWindow *window)
   cairo_region_destroy (window->current_paint.region);
   window->current_paint.region = NULL;
 
+  cairo_region_destroy (window->current_paint.flushed_region);
+  window->current_paint.flushed_region = NULL;
+
+  cairo_region_destroy (window->current_paint.need_blend_region);
+  window->current_paint.need_blend_region = NULL;
+
   window->current_paint.surface_needs_composite = FALSE;
 }
 
@@ -1938,6 +1991,14 @@ _gdk_window_destroy_hierarchy (GdkWindow *window,
 		  gdk_window_invalidate_in_parent (window);
 		}
 	    }
+
+          if (window->gl_paint_context)
+            {
+              /* Make sure to destroy if current */
+              g_object_run_dispose (G_OBJECT (window->gl_paint_context));
+              g_object_unref (window->gl_paint_context);
+              window->gl_paint_context = NULL;
+            }
 
           if (window->frame_clock)
             {
@@ -2665,6 +2726,85 @@ gdk_window_ref_impl_surface (GdkWindow *window)
   return GDK_WINDOW_IMPL_GET_CLASS (window->impl)->ref_cairo_surface (gdk_window_get_impl_window (window));
 }
 
+GdkGLContext *
+gdk_window_get_paint_gl_context (GdkWindow  *window,
+                                 GError    **error)
+{
+  GError *internal_error = NULL;
+
+  if (_gdk_gl_flags & GDK_GL_DISABLE)
+    {
+      g_set_error_literal (error, GDK_GL_ERROR,
+                           GDK_GL_ERROR_NOT_AVAILABLE,
+                           _("GL support disabled via GDK_DEBUG"));
+      return NULL;
+    }
+
+  if (window->impl_window->gl_paint_context == NULL)
+    {
+      window->impl_window->gl_paint_context =
+        GDK_WINDOW_IMPL_GET_CLASS (window->impl)->create_gl_context (window->impl_window,
+                                                                     TRUE,
+                                                                     NULL,
+                                                                     &internal_error);
+    }
+
+  if (internal_error != NULL)
+    {
+      g_propagate_error (error, internal_error);
+      g_clear_object (&(window->impl_window->gl_paint_context));
+      return NULL;
+    }
+
+  gdk_gl_context_realize (window->impl_window->gl_paint_context, &internal_error);
+  if (internal_error != NULL)
+    {
+      g_propagate_error (error, internal_error);
+      g_clear_object (&(window->impl_window->gl_paint_context));
+      return NULL;
+    }
+
+  return window->impl_window->gl_paint_context;
+}
+
+/**
+ * gdk_window_create_gl_context:
+ * @window: a #GdkWindow
+ * @error: return location for an error
+ *
+ * Creates a new #GdkGLContext matching the
+ * framebuffer format to the visual of the #GdkWindow. The context
+ * is disconnected from any particular window or surface.
+ *
+ * If the creation of the #GdkGLContext failed, @error will be set.
+ *
+ * Before using the returned #GdkGLContext, you will need to
+ * call gdk_gl_context_make_current() or gdk_gl_context_realize().
+ *
+ * Returns: (transfer full): the newly created #GdkGLContext, or
+ * %NULL on error
+ *
+ * Since: 3.16
+ **/
+GdkGLContext *
+gdk_window_create_gl_context (GdkWindow    *window,
+                              GError      **error)
+{
+  GdkGLContext *paint_context;
+
+  g_return_val_if_fail (GDK_IS_WINDOW (window), NULL);
+  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+  paint_context = gdk_window_get_paint_gl_context (window, error);
+  if (paint_context == NULL)
+    return NULL;
+
+  return GDK_WINDOW_IMPL_GET_CLASS (window->impl)->create_gl_context (window->impl_window,
+								      FALSE,
+                                                                      paint_context,
+                                                                      error);
+}
+
 /**
  * gdk_window_begin_paint_rect:
  * @window: a #GdkWindow
@@ -2741,6 +2881,7 @@ gdk_window_begin_paint_region (GdkWindow       *window,
   GdkWindowImplClass *impl_class;
   double sx, sy;
   gboolean needs_surface;
+  cairo_content_t surface_content;
 
   g_return_if_fail (GDK_IS_WINDOW (window));
 
@@ -2758,25 +2899,62 @@ gdk_window_begin_paint_region (GdkWindow       *window,
   impl_class = GDK_WINDOW_IMPL_GET_CLASS (window->impl);
 
   needs_surface = TRUE;
-  if (impl_class->begin_paint_region)
-    needs_surface = impl_class->begin_paint_region (window, region);
+  if (impl_class->begin_paint)
+    needs_surface = impl_class->begin_paint (window);
 
   window->current_paint.region = cairo_region_copy (region);
-
   cairo_region_intersect (window->current_paint.region, window->clip_region);
   cairo_region_get_extents (window->current_paint.region, &clip_box);
+
+  window->current_paint.flushed_region = cairo_region_create ();
+  window->current_paint.need_blend_region = cairo_region_create ();
+
+  surface_content = gdk_window_get_content (window);
+
+  window->current_paint.use_gl = window->impl_window->gl_paint_context != NULL;
+
+  if (window->current_paint.use_gl)
+    {
+      GdkGLContext *context;
+
+      int ww = gdk_window_get_width (window) * gdk_window_get_scale_factor (window);
+      int wh = gdk_window_get_height (window) * gdk_window_get_scale_factor (window);
+
+      context = gdk_window_get_paint_gl_context (window, NULL);
+      if (context == NULL)
+        {
+          g_warning ("gl rendering failed, context: %p", context);
+          window->current_paint.use_gl = FALSE;
+        }
+      else
+        {
+	  gdk_gl_context_make_current (context);
+          /* With gl we always need a surface to combine the gl
+             drawing with the native drawing. */
+          needs_surface = TRUE;
+          /* Also, we need the surface to include alpha */
+          surface_content = CAIRO_CONTENT_COLOR_ALPHA;
+
+          /* Initial setup */
+          glClearColor (0.0f, 0.0f, 0.0f, 0.0f);
+          glDisable (GL_DEPTH_TEST);
+          glDisable(GL_BLEND);
+          glBlendFunc (GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+          glViewport (0, 0, ww, wh);
+        }
+    }
 
   if (needs_surface)
     {
       window->current_paint.surface = gdk_window_create_similar_surface (window,
-                                                                         gdk_window_get_content (window),
+                                                                         surface_content,
                                                                          MAX (clip_box.width, 1),
                                                                          MAX (clip_box.height, 1));
       sx = sy = 1;
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
       cairo_surface_get_device_scale (window->current_paint.surface, &sx, &sy);
-#endif
       cairo_surface_set_device_offset (window->current_paint.surface, -clip_box.x*sx, -clip_box.y*sy);
+      gdk_cairo_surface_mark_as_direct (window->current_paint.surface, window);
 
       window->current_paint.surface_needs_composite = TRUE;
     }
@@ -2791,17 +2969,87 @@ gdk_window_begin_paint_region (GdkWindow       *window,
 }
 
 /**
+ * gdk_window_mark_paint_from_clip:
+ * @window: a #GdkWindow
+ * @cr: a #cairo_t
+ *
+ * If you call this during a paint (e.g. between gdk_window_begin_paint_region()
+ * and gdk_window_end_paint() then GDK will mark the current clip region of the
+ * window as being drawn. This is required when mixing GL rendering via
+ * gdk_cairo_draw_from_gl() and cairo rendering, as otherwise GDK has no way
+ * of knowing when something paints over the GL-drawn regions.
+ *
+ * This is typically called automatically by GTK+ and you don't need
+ * to care about this.
+ *
+ * Since: 3.16
+ **/
+void
+gdk_window_mark_paint_from_clip (GdkWindow          *window,
+                                 cairo_t            *cr)
+{
+  cairo_region_t *clip_region;
+  GdkWindow *impl_window = window->impl_window;
+
+  if (impl_window->current_paint.surface == NULL ||
+      cairo_get_target (cr) != impl_window->current_paint.surface)
+    return;
+
+  if (cairo_region_is_empty (impl_window->current_paint.flushed_region))
+    return;
+
+  /* This here seems a bit weird, but basically, we're taking the current
+     clip and applying also the flushed region, and the result is that the
+     new clip is the intersection of these. This is the area where the newly
+     drawn region overlaps a previosly flushed area, which is an area of the
+     double buffer surface that need to be blended OVER the back buffer rather
+     than SRCed. */
+  cairo_save (cr);
+  /* We set the identity matrix here so we get and apply regions in native
+     window coordinates. */
+  cairo_identity_matrix (cr);
+  gdk_cairo_region (cr, impl_window->current_paint.flushed_region);
+  cairo_clip (cr);
+
+  clip_region = gdk_cairo_region_from_clip (cr);
+  if (clip_region == NULL)
+    {
+      /* Failed to represent clip as region, mark all as requiring
+         blend */
+      cairo_region_union (impl_window->current_paint.need_blend_region,
+                          impl_window->current_paint.flushed_region);
+      cairo_region_destroy (impl_window->current_paint.flushed_region);
+      impl_window->current_paint.flushed_region = cairo_region_create ();
+    }
+  else
+    {
+      cairo_region_subtract (impl_window->current_paint.flushed_region, clip_region);
+      cairo_region_union (impl_window->current_paint.need_blend_region, clip_region);
+    }
+  cairo_region_destroy (clip_region);
+
+  /* Clear the area on the double buffer surface to transparent so we
+     can start drawing from scratch the area "above" the flushed
+     region */
+  cairo_set_source_rgba (cr, 0, 0, 0, 0);
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+  cairo_paint (cr);
+
+  cairo_restore (cr);
+}
+
+/**
  * gdk_window_end_paint:
  * @window: a #GdkWindow
  *
- * Indicates that the backing store created by the most recent call to
- * gdk_window_begin_paint_region() should be copied onscreen and
+ * Indicates that the backing store created by the most recent call
+ * to gdk_window_begin_paint_region() should be copied onscreen and
  * deleted, leaving the next-most-recent backing store or no backing
  * store at all as the active paint region. See
- * gdk_window_begin_paint_region() for full details. It is an error to
- * call this function without a matching
- * gdk_window_begin_paint_region() first.
+ * gdk_window_begin_paint_region() for full details.
  *
+ * It is an error to call this function without a matching
+ * gdk_window_begin_paint_region() first.
  **/
 void
 gdk_window_end_paint (GdkWindow *window)
@@ -2809,7 +3057,6 @@ gdk_window_end_paint (GdkWindow *window)
   GdkWindow *composited;
   GdkWindowImplClass *impl_class;
   GdkRectangle clip_box = { 0, };
-  cairo_region_t *full_clip;
   cairo_t *cr;
 
   g_return_if_fail (GDK_IS_WINDOW (window));
@@ -2832,40 +3079,51 @@ gdk_window_end_paint (GdkWindow *window)
   if (window->current_paint.surface_needs_composite)
     {
       cairo_surface_t *surface;
-      gboolean skip_alpha_blending;
 
       cairo_region_get_extents (window->current_paint.region, &clip_box);
-      full_clip = cairo_region_copy (window->clip_region);
-      cairo_region_intersect (full_clip, window->current_paint.region);
 
-      surface = gdk_window_ref_impl_surface (window);
-      cr = cairo_create (surface);
-      cairo_surface_destroy (surface);
-
-      cairo_set_source_surface (cr, window->current_paint.surface, 0, 0);
-      gdk_cairo_region (cr, full_clip);
-      cairo_clip (cr);
-
-      /* We can skip alpha blending for a fast composite case
-       * if we have an impl window or we're a fully opaque window. */
-      skip_alpha_blending = (gdk_window_has_impl (window) ||
-                             window->alpha == 255);
-
-      if (skip_alpha_blending)
+      if (window->current_paint.use_gl)
         {
-          cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-          cairo_paint (cr);
+          cairo_region_t *opaque_region = cairo_region_copy (window->current_paint.region);
+          cairo_region_subtract (opaque_region, window->current_paint.flushed_region);
+          cairo_region_subtract (opaque_region, window->current_paint.need_blend_region);
+
+          gdk_gl_context_make_current (window->gl_paint_context);
+
+          if (!cairo_region_is_empty (opaque_region))
+            gdk_gl_texture_from_surface (window->current_paint.surface,
+                                         opaque_region);
+          if (!cairo_region_is_empty (window->current_paint.need_blend_region))
+            {
+              glEnable(GL_BLEND);
+              gdk_gl_texture_from_surface (window->current_paint.surface,
+                                           window->current_paint.need_blend_region);
+              glDisable(GL_BLEND);
+            }
+
+          cairo_region_destroy (opaque_region);
+
+          gdk_gl_context_end_frame (window->gl_paint_context,
+                                    window->current_paint.region,
+                                    window->active_update_area);
         }
       else
         {
-          cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
-          cairo_paint_with_alpha (cr, window->alpha / 255.0);
+          surface = gdk_window_ref_impl_surface (window);
+          cr = cairo_create (surface);
+          cairo_surface_destroy (surface);
+
+          cairo_set_source_surface (cr, window->current_paint.surface, 0, 0);
+          gdk_cairo_region (cr, window->current_paint.region);
+          cairo_clip (cr);
+
+          cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+          cairo_paint (cr);
+
+          cairo_destroy (cr);
+
+          cairo_surface_flush (surface);
         }
-
-      cairo_destroy (cr);
-      cairo_region_destroy (full_clip);
-
-      cairo_surface_flush (surface);
     }
 
   gdk_window_free_current_paint (window);
@@ -3086,7 +3344,7 @@ gdk_cairo_create (GdkWindow *window)
 /* Code for dirty-region queueing
  */
 static GSList *update_windows = NULL;
-static gboolean debug_updates = FALSE;
+gboolean _gdk_debug_updates = FALSE;
 
 static inline gboolean
 gdk_window_is_ancestor (GdkWindow *window,
@@ -3361,7 +3619,9 @@ gdk_window_process_updates_internal (GdkWindow *window)
 {
   GdkWindowImplClass *impl_class;
   GdkWindow *toplevel;
+  GdkDisplay *display;
 
+  display = gdk_window_get_display (window);
   toplevel = gdk_window_get_toplevel (window);
   if (toplevel->geometry_dirty)
     {
@@ -3380,18 +3640,34 @@ gdk_window_process_updates_internal (GdkWindow *window)
    */
   if (window->update_area)
     {
-      cairo_region_t *update_area = window->update_area;
+      g_assert (window->active_update_area == NULL); /* No reentrancy */
+
+      window->active_update_area = window->update_area;
       window->update_area = NULL;
 
       if (gdk_window_is_viewable (window))
 	{
 	  cairo_region_t *expose_region;
 
-	  /* Clip to part visible in impl window */
-	  cairo_region_intersect (update_area, window->clip_region);
+	  expose_region = cairo_region_copy (window->active_update_area);
 
-	  if (debug_updates)
+          /* Sometimes we can't just paint only the new area, as the windowing system
+             requires more to be repainted. For instance, with opengl you typically
+             repaint all of each frame each time and then swap the buffer, although
+             there are extensions that allow us to reuse part of an old frame */
+          if (GDK_WINDOW_IMPL_GET_CLASS (window->impl)->invalidate_for_new_frame)
+            GDK_WINDOW_IMPL_GET_CLASS (window->impl)->invalidate_for_new_frame (window, expose_region);
+
+	  /* Clip to part visible in impl window */
+	  cairo_region_intersect (expose_region, window->clip_region);
+
+	  if (gdk_display_get_debug_updates (display))
 	    {
+              cairo_region_t *swap_region = cairo_region_copy (expose_region);
+              cairo_region_subtract (swap_region, window->active_update_area);
+              draw_ugly_color (window, swap_region, 1);
+              cairo_region_destroy (swap_region);
+
 	      /* Make sure we see the red invalid area before redrawing. */
 	      gdk_display_sync (gdk_window_get_display (window));
 	      g_usleep (70000);
@@ -3400,14 +3676,17 @@ gdk_window_process_updates_internal (GdkWindow *window)
 	  impl_class = GDK_WINDOW_IMPL_GET_CLASS (window->impl);
 
           if (impl_class->queue_antiexpose)
-            impl_class->queue_antiexpose (window, update_area);
+            impl_class->queue_antiexpose (window, expose_region);
 
-	  expose_region = cairo_region_copy (update_area);
           impl_class->process_updates_recurse (window, expose_region);
-	  cairo_region_destroy (expose_region);
-	}
 
-      cairo_region_destroy (update_area);
+          gdk_window_append_old_updated_area (window, window->active_update_area);
+
+          cairo_region_destroy (expose_region);
+        }
+
+      cairo_region_destroy (window->active_update_area);
+      window->active_update_area = NULL;
     }
 
   window->in_update = FALSE;
@@ -3710,13 +3989,17 @@ gdk_window_set_invalidate_handler (GdkWindow                      *window,
 
 static void
 draw_ugly_color (GdkWindow       *window,
-		 const cairo_region_t *region)
+		 const cairo_region_t *region,
+                 int color)
 {
   cairo_t *cr;
 
   cr = gdk_cairo_create (window);
   /* Draw ugly color all over the newly-invalid region */
-  cairo_set_source_rgb (cr, 50000/65535., 10000/65535., 10000/65535.);
+  if (color == 0)
+    cairo_set_source_rgb (cr, 50000/65535., 10000/65535., 10000/65535.);
+  else
+    cairo_set_source_rgb (cr, 10000/65535., 50000/65535., 10000/65535.);
   gdk_cairo_region (cr, region);
   cairo_fill (cr);
 
@@ -3792,6 +4075,7 @@ gdk_window_invalidate_maybe_recurse_full (GdkWindow            *window,
 {
   cairo_region_t *visible_region;
   cairo_rectangle_int_t r;
+  GdkDisplay *display;
 
   g_return_if_fail (GDK_IS_WINDOW (window));
 
@@ -3811,8 +4095,9 @@ gdk_window_invalidate_maybe_recurse_full (GdkWindow            *window,
 
   invalidate_impl_subwindows (window, region, child_func, user_data, 0, 0);
 
-  if (debug_updates)
-    draw_ugly_color (window, visible_region);
+  display = gdk_window_get_display (window);
+  if (gdk_display_get_debug_updates (display))
+    draw_ugly_color (window, visible_region, 0);
 
   while (window != NULL && 
 	 !cairo_region_is_empty (visible_region))
@@ -4105,9 +4390,17 @@ gdk_window_thaw_updates (GdkWindow *window)
  *
  * This function is not part of the GDK public API and is only
  * for use by GTK+.
- **/
+ *
+ * Deprecated: 3.16: This symbol was never meant to be used outside of GTK+
+ */
 void
 gdk_window_freeze_toplevel_updates_libgtk_only (GdkWindow *window)
+{
+  gdk_window_freeze_toplevel_updates (window);
+}
+
+void
+gdk_window_freeze_toplevel_updates (GdkWindow *window)
 {
   g_return_if_fail (GDK_IS_WINDOW (window));
   g_return_if_fail (window->window_type != GDK_WINDOW_CHILD);
@@ -4125,9 +4418,17 @@ gdk_window_freeze_toplevel_updates_libgtk_only (GdkWindow *window)
  *
  * This function is not part of the GDK public API and is only
  * for use by GTK+.
- **/
+ *
+ * Deprecated: 3.16: This symbol was never meant to be used outside of GTK+
+ */
 void
 gdk_window_thaw_toplevel_updates_libgtk_only (GdkWindow *window)
+{
+  gdk_window_thaw_toplevel_updates (window);
+}
+
+void
+gdk_window_thaw_toplevel_updates (GdkWindow *window)
 {
   g_return_if_fail (GDK_IS_WINDOW (window));
   g_return_if_fail (window->window_type != GDK_WINDOW_CHILD);
@@ -4167,7 +4468,7 @@ gdk_window_thaw_toplevel_updates_libgtk_only (GdkWindow *window)
 void
 gdk_window_set_debug_updates (gboolean setting)
 {
-  debug_updates = setting;
+  _gdk_debug_updates = setting;
 }
 
 /**
@@ -5053,6 +5354,7 @@ gdk_window_hide (GdkWindow *window)
       impl_class->hide (window);
     }
 
+  gdk_window_clear_old_updated_area (window);
   recompute_visible_regions (window, FALSE);
 
   /* all decendants became non-visible, we need to send visibility notify */
@@ -5112,6 +5414,7 @@ gdk_window_withdraw (GdkWindow *window)
 	}
 
       recompute_visible_regions (window, FALSE);
+      gdk_window_clear_old_updated_area (window);
     }
 }
 
@@ -5125,6 +5428,8 @@ gdk_window_withdraw (GdkWindow *window)
  * including #GDK_BUTTON_PRESS_MASK means the window should report button
  * press events. The event mask is the bitwise OR of values from the
  * #GdkEventMask enumeration.
+ *
+ * See the [input handling overview][event-masks] for details.
  **/
 void
 gdk_window_set_events (GdkWindow       *window,
@@ -5194,6 +5499,8 @@ gdk_window_get_events (GdkWindow *window)
  * including #GDK_BUTTON_PRESS_MASK means the window should report button
  * press events. The event mask is the bitwise OR of values from the
  * #GdkEventMask enumeration.
+ *
+ * See the [input handling overview][event-masks] for details.
  *
  * Since: 3.0
  **/
@@ -5601,10 +5908,10 @@ gdk_window_scroll (GdkWindow *window,
  * Since: 2.8
  */
 void
-gdk_window_move_region (GdkWindow       *window,
-			const cairo_region_t *region,
-			gint             dx,
-			gint             dy)
+gdk_window_move_region (GdkWindow            *window,
+                        const cairo_region_t *region,
+                        gint                  dx,
+                        gint                  dy)
 {
   cairo_region_t *expose_area;
 
@@ -5630,10 +5937,12 @@ gdk_window_move_region (GdkWindow       *window,
  * @window: a #GdkWindow
  * @color: a #GdkColor
  *
- * Sets the background color of @window. (However, when using GTK+,
- * set the background of a widget with gtk_widget_modify_bg() - if
- * you’re an application - or gtk_style_set_background() - if you're
- * implementing a custom widget.)
+ * Sets the background color of @window.
+ *
+ * However, when using GTK+, influence the background of a widget
+ * using a style class or CSS — if you’re an application — or with
+ * gtk_style_context_set_background() — if you're implementing a
+ * custom widget.
  *
  * See also gdk_window_set_background_pattern().
  *
@@ -5697,7 +6006,7 @@ gdk_window_set_background_rgba (GdkWindow     *window,
  * when the window is obscured then exposed.
  */
 void
-gdk_window_set_background_pattern (GdkWindow *window,
+gdk_window_set_background_pattern (GdkWindow       *window,
                                    cairo_pattern_t *pattern)
 {
   g_return_if_fail (GDK_IS_WINDOW (window));
@@ -5749,6 +6058,9 @@ gdk_window_set_cursor_internal (GdkWindow *window,
   if (GDK_WINDOW_DESTROYED (window))
     return;
 
+  g_assert (gdk_window_get_display (window) == gdk_device_get_display (device));
+  g_assert (!cursor || gdk_window_get_display (window) == gdk_cursor_get_display (cursor));
+
   if (window->window_type == GDK_WINDOW_ROOT ||
       window->window_type == GDK_WINDOW_FOREIGN)
     GDK_WINDOW_IMPL_GET_CLASS (window->impl)->set_device_cursor (window, device, cursor);
@@ -5794,11 +6106,15 @@ gdk_window_get_cursor (GdkWindow *window)
  * @window: a #GdkWindow
  * @cursor: (allow-none): a cursor
  *
- * Sets the default mouse pointer for a #GdkWindow. Use gdk_cursor_new_for_display()
- * or gdk_cursor_new_from_pixbuf() to create the cursor. To make the cursor
- * invisible, use %GDK_BLANK_CURSOR. Passing %NULL for the @cursor argument
- * to gdk_window_set_cursor() means that @window will use the cursor of its
- * parent window. Most windows should use this default.
+ * Sets the default mouse pointer for a #GdkWindow.
+ *
+ * Note that @cursor must be for the same display as @window.
+ *
+ * Use gdk_cursor_new_for_display() or gdk_cursor_new_from_pixbuf() to
+ * create the cursor. To make the cursor invisible, use %GDK_BLANK_CURSOR.
+ * Passing %NULL for the @cursor argument to gdk_window_set_cursor() means
+ * that @window will use the cursor of its parent window. Most windows
+ * should use this default.
  */
 void
 gdk_window_set_cursor (GdkWindow *window,
@@ -6066,7 +6382,7 @@ gdk_window_get_origin (GdkWindow *window,
  *
  * Obtains the position of a window position in root
  * window coordinates. This is similar to
- * gdk_window_get_origin() but allows you go pass
+ * gdk_window_get_origin() but allows you to pass
  * in any position in the window, not just the origin.
  *
  * Since: 2.18
@@ -6499,26 +6815,21 @@ gdk_window_merge_child_input_shapes (GdkWindow *window)
  * @window: a #GdkWindow
  * @use_static: %TRUE to turn on static gravity
  *
- * Set the bit gravity of the given window to static, and flag it so
- * all children get static subwindow gravity. This is used if you are
- * implementing scary features that involve deep knowledge of the
- * windowing system. Don’t worry about it unless you have to.
+ * Used to set the bit gravity of the given window to static, and flag
+ * it so all children get static subwindow gravity. This is used if you
+ * are implementing scary features that involve deep knowledge of the
+ * windowing system. Don’t worry about it.
  *
- * Returns: %TRUE if the server supports static gravity
+ * Returns: %FALSE
+ *
+ * Deprecated: 3.16: static gravities haven't worked on anything but X11
+ *   for a long time.
  */
 gboolean
 gdk_window_set_static_gravities (GdkWindow *window,
 				 gboolean   use_static)
 {
-  GdkWindowImplClass *impl_class;
-
   g_return_val_if_fail (GDK_IS_WINDOW (window), FALSE);
-
-  if (gdk_window_has_impl (window))
-    {
-      impl_class = GDK_WINDOW_IMPL_GET_CLASS (window->impl);
-      return impl_class->set_static_gravities (window, use_static);
-    }
 
   return FALSE;
 }
@@ -6534,6 +6845,9 @@ gdk_window_set_static_gravities (GdkWindow *window,
  * Returns: %TRUE if the window is composited.
  *
  * Since: 2.22
+ *
+ * Deprecated: 3.16: Compositing is an outdated technology that
+ *   only ever worked on X11.
  **/
 gboolean
 gdk_window_get_composited (GdkWindow *window)
@@ -6572,6 +6886,9 @@ gdk_window_get_composited (GdkWindow *window)
  * attempting to do so.
  *
  * Since: 2.12
+ *
+ * Deprecated: 3.16: Compositing is an outdated technology that
+ *   only ever worked on X11.
  */
 void
 gdk_window_set_composited (GdkWindow *window,
@@ -6594,12 +6911,14 @@ gdk_window_set_composited (GdkWindow *window,
 
   impl_class = GDK_WINDOW_IMPL_GET_CLASS (window->impl);
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
   if (composited && (!gdk_display_supports_composite (display) || !impl_class->set_composited))
     {
       g_warning ("gdk_window_set_composited called but "
                  "compositing is not supported");
       return;
     }
+G_GNUC_END_IGNORE_DEPRECATIONS
 
   impl_class->set_composited (window, composited);
 
@@ -7739,9 +8058,9 @@ gdk_pointer_grab (GdkWindow *	  window,
   gulong serial;
   GList *devices, *dev;
 
-  g_return_val_if_fail (window != NULL, 0);
-  g_return_val_if_fail (GDK_IS_WINDOW (window), 0);
-  g_return_val_if_fail (confine_to == NULL || GDK_IS_WINDOW (confine_to), 0);
+  g_return_val_if_fail (window != NULL, GDK_GRAB_FAILED);
+  g_return_val_if_fail (GDK_IS_WINDOW (window), GDK_GRAB_FAILED);
+  g_return_val_if_fail (confine_to == NULL || GDK_IS_WINDOW (confine_to), GDK_GRAB_FAILED);
 
   /* We need a native window for confine to to work, ensure we have one */
   if (confine_to)
@@ -7851,7 +8170,7 @@ gdk_keyboard_grab (GdkWindow *window,
   gulong serial;
   GList *devices, *dev;
 
-  g_return_val_if_fail (GDK_IS_WINDOW (window), 0);
+  g_return_val_if_fail (GDK_IS_WINDOW (window), GDK_GRAB_FAILED);
 
   /* Non-viewable client side window => fail */
   if (!_gdk_window_has_impl (window) &&
@@ -9162,6 +9481,7 @@ gdk_window_create_similar_surface (GdkWindow *     window,
                                    int             width,
                                    int             height)
 {
+  GdkDisplay *display;
   cairo_surface_t *window_surface, *surface;
   double sx, sy;
 
@@ -9169,28 +9489,23 @@ gdk_window_create_similar_surface (GdkWindow *     window,
 
   window_surface = gdk_window_ref_impl_surface (window);
   sx = sy = 1;
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
   cairo_surface_get_device_scale (window_surface, &sx, &sy);
-#endif
 
-  switch (_gdk_rendering_mode)
+  display = gdk_window_get_display (window);
+  switch (display->rendering_mode)
   {
     case GDK_RENDERING_MODE_RECORDING:
       {
         cairo_rectangle_t rect = { 0, 0, width * sx, height *sy };
         surface = cairo_recording_surface_create (content, &rect);
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
         cairo_surface_set_device_scale (surface, sx, sy);
-#endif
       }
       break;
     case GDK_RENDERING_MODE_IMAGE:
       surface = cairo_image_surface_create (content == CAIRO_CONTENT_COLOR ? CAIRO_FORMAT_RGB24 :
                                             content == CAIRO_CONTENT_ALPHA ? CAIRO_FORMAT_A8 : CAIRO_FORMAT_ARGB32,
                                             width * sx, height * sy);
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
       cairo_surface_set_device_scale (surface, sx, sy);
-#endif
       break;
     case GDK_RENDERING_MODE_SIMILAR:
     default:
@@ -9268,12 +9583,10 @@ gdk_window_create_similar_image_surface (GdkWindow *     window,
       cairo_surface_destroy (window_surface);
     }
 
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
   if (scale == 0)
     scale = gdk_window_get_scale_factor (window);
 
   cairo_surface_set_device_scale (surface, scale, scale);
-#endif
 
   return surface;
 }
@@ -9661,7 +9974,7 @@ gdk_window_set_event_compression (GdkWindow *window,
 {
   g_return_if_fail (GDK_IS_WINDOW (window));
 
-  window->event_compression = event_compression;
+  window->event_compression = !!event_compression;
 }
 
 /**
@@ -10270,7 +10583,12 @@ gdk_window_configure_finished (GdkWindow *window)
  *
  * For toplevel windows this depends on support from the windowing system
  * that may not always be there. For instance, On X11, this works only on
- * X screens with a compositing manager running.
+ * X screens with a compositing manager running. On Wayland, there is no
+ * per-window opacity value that the compositor would apply. Instead, use
+ * `gdk_window_set_opaque_region (window, NULL)` to tell the compositor
+ * that the entire window is (potentially) non-opaque, and draw your content
+ * with alpha, or use gtk_widget_set_opacity() to set an overall opacity
+ * for your widgets.
  *
  * For child windows this function only works for non-native windows.
  *
@@ -10762,6 +11080,37 @@ gdk_window_get_scale_factor (GdkWindow *window)
 
   return 1;
 }
+
+/* Returns the *real* unscaled size, which may be a fractional size
+   in window scale coordinates. We need this to properly handle GL
+   coordinates which are y-flipped in the real coordinates. */
+void
+gdk_window_get_unscaled_size (GdkWindow *window,
+                              int *unscaled_width,
+                              int *unscaled_height)
+{
+  GdkWindowImplClass *impl_class;
+  gint scale;
+
+  g_return_if_fail (GDK_IS_WINDOW (window));
+
+  if (window->impl_window == window)
+    {
+      impl_class = GDK_WINDOW_IMPL_GET_CLASS (window->impl);
+
+      if (impl_class->get_unscaled_size)
+        return impl_class->get_unscaled_size (window, unscaled_width, unscaled_height);
+    }
+
+  scale = gdk_window_get_scale_factor (window);
+
+  if (unscaled_width)
+    *unscaled_width = window->width * scale;
+
+  if (unscaled_height)
+    *unscaled_height = window->height * scale;
+}
+
 
 /**
  * gdk_window_set_opaque_region:

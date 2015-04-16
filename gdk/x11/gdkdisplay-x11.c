@@ -37,6 +37,8 @@
 #include "gdkdisplay-x11.h"
 #include "gdkprivate-x11.h"
 #include "gdkscreen-x11.h"
+#include "gdkglcontext-x11.h"
+#include "gdk-private.h"
 
 #include <glib.h>
 #include <glib/gprintf.h>
@@ -164,7 +166,8 @@ static const char *const precache_atoms[] = {
   "_NET_WM_USER_TIME_WINDOW",
   "_NET_VIRTUAL_ROOTS",
   "GDK_SELECTION",
-  "_NET_WM_STATE_FOCUSED"
+  "_NET_WM_STATE_FOCUSED",
+  "GDK_VISUALS"
 };
 
 static char *gdk_sm_client_id;
@@ -702,7 +705,7 @@ gdk_x11_display_translate_event (GdkEventTranslator *translator,
             }
 
 	  if (toplevel)
-            gdk_window_freeze_toplevel_updates_libgtk_only (window);
+            gdk_window_freeze_toplevel_updates (window);
 
           _gdk_x11_window_grab_check_unmap (window, xevent->xany.serial);
         }
@@ -726,7 +729,7 @@ gdk_x11_display_translate_event (GdkEventTranslator *translator,
 					 0);
 
 	  if (toplevel)
-	    gdk_window_thaw_toplevel_updates_libgtk_only (window);
+	    gdk_window_thaw_toplevel_updates (window);
 	}
 
       break;
@@ -764,11 +767,13 @@ gdk_x11_display_translate_event (GdkEventTranslator *translator,
 			   : ""));
       if (window && GDK_WINDOW_TYPE (window) == GDK_WINDOW_ROOT)
         {
-	  window->width = xevent->xconfigure.width / window_impl->window_scale;
-	  window->height = xevent->xconfigure.height / window_impl->window_scale;
+          window_impl->unscaled_width = xevent->xconfigure.width;
+          window_impl->unscaled_height = xevent->xconfigure.height;
+	  window->width = (xevent->xconfigure.width + window_impl->window_scale - 1) / window_impl->window_scale;
+	  window->height = (xevent->xconfigure.height + window_impl->window_scale - 1) / window_impl->window_scale;
 
 	  _gdk_window_update_size (window);
-	  _gdk_x11_window_update_size (GDK_WINDOW_IMPL_X11 (window->impl));
+	  _gdk_x11_window_update_size (window_impl);
 	  _gdk_x11_screen_size_changed (screen, xevent);
         }
 
@@ -790,8 +795,8 @@ gdk_x11_display_translate_event (GdkEventTranslator *translator,
 	{
 	  event->configure.type = GDK_CONFIGURE;
 	  event->configure.window = window;
-	  event->configure.width = xevent->xconfigure.width / window_impl->window_scale;
-	  event->configure.height = xevent->xconfigure.height / window_impl->window_scale;
+	  event->configure.width = (xevent->xconfigure.width + window_impl->window_scale - 1) / window_impl->window_scale;
+	  event->configure.height = (xevent->xconfigure.height + window_impl->window_scale - 1) / window_impl->window_scale;
 
 	  if (!xevent->xconfigure.send_event &&
 	      !xevent->xconfigure.override_redirect &&
@@ -823,11 +828,18 @@ gdk_x11_display_translate_event (GdkEventTranslator *translator,
 	    {
 	      window->x = event->configure.x;
 	      window->y = event->configure.y;
-	      window->width = xevent->xconfigure.width / window_impl->window_scale;
-	      window->height = xevent->xconfigure.height / window_impl->window_scale;
 
-	      _gdk_window_update_size (window);
-	      _gdk_x11_window_update_size (GDK_WINDOW_IMPL_X11 (window->impl));
+              if (window_impl->unscaled_width != xevent->xconfigure.width ||
+                  window_impl->unscaled_height != xevent->xconfigure.height)
+                {
+                  window_impl->unscaled_width = xevent->xconfigure.width;
+                  window_impl->unscaled_height = xevent->xconfigure.height;
+                  window->width = event->configure.width;
+                  window->height = event->configure.height;
+
+                  _gdk_window_update_size (window);
+                  _gdk_x11_window_update_size (window_impl);
+                }
 
 	      if (window->resize_count >= 1)
 		{
@@ -1949,7 +1961,8 @@ gdk_x11_lookup_xdisplay (Display *xdisplay)
 
   for (l = list; l; l = l->next)
     {
-      if (GDK_DISPLAY_XDISPLAY (l->data) == xdisplay)
+      if (GDK_IS_X11_DISPLAY (l->data) &&
+          GDK_DISPLAY_XDISPLAY (l->data) == xdisplay)
         {
           display = l->data;
           break;
@@ -2706,11 +2719,6 @@ gdk_x11_display_set_window_scale (GdkDisplay *display,
 
   scale = MAX (scale, 1);
 
-#ifndef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
-  /* Without cairo support we can't support any scale but 1 */
-  scale = 1;
-#endif
-
   x11_screen = GDK_X11_SCREEN (GDK_X11_DISPLAY (display)->screen);
 
   if (!x11_screen->fixed_window_scale)
@@ -2803,22 +2811,12 @@ gdk_x11_set_sm_client_id (const gchar *sm_client_id)
 
   displays = gdk_display_manager_list_displays (gdk_display_manager_get ());
   for (l = displays; l; l = l->next)
-    set_sm_client_id (l->data, sm_client_id);
+    {
+      if (GDK_IS_X11_DISPLAY (l->data))
+        set_sm_client_id (l->data, sm_client_id);
+    }
 
   g_slist_free (displays);
-}
-
-static void
-gdk_x11_display_event_data_copy (GdkDisplay    *display,
-                                const GdkEvent *src,
-                                GdkEvent       *dst)
-{
-}
-
-static void
-gdk_x11_display_event_data_free (GdkDisplay *display,
-                                 GdkEvent *event)
-{
 }
 
 static gint
@@ -2892,8 +2890,6 @@ gdk_x11_display_class_init (GdkX11DisplayClass * class)
   display_class->after_process_all_updates = _gdk_x11_display_after_process_all_updates;
   display_class->get_next_serial = gdk_x11_display_get_next_serial;
   display_class->notify_startup_complete = gdk_x11_display_notify_startup_complete;
-  display_class->event_data_copy = gdk_x11_display_event_data_copy;
-  display_class->event_data_free = gdk_x11_display_event_data_free;
   display_class->create_window_impl = _gdk_x11_display_create_window_impl;
   display_class->get_keymap = gdk_x11_display_get_keymap;
   display_class->push_error_trap = gdk_x11_display_error_trap_push;
@@ -2905,6 +2901,8 @@ gdk_x11_display_class_init (GdkX11DisplayClass * class)
   display_class->convert_selection = _gdk_x11_display_convert_selection;
   display_class->text_property_to_utf8_list = _gdk_x11_display_text_property_to_utf8_list;
   display_class->utf8_to_string_target = _gdk_x11_display_utf8_to_string_target;
+
+  display_class->make_gl_context_current = gdk_x11_display_make_gl_context_current;
 
   _gdk_x11_windowing_init ();
 }

@@ -36,7 +36,9 @@
 #include "gdkasync.h"
 #include "gdkeventsource.h"
 #include "gdkdisplay-x11.h"
+#include "gdkglcontext-x11.h"
 #include "gdkprivate-x11.h"
+#include "gdk-private.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -99,8 +101,6 @@ const gint _gdk_x11_event_mask_table_size = G_N_ELEMENTS (_gdk_x11_event_mask_ta
 
 /* Forward declarations */
 static void     gdk_x11_window_apply_fullscreen_mode (GdkWindow  *window);
-static void     gdk_window_set_static_win_gravity (GdkWindow  *window,
-						   gboolean    on);
 static gboolean gdk_window_icon_name_set          (GdkWindow  *window);
 static void     set_wm_name                       (GdkDisplay  *display,
 						   Window       xwindow,
@@ -194,9 +194,22 @@ _gdk_x11_window_update_size (GdkWindowImplX11 *impl)
   if (impl->cairo_surface)
     {
       cairo_xlib_surface_set_size (impl->cairo_surface,
-                                   gdk_window_get_width (impl->wrapper) * impl->window_scale,
-                                   gdk_window_get_height (impl->wrapper) * impl->window_scale);
+                                   impl->unscaled_width, impl->unscaled_height);
     }
+}
+
+void
+gdk_x11_window_get_unscaled_size (GdkWindow *window,
+                                  int *unscaled_width,
+                                  int *unscaled_height)
+{
+  GdkWindowImplX11 *impl = GDK_WINDOW_IMPL_X11 (window->impl);
+
+  if (unscaled_width)
+    *unscaled_width = impl->unscaled_width;
+
+  if (unscaled_height)
+    *unscaled_height = impl->unscaled_height;
 }
 
 static void
@@ -206,10 +219,10 @@ set_sync_counter(Display     *display,
 {
     XSyncValue sync_value;
 
-    XSyncIntsToValue(&sync_value,
-                     value & G_GINT64_CONSTANT(0xFFFFFFFF),
-                     value >> 32);
-    XSyncSetCounter(display, counter, sync_value);
+    XSyncIntsToValue (&sync_value,
+                      value & G_GINT64_CONSTANT(0xFFFFFFFF),
+                      value >> 32);
+    XSyncSetCounter (display, counter, sync_value);
 }
 
 static void
@@ -227,9 +240,9 @@ window_pre_damage (GdkWindow *window)
       impl->toplevel->current_counter_value % 2 == 0)
     {
       impl->toplevel->current_counter_value += 1;
-      set_sync_counter(GDK_WINDOW_XDISPLAY (impl->wrapper),
-		       impl->toplevel->extended_update_counter,
-		       impl->toplevel->current_counter_value);
+      set_sync_counter (GDK_WINDOW_XDISPLAY (impl->wrapper),
+		        impl->toplevel->extended_update_counter,
+                        impl->toplevel->current_counter_value);
     }
 }
 
@@ -467,9 +480,7 @@ gdk_x11_ref_cairo_surface (GdkWindow *window)
       impl->cairo_surface = gdk_x11_create_cairo_surface (impl,
                                                           gdk_window_get_width (window) * impl->window_scale,
                                                           gdk_window_get_height (window) * impl->window_scale);
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
       cairo_surface_set_device_scale (impl->cairo_surface, impl->window_scale, impl->window_scale);
-#endif
 
       if (WINDOW_IS_TOPLEVEL (window) && impl->toplevel->in_frame)
         hook_surface_changed (window);
@@ -736,6 +747,8 @@ _gdk_x11_screen_init_root_window (GdkScreen *screen)
   window->y = 0;
   window->abs_x = 0;
   window->abs_y = 0;
+  impl->unscaled_width = WidthOfScreen (x11_screen->xscreen);
+  impl->unscaled_height = HeightOfScreen (x11_screen->xscreen);
   window->width = WidthOfScreen (x11_screen->xscreen) / impl->window_scale;
   window->height = HeightOfScreen (x11_screen->xscreen) / impl->window_scale;
   window->viewable = TRUE;
@@ -1029,12 +1042,6 @@ _gdk_x11_display_create_window_impl (GdkDisplay    *display,
 
   impl->override_redirect = xattributes.override_redirect;
 
-  if (window->parent && window->parent->guffaw_gravity)
-    {
-      xattributes.win_gravity = StaticGravity;
-      xattributes_mask |= CWWinGravity;
-    }
-
   /* Sanity checks */
   switch (window->window_type)
     {
@@ -1056,11 +1063,7 @@ _gdk_x11_display_create_window_impl (GdkDisplay    *display,
       xattributes.border_pixel = BlackPixel (xdisplay, x11_screen->screen_num);
       xattributes_mask |= CWBorderPixel | CWBackPixel;
 
-      if (window->guffaw_gravity)
-        xattributes.bit_gravity = StaticGravity;
-      else
-        xattributes.bit_gravity = NorthWestGravity;
-
+      xattributes.bit_gravity = NorthWestGravity;
       xattributes_mask |= CWBitGravity;
 
       xattributes.colormap = _gdk_visual_get_x11_colormap (window->visual);
@@ -1091,6 +1094,9 @@ _gdk_x11_display_create_window_impl (GdkDisplay    *display,
       if (window->height  * impl->window_scale > 32767)
         window->height = 32767 /  impl->window_scale;
     }
+
+  impl->unscaled_width = window->width * impl->window_scale;
+  impl->unscaled_height = window->height * impl->window_scale;
 
   impl->xid = XCreateWindow (xdisplay, xparent,
                              (window->x + window->parent->abs_x) * impl->window_scale,
@@ -1140,7 +1146,7 @@ _gdk_x11_display_create_window_impl (GdkDisplay    *display,
   connect_frame_clock (window);
 
   if (GDK_WINDOW_TYPE (window) != GDK_WINDOW_CHILD)
-    gdk_window_freeze_toplevel_updates_libgtk_only (window);
+    gdk_window_freeze_toplevel_updates (window);
 }
 
 static GdkEventMask
@@ -1241,6 +1247,8 @@ gdk_x11_window_foreign_new_for_display (GdkDisplay *display,
 
   win->x = attrs.x / impl->window_scale;
   win->y = attrs.y / impl->window_scale;
+  impl->unscaled_width = attrs.width;
+  impl->unscaled_height = attrs.height;
   win->width = attrs.width / impl->window_scale;
   win->height = attrs.height  / impl->window_scale;
   win->window_type = GDK_WINDOW_FOREIGN;
@@ -1801,13 +1809,15 @@ window_x11_resize (GdkWindow *window,
 
       if (impl->override_redirect)
         {
+          impl->unscaled_width = width * impl->window_scale;
+          impl->unscaled_height = height * impl->window_scale;
           window->width = width;
           window->height = height;
           _gdk_x11_window_update_size (GDK_WINDOW_IMPL_X11 (window->impl));
         }
       else
         {
-          if (width != window->width || height != window->height)
+          if (width * impl->window_scale != impl->unscaled_width || height * impl->window_scale != impl->unscaled_height)
             window->resize_count += 1;
         }
     }
@@ -1847,6 +1857,8 @@ window_x11_move_resize (GdkWindow *window,
           window->x = x;
           window->y = y;
 
+          impl->unscaled_width = width * impl->window_scale;
+          impl->unscaled_height = height * impl->window_scale;
           window->width = width;
           window->height = height;
 
@@ -1854,7 +1866,7 @@ window_x11_move_resize (GdkWindow *window,
         }
       else
         {
-          if (width != window->width || height != window->height)
+          if (width * impl->window_scale != impl->unscaled_width || height * impl->window_scale != impl->unscaled_height)
             window->resize_count += 1;
         }
     }
@@ -1910,10 +1922,8 @@ _gdk_x11_window_set_window_scale (GdkWindow *window,
   impl = GDK_WINDOW_IMPL_X11 (window->impl);
 
   impl->window_scale = scale;
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
   if (impl->cairo_surface)
     cairo_surface_set_device_scale (impl->cairo_surface, impl->window_scale, impl->window_scale);
-#endif
   _gdk_window_update_size (window);
 
   toplevel = _gdk_x11_window_get_toplevel (window);
@@ -1934,17 +1944,30 @@ _gdk_x11_window_set_window_scale (GdkWindow *window,
                  (window->x + window->parent->abs_x) * impl->window_scale,
                  (window->y + window->parent->abs_y) * impl->window_scale);
   else if (WINDOW_IS_TOPLEVEL(window))
-    XResizeWindow (GDK_WINDOW_XDISPLAY (window),
-                   GDK_WINDOW_XID (window),
-                   window->width * impl->window_scale,
-                   window->height * impl->window_scale);
+    {
+      if (impl->override_redirect)
+        {
+          impl->unscaled_width = window->width * impl->window_scale;
+          impl->unscaled_height = window->height * impl->window_scale;
+        }
+
+      XResizeWindow (GDK_WINDOW_XDISPLAY (window),
+                     GDK_WINDOW_XID (window),
+                     window->width * impl->window_scale,
+                     window->height * impl->window_scale);
+    }
   else
-    XMoveResizeWindow (GDK_WINDOW_XDISPLAY (window),
-                       GDK_WINDOW_XID (window),
-                       (window->x + window->parent->abs_x) * impl->window_scale,
-                       (window->y + window->parent->abs_y) * impl->window_scale,
-                       window->width * impl->window_scale,
-                       window->height * impl->window_scale);
+    {
+      impl->unscaled_width = window->width * impl->window_scale;
+      impl->unscaled_height = window->height * impl->window_scale;
+
+      XMoveResizeWindow (GDK_WINDOW_XDISPLAY (window),
+                         GDK_WINDOW_XID (window),
+                         (window->x + window->parent->abs_x) * impl->window_scale,
+                         (window->y + window->parent->abs_y) * impl->window_scale,
+                         window->width * impl->window_scale,
+                         window->height * impl->window_scale);
+    }
 
   gdk_window_invalidate_rect (window, NULL, TRUE);
 
@@ -2940,15 +2963,15 @@ gdk_window_x11_set_background (GdkWindow      *window,
     {
       GdkWindow *parent;
 
-      /* X throws BadMatch if the parent has a different visual when
+      /* X throws BadMatch if the parent has a different depth when
        * using ParentRelative */
       parent = gdk_window_get_parent (window);
-      if (parent && gdk_window_get_visual (parent) == gdk_window_get_visual (window))
-        XSetWindowBackgroundPixmap (GDK_WINDOW_XDISPLAY (window),
-                                    GDK_WINDOW_XID (window), ParentRelative);
-      else
+      if (parent && window->depth != parent->depth)
         XSetWindowBackgroundPixmap (GDK_WINDOW_XDISPLAY (window),
                                     GDK_WINDOW_XID (window), None);
+      else
+        XSetWindowBackgroundPixmap (GDK_WINDOW_XDISPLAY (window),
+                                    GDK_WINDOW_XID (window), ParentRelative);
       return;
     }
 
@@ -2971,9 +2994,7 @@ gdk_window_x11_set_background (GdkWindow      *window,
 
           cairo_surface_get_device_offset (surface, &x, &y);
           sx = sy = 1.;
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
           cairo_surface_get_device_scale (surface, &sx, &sy);
-#endif
           /* XXX: This still bombs for non-pixmaps, but there's no way to
            * detect we're not a pixmap in Cairo... */
           if (x == 0.0 && y == 0.0 &&
@@ -3253,10 +3274,14 @@ gdk_x11_window_get_frame_extents (GdkWindow    *window,
   if (vroots)
     XFree (vroots);
 
-  rect->x /= impl->window_scale;
-  rect->y /= impl->window_scale;
-  rect->width /= impl->window_scale;
-  rect->height /= impl->window_scale;
+  /* Here we extend the size to include the extra pixels if we round x/y down
+     as well as round the size up when we divide by scale so that the returned
+     size is guaranteed to cover the real pixels, but it may overshoot a bit
+     in case the window is not positioned/sized according to the scale */
+  rect->width = (rect->width + rect->x % impl->window_scale + impl->window_scale - 1) / impl->window_scale;
+  rect->height = (rect->height + rect->y % impl->window_scale + impl->window_scale - 1) / impl->window_scale;
+  rect->x = rect->x / impl->window_scale;
+  rect->y = rect->y / impl->window_scale;
   gdk_x11_display_error_trap_pop_ignored (display);
 }
 
@@ -3268,8 +3293,6 @@ gdk_window_x11_get_device_state (GdkWindow       *window,
                                  GdkModifierType *mask)
 {
   GdkWindow *child;
-
-  g_return_val_if_fail (window == NULL || GDK_IS_WINDOW (window), FALSE);
 
   if (GDK_WINDOW_DESTROYED (window))
     return FALSE;
@@ -4574,68 +4597,6 @@ gdk_x11_window_get_input_shape (GdkWindow *window)
   return NULL;
 }
 
-static void
-gdk_window_set_static_bit_gravity (GdkWindow *window,
-                                   gboolean   on)
-{
-  XSetWindowAttributes xattributes;
-  guint xattributes_mask = 0;
-  
-  g_return_if_fail (GDK_IS_WINDOW (window));
-
-  if (window->input_only)
-    return;
-  
-  xattributes.bit_gravity = StaticGravity;
-  xattributes_mask |= CWBitGravity;
-  xattributes.bit_gravity = on ? StaticGravity : ForgetGravity;
-  XChangeWindowAttributes (GDK_WINDOW_XDISPLAY (window),
-			   GDK_WINDOW_XID (window),
-			   CWBitGravity,  &xattributes);
-}
-
-static void
-gdk_window_set_static_win_gravity (GdkWindow *window,
-                                   gboolean   on)
-{
-  XSetWindowAttributes xattributes;
-  
-  g_return_if_fail (GDK_IS_WINDOW (window));
-  
-  xattributes.win_gravity = on ? StaticGravity : NorthWestGravity;
-  
-  XChangeWindowAttributes (GDK_WINDOW_XDISPLAY (window),
-			   GDK_WINDOW_XID (window),
-			   CWWinGravity,  &xattributes);
-}
-
-static gboolean
-gdk_window_x11_set_static_gravities (GdkWindow *window,
-                                     gboolean   use_static)
-{
-  GList *tmp_list;
-  
-  if (!use_static == !window->guffaw_gravity)
-    return TRUE;
-
-  window->guffaw_gravity = use_static;
-  
-  if (!GDK_WINDOW_DESTROYED (window))
-    {
-      gdk_window_set_static_bit_gravity (window, use_static);
-      
-      tmp_list = window->children;
-      while (tmp_list)
-	{
-	  gdk_window_set_static_win_gravity (tmp_list->data, use_static);
-	  
-	  tmp_list = tmp_list->next;
-	}
-    }
-  
-  return TRUE;
-}
-
 /* From the WM spec */
 #define _NET_WM_MOVERESIZE_SIZE_TOPLEFT      0
 #define _NET_WM_MOVERESIZE_SIZE_TOP          1
@@ -4974,12 +4935,7 @@ finish_drag (MoveResizeData *mv_resize)
   mv_resize->moveresize_emulation_window = NULL;
   g_object_unref (mv_resize->moveresize_window);
   mv_resize->moveresize_window = NULL;
-
-  if (mv_resize->moveresize_pending_event)
-    {
-      g_free (mv_resize->moveresize_pending_event);
-      mv_resize->moveresize_pending_event = NULL;
-    }
+  g_clear_pointer (&mv_resize->moveresize_pending_event, g_free);
 }
 
 static int
@@ -5674,8 +5630,7 @@ gdk_x11_window_set_opaque_region (GdkWindow      *window,
                    XA_CARDINAL, 32, PropModeReplace,
                    (guchar *) data, nitems);
 
-  if (data != NULL)
-    g_free (data);
+  g_free (data);
 }
 
 static gboolean
@@ -5753,7 +5708,6 @@ gdk_window_impl_x11_class_init (GdkWindowImplX11Class *klass)
   impl_class->get_device_state = gdk_window_x11_get_device_state;
   impl_class->shape_combine_region = gdk_window_x11_shape_combine_region;
   impl_class->input_shape_combine_region = gdk_window_x11_input_shape_combine_region;
-  impl_class->set_static_gravities = gdk_window_x11_set_static_gravities;
   impl_class->queue_antiexpose = _gdk_x11_window_queue_antiexpose;
   impl_class->destroy = gdk_x11_window_destroy;
   impl_class->destroy_foreign = gdk_x11_window_destroy_foreign;
@@ -5814,4 +5768,7 @@ gdk_window_impl_x11_class_init (GdkWindowImplX11Class *klass)
   impl_class->set_opaque_region = gdk_x11_window_set_opaque_region;
   impl_class->set_shadow_width = gdk_x11_window_set_shadow_width;
   impl_class->show_window_menu = gdk_x11_window_show_window_menu;
+  impl_class->create_gl_context = gdk_x11_window_create_gl_context;
+  impl_class->invalidate_for_new_frame = gdk_x11_window_invalidate_for_new_frame;
+  impl_class->get_unscaled_size = gdk_x11_window_get_unscaled_size;
 }

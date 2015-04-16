@@ -126,6 +126,9 @@ testdata = \
 	border-color-default.css \
 	border-color-default.ref.ui \
 	border-color-default.ui \
+	border-corner-zero-width-rendering.css \
+	border-corner-zero-width-rendering.ref.ui \
+	border-corner-zero-width-rendering.ui \
 	border-half-pixel.css \
 	border-half-pixel.ref.ui \
 	border-half-pixel.ui \
@@ -268,6 +271,9 @@ testdata = \
 	iconview-empty.css \
 	iconview-empty.ui \
 	iconview-empty.ref.ui \
+	image-icon-shadow-clipping.css \
+	image-icon-shadow-clipping.ref.ui \
+	image-icon-shadow-clipping.ui \
 	image-load-from-file.css \
 	image-load-from-file.ref.ui \
 	image-load-from-file.ui \
@@ -301,8 +307,12 @@ testdata = \
 	label-sizing.ui \
 	label-small-ellipsized.ref.ui \
 	label-small-ellipsized.ui \
+	label-text-shadow-clipping.css \
 	label-text-shadow-clipping.ref.ui \
 	label-text-shadow-clipping.ui \
+	label-text-shadow-changes-modify-clip.css \
+	label-text-shadow-changes-modify-clip.ref.ui \
+	label-text-shadow-changes-modify-clip.ui \
 	label-width-chars-dont-shrink.ref.ui \
 	label-width-chars-dont-shrink.ui \
 	label-wrap-justify.ref.ui \
@@ -390,6 +400,9 @@ testdata = \
 	sizegroups-get-preferred-null.ref.ui \
 	statusbar-remove-all.ref.ui \
 	statusbar-remove-all.ui \
+	style-context-save-inheritance.css \
+	style-context-save-inheritance.ref.ui \
+	style-context-save-inheritance.ui \
 	style-properties-nth-child.css \
 	style-properties-nth-child.ref.ui \
 	style-properties-nth-child.ui \
@@ -405,6 +418,8 @@ testdata = \
 	textview-margins.css \
 	textview-margins.ref.ui \
 	textview-margins.ui \
+	textview-tags.ref.ui \
+	textview-tags.ui \
 	toplevel-vs-popup.ref.ui \
 	toplevel-vs-popup.ui \
 	treeview-crash-too-wide.ref.ui \
@@ -476,9 +491,11 @@ libreftest_la_CFLAGS = $(gtk_reftest_CFLAGS)
 libreftest_la_LIBADD = $(gtk_reftest_LDADD)
 libreftest_la_SOURCES =			\
 	expand-expander.c		\
+	label-text-shadow-changes-modify-clip.c	\
 	set-default-direction.c		\
 	statusbar-remove-all.c		\
 	textview-border-windows.c	\
+	textview-tags.c			\
 	$(NULL)
 
 -include $(top_srcdir)/git.mk

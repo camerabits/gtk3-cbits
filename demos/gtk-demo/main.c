@@ -772,19 +772,53 @@ load_file (const gchar *demoname,
         case 3:
           /* Reading program body */
           gtk_text_buffer_insert (source_buffer, &start, p, -1);
-          gtk_text_buffer_insert (source_buffer, &start, "\n", 1);
+          if (lines[i+1] != NULL)
+            gtk_text_buffer_insert (source_buffer, &start, "\n", 1);
           break;
         }
     }
 
+  g_strfreev (lines);
+
   fontify (source_buffer);
 
-  g_strfreev (lines);
+  gtk_text_buffer_create_tag (source_buffer, "top-margin",
+                              "pixels-above-lines", 20,
+                              NULL);
+  gtk_text_buffer_get_start_iter (source_buffer, &start);
+  end = start;
+  gtk_text_iter_forward_word_end (&end);
+  gtk_text_buffer_apply_tag_by_name (source_buffer, "top-margin", &start, &end);
+
+  gtk_text_buffer_create_tag (source_buffer, "bottom-margin",
+                              "pixels-below-lines", 20,
+                              NULL);
+  gtk_text_buffer_get_end_iter (source_buffer, &end);
+  start = end;
+  gtk_text_iter_backward_word_start (&start);
+  gtk_text_buffer_apply_tag_by_name (source_buffer, "bottom-margin", &start, &end);
+
+  gtk_text_view_set_buffer (GTK_TEXT_VIEW (source_view), source_buffer);
+  g_object_unref (source_buffer);
+
+  gtk_text_buffer_create_tag (info_buffer, "top-margin",
+                              "pixels-above-lines", 20,
+                              NULL);
+  gtk_text_buffer_get_start_iter (info_buffer, &start);
+  end = start;
+  gtk_text_iter_forward_word_end (&end);
+  gtk_text_buffer_apply_tag_by_name (info_buffer, "top-margin", &start, &end);
+
+  gtk_text_buffer_create_tag (info_buffer, "bottom-margin",
+                              "pixels-below-lines", 20,
+                              NULL);
+  gtk_text_buffer_get_end_iter (info_buffer, &end);
+  start = end;
+  gtk_text_iter_backward_word_start (&start);
+  gtk_text_buffer_apply_tag_by_name (info_buffer, "bottom-margin", &start, &end);
 
   gtk_text_view_set_buffer (GTK_TEXT_VIEW (info_view), info_buffer);
   g_object_unref (info_buffer);
-  gtk_text_view_set_buffer (GTK_TEXT_VIEW (source_view), source_buffer);
-  g_object_unref (source_buffer);
 }
 
 static void
@@ -821,7 +855,6 @@ create_text (GtkWidget **view,
 {
   GtkWidget *scrolled_window;
   GtkWidget *text_view;
-  PangoFontDescription *font_desc;
 
   scrolled_window = gtk_scrolled_window_new (NULL, NULL);
   gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window),
@@ -831,7 +864,10 @@ create_text (GtkWidget **view,
                                        GTK_SHADOW_NONE);
 
   *view = text_view = gtk_text_view_new ();
-  g_object_set (text_view, "margin", 20, NULL);
+  g_object_set (text_view,
+                "left-margin", 20,
+                "right-margin", 20,
+                NULL);
 
   gtk_text_view_set_editable (GTK_TEXT_VIEW (text_view), FALSE);
   gtk_text_view_set_cursor_visible (GTK_TEXT_VIEW (text_view), FALSE);
@@ -840,22 +876,15 @@ create_text (GtkWidget **view,
 
   if (is_source)
     {
-      font_desc = pango_font_description_from_string ("monospace");
-      gtk_widget_override_font (text_view, font_desc);
-      pango_font_description_free (font_desc);
-
-      gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (text_view),
-                                   GTK_WRAP_NONE);
+      gtk_text_view_set_monospace (GTK_TEXT_VIEW (text_view), TRUE);
+      gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (text_view), GTK_WRAP_NONE);
     }
   else
     {
       /* Make it a bit nicer for text. */
-      gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (text_view),
-                                   GTK_WRAP_WORD);
-      gtk_text_view_set_pixels_above_lines (GTK_TEXT_VIEW (text_view),
-                                            2);
-      gtk_text_view_set_pixels_below_lines (GTK_TEXT_VIEW (text_view),
-                                            2);
+      gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (text_view), GTK_WRAP_WORD);
+      gtk_text_view_set_pixels_above_lines (GTK_TEXT_VIEW (text_view), 2);
+      gtk_text_view_set_pixels_below_lines (GTK_TEXT_VIEW (text_view), 2);
     }
 
   return scrolled_window;

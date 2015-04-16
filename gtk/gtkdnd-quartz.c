@@ -343,6 +343,8 @@ gtk_drag_clear_source_info (GdkDragContext *context)
 /**
  * gtk_drag_get_source_widget: (method)
  * @context: a (destination side) drag context
+ *
+ * Returns: (transfer none):
  */
 GtkWidget *
 gtk_drag_get_source_widget (GdkDragContext *context)
@@ -1091,6 +1093,8 @@ _gtk_drag_dest_handle_event (GtkWidget *toplevel,
  * @context: drag context
  * @target_list: (allow-none): list of droppable targets, or %NULL to use
  *    gtk_drag_dest_get_target_list (@widget).
+ *
+ * Returns: (transfer none):
  */
 GdkAtom
 gtk_drag_dest_find_target (GtkWidget      *widget,
@@ -1369,6 +1373,18 @@ gtk_drag_begin_internal (GtkWidget         *widget,
   return context;
 }
 
+/**
+ * gtk_drag_begin_with_coordinates: (method)
+ * @widget:
+ * @targets:
+ * @actions:
+ * @button:
+ * @event:
+ * @x:
+ * @y:
+ *
+ * Returns: (transfer none):
+ */
 GdkDragContext *
 gtk_drag_begin_with_coordinates (GtkWidget         *widget,
 				 GtkTargetList     *targets,
@@ -1393,6 +1409,8 @@ gtk_drag_begin_with_coordinates (GtkWidget         *widget,
  * @actions: A bitmask of the allowed drag actions for this drag.
  * @button: The button the user clicked to start the drag.
  * @event: The event that triggered the start of the drag.
+ *
+ * Returns: (transfer none):
  */
 GdkDragContext *
 gtk_drag_begin (GtkWidget         *widget,
@@ -1553,6 +1571,8 @@ gtk_drag_source_unset (GtkWidget *widget)
 /**
  * gtk_drag_source_get_target_list: (method)
  * @widget: a #GtkWidget
+ *
+ * Returns: (transfer none):
  */
 GtkTargetList *
 gtk_drag_source_get_target_list (GtkWidget *widget)
@@ -1598,7 +1618,7 @@ gtk_drag_source_set_target_list (GtkWidget     *widget,
 }
 
 /**
- * gtk_drag_source_add_text_targets:
+ * gtk_drag_source_add_text_targets: (method)
  * @widget: a #GtkWidget that’s is a drag source
  *
  * Add the text targets supported by #GtkSelection to
@@ -1722,7 +1742,7 @@ gtk_drag_source_set_icon_pixbuf (GtkWidget   *widget,
 }
 
 /**
- * gtk_drag_source_set_icon_stock:
+ * gtk_drag_source_set_icon_stock: (method)
  * @widget: a #GtkWidget
  * @stock_id: the ID of the stock icon to use
  *
@@ -1748,7 +1768,7 @@ gtk_drag_source_set_icon_stock (GtkWidget   *widget,
 }
 
 /**
- * gtk_drag_source_set_icon_name:
+ * gtk_drag_source_set_icon_name: (method)
  * @widget: a #GtkWidget
  * @icon_name: name of icon to use
  * 
@@ -1777,7 +1797,7 @@ gtk_drag_source_set_icon_name (GtkWidget   *widget,
 
 
 /**
- * gtk_drag_set_icon_widget:
+ * gtk_drag_set_icon_widget: (method)
  * @context: the context for a drag. (This must be called 
           with a  context for the source side of a drag)
  * @widget: a toplevel window to use as an icon.
@@ -2005,7 +2025,7 @@ gtk_drag_set_icon_name (GdkDragContext *context,
 }
 
 /**
- * gtk_drag_set_icon_default:
+ * gtk_drag_set_icon_default: (method)
  * @context: the context for a drag. (This must be called 
              with a  context for the source side of a drag)
  * 

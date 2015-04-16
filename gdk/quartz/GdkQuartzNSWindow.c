@@ -409,6 +409,8 @@
 
 #ifdef AVAILABLE_MAC_OS_X_VERSION_10_7_AND_LATER
 
+#ifdef AVAILABLE_MAC_OS_X_VERSION_10_7_AND_LATER
+
 - (void)setStyleMask:(NSUInteger)styleMask
 {
   gboolean was_fullscreen;

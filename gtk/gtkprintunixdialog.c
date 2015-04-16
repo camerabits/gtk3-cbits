@@ -726,6 +726,11 @@ gtk_print_unix_dialog_init (GtkPrintUnixDialog *dialog)
   priv->support_selection = FALSE;
   priv->has_selection = FALSE;
 
+  g_type_ensure (GTK_TYPE_PRINTER);
+  g_type_ensure (GTK_TYPE_PRINTER_OPTION);
+  g_type_ensure (GTK_TYPE_PRINTER_OPTION_SET);
+  g_type_ensure (GTK_TYPE_PRINTER_OPTION_WIDGET);
+
   gtk_widget_init_template (GTK_WIDGET (dialog));
   gtk_dialog_set_use_header_bar_from_setting (GTK_DIALOG (dialog));
   gtk_dialog_add_buttons (GTK_DIALOG (dialog),
@@ -737,7 +742,7 @@ gtk_print_unix_dialog_init (GtkPrintUnixDialog *dialog)
   widget = gtk_dialog_get_widget_for_response (GTK_DIALOG (dialog), GTK_RESPONSE_OK);
   gtk_widget_set_sensitive (widget, FALSE);
 
-  /* Treeview auxilary functions need to be setup here  */
+  /* Treeview auxiliary functions need to be setup here */
   gtk_tree_model_filter_set_visible_func (priv->printer_list_filter,
                                           (GtkTreeModelFilterVisibleFunc) is_printer_active,
                                           dialog,
@@ -956,7 +961,7 @@ void set_cell_sensitivity_func (GtkTreeViewColumn *tree_column,
   else
     g_object_set (cell, "sensitive", TRUE, NULL);
 
-  g_object_unref (printer);
+  g_clear_object (&printer);
 }
 
 static void
@@ -2087,8 +2092,8 @@ selected_printer_changed (GtkTreeSelection   *selection,
           if (page_setup && priv->page_setup)
             gtk_page_setup_set_orientation (page_setup, gtk_page_setup_get_orientation (priv->page_setup));
 
-          g_object_unref (priv->page_setup);
-          priv->page_setup = page_setup;
+          g_clear_object (&priv->page_setup);
+          priv->page_setup = page_setup; /* transfer ownership */
         }
 
       priv->printer_capabilities = gtk_printer_get_capabilities (printer);
@@ -2220,6 +2225,7 @@ paint_page (GtkWidget *widget,
 
   gtk_style_context_save (context);
   gtk_style_context_add_class (context, GTK_STYLE_CLASS_FRAME);
+  gtk_style_context_add_class (context, GTK_STYLE_CLASS_PAPER);
   gtk_style_context_add_class (context, GTK_STYLE_CLASS_VIEW);
 
   gtk_render_background (context, cr, x, y, width, height);
@@ -2758,6 +2764,7 @@ draw_page_cb (GtkWidget          *widget,
   context = gtk_widget_get_style_context (widget);
 
   gtk_style_context_save (context);
+  gtk_style_context_add_class (context, GTK_STYLE_CLASS_PAPER);
   gtk_style_context_add_class (context, GTK_STYLE_CLASS_VIEW);
 
   pos_x = (width - w) / 2;
@@ -3242,7 +3249,7 @@ custom_paper_dialog_response_cb (GtkDialog *custom_paper_dialog,
                              gtk_paper_size_get_display_name (gtk_page_setup_get_paper_size (priv->page_setup))) == 0)
                 gtk_print_unix_dialog_set_page_setup (print_dialog, page_setup);
 
-              g_object_unref (page_setup);
+              g_clear_object (&page_setup);
             } while (gtk_tree_model_iter_next (model, &iter));
         }
     }
@@ -3430,7 +3437,7 @@ gtk_print_unix_dialog_set_page_setup (GtkPrintUnixDialog *dialog,
 
   if (priv->page_setup != page_setup)
     {
-      g_object_unref (priv->page_setup);
+      g_clear_object (&priv->page_setup);
       priv->page_setup = g_object_ref (page_setup);
 
       priv->page_setup_set = TRUE;

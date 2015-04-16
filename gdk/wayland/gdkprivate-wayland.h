@@ -19,11 +19,11 @@
  * Modified by the GTK+ Team and others 1997-2000.  See the AUTHORS
  * file for a list of people on the GTK+ Team.  See the ChangeLog
  * files for a list of changes.  These files are distributed with
- * GTK+ at ftp://ftp.gtk.org/pub/gtk/. 
+ * GTK+ at ftp://ftp.gtk.org/pub/gtk/.
  */
 
 /*
- * Private uninstalled header defining things local to X windowing code
+ * Private uninstalled header defining things local to the Wayland backend
  */
 
 #ifndef __GDK_PRIVATE_WAYLAND_H__
@@ -40,6 +40,10 @@
 
 #include "config.h"
 
+#define WL_SURFACE_HAS_BUFFER_SCALE 3
+
+#define SUPPORTED_GTK_SHELL_VERSION 1
+
 #define GDK_WINDOW_IS_WAYLAND(win)    (GDK_IS_WINDOW_IMPL_WAYLAND (((GdkWindow *)win)->impl))
 
 GdkKeymap *_gdk_wayland_keymap_new (void);
@@ -54,11 +58,16 @@ gboolean           _gdk_wayland_keymap_key_is_modifier (GdkKeymap *keymap,
 
 void       _gdk_wayland_display_init_cursors (GdkWaylandDisplay *display);
 void       _gdk_wayland_display_finalize_cursors (GdkWaylandDisplay *display);
-void       _gdk_wayland_display_update_cursors (GdkWaylandDisplay      *display,
-                                                struct wl_cursor_theme *theme);
+void       _gdk_wayland_display_update_cursors (GdkWaylandDisplay *display);
+
+struct wl_cursor_theme * _gdk_wayland_display_get_scaled_cursor_theme (GdkWaylandDisplay *wayland_display,
+                                                                       guint              scale);
 
 GdkCursor *_gdk_wayland_display_get_cursor_for_type (GdkDisplay    *display,
 						     GdkCursorType  cursor_type);
+GdkCursor *_gdk_wayland_display_get_cursor_for_type_with_scale (GdkDisplay    *display,
+                                                                GdkCursorType  cursor_type,
+                                                                guint          scale);
 GdkCursor *_gdk_wayland_display_get_cursor_for_name (GdkDisplay  *display,
 						     const gchar *name);
 GdkCursor *_gdk_wayland_display_get_cursor_for_surface (GdkDisplay *display,
@@ -84,6 +93,9 @@ struct wl_buffer *_gdk_wayland_cursor_get_buffer (GdkCursor *cursor,
 guint      _gdk_wayland_cursor_get_next_image_index (GdkCursor *cursor,
                                                      guint      current_image_index,
                                                      guint     *next_image_delay);
+
+void       _gdk_wayland_cursor_set_scale (GdkCursor *cursor,
+                                          guint      scale);
 
 GdkDragProtocol _gdk_wayland_window_get_drag_protocol (GdkWindow *window,
 						       GdkWindow **target);
@@ -219,14 +231,16 @@ cairo_surface_t * _gdk_wayland_display_create_shm_surface (GdkWaylandDisplay *di
 struct wl_buffer *_gdk_wayland_shm_surface_get_wl_buffer (cairo_surface_t *surface);
 void _gdk_wayland_shm_surface_set_busy (cairo_surface_t *surface);
 gboolean _gdk_wayland_shm_surface_get_busy (cairo_surface_t *surface);
+gboolean _gdk_wayland_is_shm_surface (cairo_surface_t *surface);
 
 GdkWaylandSelection * gdk_wayland_display_get_selection (GdkDisplay *display);
 GdkWaylandSelection * gdk_wayland_selection_new (void);
 void gdk_wayland_selection_free (GdkWaylandSelection *selection);
 
-void gdk_wayland_selection_set_offer (struct wl_data_offer *offer);
-struct wl_data_offer * gdk_wayland_selection_get_offer (void);
-GList * gdk_wayland_selection_get_targets (void);
+void gdk_wayland_selection_set_offer (GdkDisplay           *display,
+                                      struct wl_data_offer *wl_offer);
+struct wl_data_offer * gdk_wayland_selection_get_offer (GdkDisplay *display);
+GList * gdk_wayland_selection_get_targets (GdkDisplay *display);
 
 void     gdk_wayland_selection_store   (GdkWindow    *window,
                                         GdkAtom       type,
@@ -235,7 +249,11 @@ void     gdk_wayland_selection_store   (GdkWindow    *window,
                                         gint          len);
 struct wl_data_source * gdk_wayland_selection_get_data_source (GdkWindow *owner,
                                                                GdkAtom    selection);
-void gdk_wayland_selection_unset_data_source (GdkAtom selection);
+void gdk_wayland_selection_unset_data_source (GdkDisplay *display, GdkAtom selection);
 
+EGLSurface gdk_wayland_window_get_egl_surface (GdkWindow *window,
+                                               EGLConfig config);
+EGLSurface gdk_wayland_window_get_dummy_egl_surface (GdkWindow *window,
+						     EGLConfig config);
 
 #endif /* __GDK_PRIVATE_WAYLAND_H__ */

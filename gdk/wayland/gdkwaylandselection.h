@@ -19,7 +19,7 @@
  * Modified by the GTK+ Team and others 1997-2000.  See the AUTHORS
  * file for a list of people on the GTK+ Team.  See the ChangeLog
  * files for a list of changes.  These files are distributed with
- * GTK+ at ftp://ftp.gtk.org/pub/gtk/. 
+ * GTK+ at ftp://ftp.gtk.org/pub/gtk/.
  */
 
 #ifndef __GDK_WAYLAND_SELECTION_H__
@@ -45,7 +45,7 @@ gdk_wayland_selection_add_targets (GdkWindow *window,
 #define gdk_wayland_selection_clear_targets gdk_wayland_selection_clear_targets_libgtk_only
 GDK_AVAILABLE_IN_ALL
 void
-gdk_wayland_selection_clear_targets (GdkAtom selection);
+gdk_wayland_selection_clear_targets (GdkDisplay *display, GdkAtom selection);
 
 #define gdk_wayland_drag_context_get_dnd_window gdk_wayland_drag_context_get_dnd_window_libgtk_only
 GDK_AVAILABLE_IN_ALL

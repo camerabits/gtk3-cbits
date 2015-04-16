@@ -19,7 +19,7 @@
 #include <glib/gi18n-lib.h>
 
 #include "prop-editor.h"
-#include "widget-tree.h"
+#include "object-tree.h"
 
 #include "gtkactionable.h"
 #include "gtkadjustment.h"
@@ -414,7 +414,6 @@ static void
 bool_changed (GObject *object, GParamSpec *pspec, gpointer data)
 {
   GtkToggleButton *tb = GTK_TOGGLE_BUTTON (data);
-  GtkWidget *child;
   GValue val = G_VALUE_INIT;
 
   g_value_init (&val, G_TYPE_BOOLEAN);
@@ -427,9 +426,8 @@ bool_changed (GObject *object, GParamSpec *pspec, gpointer data)
       unblock_controller (G_OBJECT (tb));
     }
 
-  child = gtk_bin_get_child (GTK_BIN (tb));
-  gtk_label_set_text (GTK_LABEL (child),
-                      g_value_get_boolean (&val) ? "TRUE" : "FALSE");
+  gtk_button_set_label (GTK_BUTTON (tb),
+                        g_value_get_boolean (&val) ? "TRUE" : "FALSE");
 
   g_value_unset (&val);
 }
@@ -1264,7 +1262,7 @@ find_action_owner (GtkActionable *actionable)
 
   while (widget != NULL)
     {
-      group = _gtk_widget_get_action_group (widget, prefix);
+      group = gtk_widget_get_action_group (widget, prefix);
       if (group && g_action_group_has_action (group, name))
         return (GObject *)widget;
       widget = action_ancestor (widget);

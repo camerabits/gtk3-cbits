@@ -27,6 +27,7 @@
 #include "gtkliststore.h"
 #include "gtkwidgetprivate.h"
 #include "gtkpopover.h"
+#include "gtklabel.h"
 
 enum
 {
@@ -43,6 +44,7 @@ struct _GtkInspectorActionsPrivate
   GtkListStore *model;
   GHashTable *groups;
   GHashTable *iters;
+  GtkWidget *object_title;
 };
 
 G_DEFINE_TYPE_WITH_PRIVATE (GtkInspectorActions, gtk_inspector_actions, GTK_TYPE_BOX)
@@ -214,20 +216,27 @@ gtk_inspector_actions_set_object (GtkInspectorActions *sl,
     add_group (sl, G_ACTION_GROUP (object), "win");
   else if (GTK_IS_WIDGET (object))
     {
-      gchar **prefixes;
+      const gchar **prefixes;
       GActionGroup *group;
       gint i;
 
-      prefixes = _gtk_widget_list_action_prefixes (GTK_WIDGET (object));
+      prefixes = gtk_widget_list_action_prefixes (GTK_WIDGET (object));
       if (prefixes)
         {
           for (i = 0; prefixes[i]; i++)
             {
-              group = _gtk_widget_get_action_group (GTK_WIDGET (object), prefixes[i]);
+              group = gtk_widget_get_action_group (GTK_WIDGET (object), prefixes[i]);
               add_group (sl, group, prefixes[i]);
             }
           g_free (prefixes);
         }
+    }
+
+  if (G_IS_OBJECT (object))
+    {
+      const gchar *title;
+      title = (const gchar *)g_object_get_data (object, "gtk-inspector-object-title");
+      gtk_label_set_label (GTK_LABEL (sl->priv->object_title), title);
     }
 }
 
@@ -275,8 +284,9 @@ gtk_inspector_actions_class_init (GtkInspectorActionsClass *klass)
 {
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
 
-  gtk_widget_class_set_template_from_resource (widget_class, "/org/gtk/inspector/actions.ui");
+  gtk_widget_class_set_template_from_resource (widget_class, "/org/gtk/libgtk/inspector/actions.ui");
   gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorActions, model);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorActions, object_title);
   gtk_widget_class_bind_template_callback (widget_class, row_activated);
 }
 

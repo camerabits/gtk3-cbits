@@ -41,6 +41,7 @@
 #include <gdk/gdkevents.h>
 #include <gdk/gdkframeclock.h>
 #include <gdk/gdkframetimings.h>
+#include <gdk/gdkglcontext.h>
 #include <gdk/gdkkeys.h>
 #include <gdk/gdkkeysyms.h>
 #include <gdk/gdkmain.h>
@@ -60,6 +61,8 @@
 #ifndef GDK_DISABLE_DEPRECATED
 #include <gdk/deprecated/gdkcolor.h>
 #endif
+
+#include <gdk/gdk-autocleanup.h>
 
 #undef __GDK_H_INSIDE__
 

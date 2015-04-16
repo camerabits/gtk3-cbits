@@ -281,6 +281,7 @@ enum
   SELECT_ALL,
   TOGGLE_CURSOR_VISIBLE,
   PREEDIT_CHANGED,
+  EXTEND_SELECTION,
   LAST_SIGNAL
 };
 
@@ -308,7 +309,8 @@ enum
   PROP_VSCROLL_POLICY,
   PROP_INPUT_PURPOSE,
   PROP_INPUT_HINTS,
-  PROP_POPULATE_ALL
+  PROP_POPULATE_ALL,
+  PROP_MONOSPACE
 };
 
 static GQuark quark_text_selection_data = 0;
@@ -456,7 +458,7 @@ static void     gtk_text_view_check_keymap_direction (GtkTextView        *text_v
 static void     gtk_text_view_start_selection_drag   (GtkTextView          *text_view,
                                                       const GtkTextIter    *iter,
                                                       SelectionGranularity  granularity,
-                                                      const GdkEvent       *event);
+                                                      gboolean              extends);
 static gboolean gtk_text_view_end_selection_drag     (GtkTextView        *text_view);
 static void     gtk_text_view_start_selection_dnd    (GtkTextView        *text_view,
                                                       const GtkTextIter  *iter,
@@ -559,6 +561,12 @@ static void gtk_text_view_queue_draw_region (GtkWidget            *widget,
 
 static void gtk_text_view_get_rendered_rect (GtkTextView  *text_view,
                                              GdkRectangle *rect);
+
+static gboolean gtk_text_view_extend_selection (GtkTextView            *text_view,
+                                                GtkTextExtendSelection  granularity,
+                                                const GtkTextIter      *location,
+                                                GtkTextIter            *start,
+                                                GtkTextIter            *end);
 
 
 /* FIXME probably need the focus methods. */
@@ -713,6 +721,7 @@ gtk_text_view_class_init (GtkTextViewClass *klass)
   klass->paste_clipboard = gtk_text_view_paste_clipboard;
   klass->toggle_overwrite = gtk_text_view_toggle_overwrite;
   klass->create_buffer = gtk_text_view_create_buffer;
+  klass->extend_selection = gtk_text_view_extend_selection;
 
   /*
    * Properties
@@ -905,6 +914,23 @@ gtk_text_view_class_init (GtkTextViewClass *klass)
                                                          FALSE,
                                                          GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY));
 
+  /**
+   * GtkTextview:monospace:
+   *
+   * If %TRUE, set the %GTK_STYLE_CLASS_MONOSPACE style class on the
+   * text view to indicate that a monospace font is desired.
+   *
+   * Since: 3.16
+   */
+  g_object_class_install_property (gobject_class,
+                                   PROP_MONOSPACE,
+                                   g_param_spec_boolean ("monospace",
+                                                         P_("Monospace"),
+                                                         P_("Whether to use a monospace font"),
+                                                         FALSE,
+                                                         GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY));
+
+  
 
    /* GtkScrollable interface */
    g_object_class_override_property (gobject_class, PROP_HADJUSTMENT,    "hadjustment");
@@ -1260,6 +1286,34 @@ G_GNUC_END_IGNORE_DEPRECATIONS
                                 G_TYPE_NONE, 1,
                                 G_TYPE_STRING);
 
+  /**
+   * GtkTextView::extend-selection:
+   * @text_view: the object which received the signal
+   * @granularity: the granularity type
+   * @location: the location where to extend the selection
+   * @start: where the selection should start
+   * @end: where the selection should end
+   *
+   * The ::extend-selection signal is emitted when the selection needs to be
+   * extended at @location.
+   *
+   * Returns: %GDK_EVENT_STOP to stop other handlers from being invoked for the
+   *   event. %GDK_EVENT_PROPAGATE to propagate the event further.
+   * Since: 3.16
+   */
+  signals[EXTEND_SELECTION] =
+    g_signal_new (I_("extend-selection"),
+                  G_OBJECT_CLASS_TYPE (gobject_class),
+                  G_SIGNAL_RUN_LAST,
+                  G_STRUCT_OFFSET (GtkTextViewClass, extend_selection),
+                  _gtk_boolean_handled_accumulator, NULL,
+                  NULL, /* generic marshaller */
+                  G_TYPE_BOOLEAN, 4,
+                  GTK_TYPE_TEXT_EXTEND_SELECTION,
+                  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+                  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+                  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
+
   /*
    * Key bindings
    */
@@ -1585,7 +1639,6 @@ _gtk_text_view_ensure_magnifier (GtkTextView *text_view)
     return;
 
   priv->magnifier = _gtk_magnifier_new (GTK_WIDGET (text_view));
-  gtk_widget_set_size_request (priv->magnifier, 100, 60);
   _gtk_magnifier_set_magnification (GTK_MAGNIFIER (priv->magnifier), 2.0);
   priv->magnifier_popover = gtk_popover_new (GTK_WIDGET (text_view));
   gtk_style_context_add_class (gtk_widget_get_style_context (priv->magnifier_popover),
@@ -3219,6 +3272,9 @@ gtk_text_view_destroy (GtkWidget *widget)
       priv->pixel_cache = NULL;
     }
 
+  if (priv->magnifier)
+    _gtk_magnifier_set_inspected (GTK_MAGNIFIER (priv->magnifier), NULL);
+
   GTK_WIDGET_CLASS (gtk_text_view_parent_class)->destroy (widget);
 }
 
@@ -3396,6 +3452,9 @@ gtk_text_view_set_property (GObject         *object,
           g_object_notify_by_pspec (object, pspec);
         }
       break;
+    case PROP_MONOSPACE:
+      gtk_text_view_set_monospace (text_view, g_value_get_boolean (value));
+      break;
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -3503,6 +3562,10 @@ gtk_text_view_get_property (GObject         *object,
 
     case PROP_POPULATE_ALL:
       g_value_set_boolean (value, priv->populate_all);
+      break;
+
+    case PROP_MONOSPACE:
+      g_value_set_boolean (value, gtk_text_view_get_monospace (text_view));
       break;
 
     default:
@@ -4391,11 +4454,15 @@ gtk_text_view_set_background (GtkTextView *text_view)
 static void
 gtk_text_view_style_updated (GtkWidget *widget)
 {
+  static GtkBitmask *affects_font = NULL;
   GtkTextView *text_view;
   GtkTextViewPrivate *priv;
   PangoContext *ltr_context, *rtl_context;
   GtkStyleContext *style_context;
   const GtkBitmask *changes;
+
+  if (G_UNLIKELY (affects_font == NULL))
+    affects_font = _gtk_css_style_property_get_mask_affecting (GTK_CSS_AFFECTS_FONT);
 
   text_view = GTK_TEXT_VIEW (widget);
   priv = text_view->priv;
@@ -4410,7 +4477,8 @@ gtk_text_view_style_updated (GtkWidget *widget)
 
   style_context = gtk_widget_get_style_context (widget);
   changes = _gtk_style_context_get_changes (style_context);
-  if ((changes == NULL || _gtk_css_style_property_changes_affect_font (changes)) &&
+
+  if ((changes == NULL || _gtk_bitmask_intersects (changes, affects_font)) &&
       priv->layout && priv->layout->default_style)
     {
       gtk_text_view_set_attributes_from_style (text_view,
@@ -4658,32 +4726,42 @@ gtk_text_view_set_handle_position (GtkTextView           *text_view,
 
 static void
 gtk_text_view_show_magnifier (GtkTextView *text_view,
+                              GtkTextIter *iter,
                               gint         x,
                               gint         y)
 {
   cairo_rectangle_int_t rect;
   GtkTextViewPrivate *priv;
-  GtkAllocation allocation;
+  GtkRequisition req;
 
-  _gtk_text_view_ensure_magnifier (text_view);
-  gtk_widget_get_allocation (GTK_WIDGET (text_view), &allocation);
-
-#define RECT_WIDTH 40
+#define N_LINES 1
 
   priv = text_view->priv;
-  x = CLAMP (x, 0, allocation.width);
-  y = CLAMP (y, 0, allocation.height);
-  rect.x = x - (RECT_WIDTH / 2);
-  rect.y = y - (RECT_WIDTH / 2);
-  rect.width = rect.height = RECT_WIDTH;
-  _text_window_to_widget_coords (text_view, &rect.x, &rect.y);
+  _gtk_text_view_ensure_magnifier (text_view);
 
-  _gtk_magnifier_set_coords (GTK_MAGNIFIER (priv->magnifier), x, y);
+  /* Set size/content depending on iter rect */
+  gtk_text_view_get_iter_location (text_view, iter,
+                                   (GdkRectangle *) &rect);
+  rect.x = x + priv->xoffset;
+  gtk_text_view_buffer_to_window_coords (text_view, GTK_TEXT_WINDOW_TEXT,
+                                         rect.x, rect.y, &rect.x, &rect.y);
+  _text_window_to_widget_coords (text_view, &rect.x, &rect.y);
+  req.height = rect.height * N_LINES *
+    _gtk_magnifier_get_magnification (GTK_MAGNIFIER (priv->magnifier));
+  req.width = MAX ((req.height * 4) / 3, 80);
+  gtk_widget_set_size_request (priv->magnifier, req.width, req.height);
+
+  _gtk_magnifier_set_coords (GTK_MAGNIFIER (priv->magnifier),
+                             rect.x, rect.y + rect.height / 2);
+
+  rect.y += rect.height / 4;
+  rect.height -= rect.height / 4;
   gtk_popover_set_pointing_to (GTK_POPOVER (priv->magnifier_popover),
                                &rect);
+
   gtk_widget_show (priv->magnifier_popover);
 
-#undef RECT_WIDTH
+#undef N_LINES
 }
 
 static void
@@ -4773,7 +4851,10 @@ gtk_text_view_handle_dragged (GtkTextHandle         *handle,
                                             gtk_text_buffer_get_selection_bound (buffer));
     }
 
-  gtk_text_view_show_magnifier (text_view, x, y);
+  if (_gtk_text_handle_get_is_dragged (priv->text_handle, cursor_pos))
+    gtk_text_view_show_magnifier (text_view, &cursor, x, y);
+  else
+    gtk_text_view_show_magnifier (text_view, &bound, x, y);
 }
 
 static void
@@ -5110,6 +5191,15 @@ gtk_text_view_multipress_gesture_pressed (GtkGestureMultiPress *gesture,
   else if (button == GDK_BUTTON_PRIMARY)
     {
       GtkTextHandleMode handle_mode = GTK_TEXT_HANDLE_MODE_NONE;
+      gboolean extends = FALSE;
+      GdkModifierType state;
+
+      gdk_event_get_state (event, &state);
+
+      if (state &
+          gtk_widget_get_modifier_mask (GTK_WIDGET (text_view),
+                                        GDK_MODIFIER_INTENT_EXTEND_SELECTION))
+        extends = TRUE;
 
       switch (n_press)
         {
@@ -5126,23 +5216,45 @@ gtk_text_view_multipress_gesture_pressed (GtkGestureMultiPress *gesture,
 
             if (gtk_text_buffer_get_selection_bounds (get_buffer (text_view),
                                                       &start, &end) &&
-                gtk_text_iter_in_range (&iter, &start, &end) &&
-                !(event->button.state &
-                  gtk_widget_get_modifier_mask (GTK_WIDGET (text_view),
-                                                GDK_MODIFIER_INTENT_EXTEND_SELECTION)))
+                gtk_text_iter_in_range (&iter, &start, &end) && !extends)
               {
-                /* Claim the sequence on the drag gesture, but attach no selection data */
-                gtk_gesture_set_state (priv->drag_gesture,
-                                       GTK_EVENT_SEQUENCE_CLAIMED);
+                if (is_touchscreen)
+                  {
+                    if (!priv->selection_bubble ||
+			!gtk_widget_get_visible (priv->selection_bubble))
+                      gtk_text_view_selection_bubble_popup_set (text_view);
+                    else
+                      gtk_text_view_selection_bubble_popup_unset (text_view);
+
+                    handle_mode = GTK_TEXT_HANDLE_MODE_SELECTION;
+                  }
+                else
+                  {
+                    /* Claim the sequence on the drag gesture, but attach no
+                     * selection data, this is a special case to start DnD.
+                     */
+                    gtk_gesture_set_state (priv->drag_gesture,
+                                           GTK_EVENT_SEQUENCE_CLAIMED);
+                  }
                 break;
               }
+            else
+	      {
+                gtk_text_view_selection_bubble_popup_unset (text_view);
 
-            gtk_text_view_start_selection_drag (text_view, &iter,
-                                                SELECT_CHARACTERS, event);
+		if (is_touchscreen)
+		  gtk_text_buffer_place_cursor (get_buffer (text_view), &iter);
+		else
+		  gtk_text_view_start_selection_drag (text_view, &iter,
+						      SELECT_CHARACTERS, extends);
+	      }
             break;
           }
         case 2:
         case 3:
+          if (is_touchscreen)
+            break;
+
           handle_mode = GTK_TEXT_HANDLE_MODE_SELECTION;
           gtk_text_view_end_selection_drag (text_view);
 
@@ -5150,7 +5262,7 @@ gtk_text_view_multipress_gesture_pressed (GtkGestureMultiPress *gesture,
                                  &iter, NULL, NULL);
           gtk_text_view_start_selection_drag (text_view, &iter,
                                               n_press == 2 ? SELECT_WORDS : SELECT_LINES,
-                                              event);
+                                              extends);
           break;
         default:
           break;
@@ -6844,28 +6956,68 @@ drag_scan_timeout (gpointer data)
   return TRUE;
 }
 
-/*
- * Move @start and @end to the boundaries of the selection unit (indicated by 
- * @granularity) which contained @start initially.
- * If the selction unit is SELECT_WORDS and @start is not contained in a word
- * the selection is extended to all the white spaces between the end of the 
- * word preceding @start and the start of the one following.
- */
 static void
-extend_selection (GtkTextView *text_view, 
-		  SelectionGranularity granularity, 
-		  GtkTextIter *start, 
-		  GtkTextIter *end)
+extend_selection (GtkTextView          *text_view,
+                  SelectionGranularity  granularity,
+                  const GtkTextIter    *location,
+                  GtkTextIter          *start,
+                  GtkTextIter          *end)
 {
-  *end = *start;
+  GtkTextExtendSelection extend_selection_granularity;
+  gboolean handled = FALSE;
 
-  if (granularity == SELECT_WORDS) 
+  switch (granularity)
     {
+    case SELECT_CHARACTERS:
+      *start = *location;
+      *end = *location;
+      return;
+
+    case SELECT_WORDS:
+      extend_selection_granularity = GTK_TEXT_EXTEND_SELECTION_WORD;
+      break;
+
+    case SELECT_LINES:
+      extend_selection_granularity = GTK_TEXT_EXTEND_SELECTION_LINE;
+      break;
+
+    default:
+      g_assert_not_reached ();
+    }
+
+  g_signal_emit (text_view,
+                 signals[EXTEND_SELECTION], 0,
+                 extend_selection_granularity,
+                 location,
+                 start,
+                 end,
+                 &handled);
+
+  if (!handled)
+    {
+      *start = *location;
+      *end = *location;
+    }
+}
+
+static gboolean
+gtk_text_view_extend_selection (GtkTextView            *text_view,
+                                GtkTextExtendSelection  granularity,
+                                const GtkTextIter      *location,
+                                GtkTextIter            *start,
+                                GtkTextIter            *end)
+{
+  *start = *location;
+  *end = *location;
+
+  switch (granularity)
+    {
+    case GTK_TEXT_EXTEND_SELECTION_WORD:
       if (gtk_text_iter_inside_word (start))
 	{
 	  if (!gtk_text_iter_starts_word (start))
 	    gtk_text_iter_backward_visible_word_start (start);
-	  
+
 	  if (!gtk_text_iter_ends_word (end))
 	    {
 	      if (!gtk_text_iter_forward_visible_word_end (end))
@@ -6875,6 +7027,11 @@ extend_selection (GtkTextView *text_view,
       else
 	{
 	  GtkTextIter tmp;
+
+          /* @start is not contained in a word: the selection is extended to all
+           * the white spaces between the end of the word preceding @start and
+           * the start of the one following.
+           */
 
 	  tmp = *start;
 	  if (gtk_text_iter_backward_visible_word_start (&tmp))
@@ -6897,9 +7054,9 @@ extend_selection (GtkTextView *text_view,
 	  else
 	    gtk_text_iter_forward_to_line_end (end);
 	}
-    }
-  else if (granularity == SELECT_LINES) 
-    {
+      break;
+
+    case GTK_TEXT_EXTEND_SELECTION_LINE:
       if (gtk_text_view_starts_display_line (text_view, start))
 	{
 	  /* If on a display line boundary, we assume the user
@@ -6914,13 +7071,18 @@ extend_selection (GtkTextView *text_view,
 	   * start, and move end to the end unless it's already there.
 	   */
 	  gtk_text_view_backward_display_line_start (text_view, start);
-	  
+
 	  if (!gtk_text_view_starts_display_line (text_view, end))
 	    gtk_text_view_forward_display_line_end (text_view, end);
 	}
+      break;
+
+    default:
+      g_return_val_if_reached (GDK_EVENT_STOP);
     }
+
+  return GDK_EVENT_STOP;
 }
- 
 
 typedef struct
 {
@@ -6978,12 +7140,22 @@ gtk_text_view_drag_gesture_update (GtkGestureDrag *gesture,
   const GdkEvent *event;
   SelectionData *data;
   GdkDevice *device;
+  GtkTextIter cursor;
 
   data = g_object_get_qdata (G_OBJECT (gesture), quark_text_selection_data);
   sequence = gtk_gesture_single_get_current_sequence (GTK_GESTURE_SINGLE (gesture));
   event = gtk_gesture_get_last_event (GTK_GESTURE (gesture), sequence);
   drag_gesture_get_text_window_coords (gesture, text_view,
                                        &start_x, &start_y, &x, &y);
+
+  device = gdk_event_get_source_device (event);
+
+  is_touchscreen = test_touchscreen ||
+                   (gtk_get_debug_flags () & GTK_DEBUG_TOUCHSCREEN) != 0 ||
+                   gdk_device_get_source (device) == GDK_SOURCE_TOUCHSCREEN;
+
+  get_iter_from_gesture (text_view, text_view->priv->drag_gesture,
+                         &cursor, NULL, NULL);
 
   if (!data)
     {
@@ -6993,39 +7165,43 @@ gtk_text_view_drag_gesture_update (GtkGestureDrag *gesture,
       if (gtk_drag_check_threshold (GTK_WIDGET (text_view),
 				    start_x, start_y, x, y))
         {
-          GtkTextIter iter;
-          gint buffer_x, buffer_y;
+          if (!is_touchscreen)
+            {
+              GtkTextIter iter;
+              gint buffer_x, buffer_y;
 
-          gtk_text_view_window_to_buffer_coords (text_view,
-                                                 GTK_TEXT_WINDOW_TEXT,
-                                                 start_x, start_y,
-                                                 &buffer_x,
-                                                 &buffer_y);
+              gtk_text_view_window_to_buffer_coords (text_view,
+                                                     GTK_TEXT_WINDOW_TEXT,
+                                                     start_x, start_y,
+                                                     &buffer_x,
+                                                     &buffer_y);
 
-          gtk_text_layout_get_iter_at_pixel (text_view->priv->layout,
-                                             &iter, buffer_x, buffer_y);
+              gtk_text_layout_get_iter_at_pixel (text_view->priv->layout,
+                                                 &iter, buffer_x, buffer_y);
 
-          gtk_text_view_start_selection_dnd (text_view, &iter, event,
-                                             start_x, start_y);
+              gtk_text_view_start_selection_dnd (text_view, &iter, event,
+                                                 start_x, start_y);
+              return;
+            }
+          else
+            {
+              gtk_text_view_start_selection_drag (text_view, &cursor,
+                                                  SELECT_WORDS, TRUE);
+              data = g_object_get_qdata (G_OBJECT (gesture), quark_text_selection_data);
+            }
         }
-
-      return;
+      else
+        return;
     }
 
   /* Text selection */
-  device = gdk_event_get_source_device (event);
-
-  is_touchscreen = test_touchscreen ||
-                   (gtk_get_debug_flags () & GTK_DEBUG_TOUCHSCREEN) != 0 ||
-                   gdk_device_get_source (device) == GDK_SOURCE_TOUCHSCREEN;
-
   if (data->granularity == SELECT_CHARACTERS)
     {
       move_mark_to_pointer_and_scroll (text_view, "insert");
     }
   else
     {
-      GtkTextIter cursor, start, end;
+      GtkTextIter start, end;
       GtkTextIter orig_start, orig_end;
       GtkTextBuffer *buffer;
 
@@ -7036,14 +7212,15 @@ gtk_text_view_drag_gesture_update (GtkGestureDrag *gesture,
 
       get_iter_from_gesture (text_view, text_view->priv->drag_gesture,
                              &cursor, NULL, NULL);
-      start = cursor;
-      extend_selection (text_view, data->granularity, &start, &end);
+
+      extend_selection (text_view, data->granularity, &cursor, &start, &end);
 
       /* either the selection extends to the front, or end (or not) */
-      if (gtk_text_iter_compare (&cursor, &orig_start) < 0)
-        gtk_text_buffer_select_range (buffer, &start, &orig_end);
-      else
-        gtk_text_buffer_select_range (buffer, &end, &orig_start);
+      if (gtk_text_iter_compare (&orig_start, &start) < 0)
+        start = orig_start;
+      if (gtk_text_iter_compare (&orig_end, &end) > 0)
+        end = orig_end;
+      gtk_text_buffer_select_range (buffer, &start, &end);
 
       gtk_text_view_scroll_mark_onscreen (text_view,
 					  gtk_text_buffer_get_insert (buffer));
@@ -7067,7 +7244,7 @@ gtk_text_view_drag_gesture_update (GtkGestureDrag *gesture,
     {
       _gtk_text_view_ensure_text_handles (text_view);
       gtk_text_view_update_handles (text_view, GTK_TEXT_HANDLE_MODE_SELECTION);
-      gtk_text_view_show_magnifier (text_view, x, y);
+      gtk_text_view_show_magnifier (text_view, &cursor, x, y);
     }
 }
 
@@ -7116,13 +7293,11 @@ gtk_text_view_drag_gesture_end (GtkGestureDrag *gesture,
     (gtk_get_debug_flags () & GTK_DEBUG_TOUCHSCREEN) != 0 ||
     gdk_device_get_source (device) == GDK_SOURCE_TOUCHSCREEN;
 
-  if (priv->selection_bubble &&
-      gtk_widget_get_visible (priv->selection_bubble))
-    gtk_text_view_selection_bubble_popup_unset (text_view);
-  else if (is_touchscreen)
+  if (!clicked_in_selection && is_touchscreen &&
+      (!priv->selection_bubble || !gtk_widget_get_visible (priv->selection_bubble)))
     gtk_text_view_selection_bubble_popup_set (text_view);
 
-  if (clicked_in_selection &&
+  if (!is_touchscreen && clicked_in_selection &&
       !gtk_drag_check_threshold (GTK_WIDGET (text_view), start_x, start_y, x, y))
     {
       GtkTextHandleMode mode = GTK_TEXT_HANDLE_MODE_NONE;
@@ -7152,32 +7327,27 @@ static void
 gtk_text_view_start_selection_drag (GtkTextView          *text_view,
                                     const GtkTextIter    *iter,
                                     SelectionGranularity  granularity,
-                                    const GdkEvent       *event)
+                                    gboolean              extend)
 {
   GtkTextViewPrivate *priv;
   GtkTextIter cursor, ins, bound;
   GtkTextIter orig_start, orig_end;
   GtkTextBuffer *buffer;
   SelectionData *data;
-  GdkModifierType state;
 
   priv = text_view->priv;
   data = g_slice_new0 (SelectionData);
   data->granularity = granularity;
 
   buffer = get_buffer (text_view);
-  
+
   cursor = *iter;
-  ins = cursor;
-  
-  extend_selection (text_view, data->granularity, &ins, &bound);
+  extend_selection (text_view, data->granularity, &cursor, &ins, &bound);
+
   orig_start = ins;
   orig_end = bound;
-  gdk_event_get_state (event, &state);
 
-  if (state &
-      gtk_widget_get_modifier_mask (GTK_WIDGET (text_view),
-                                    GDK_MODIFIER_INTENT_EXTEND_SELECTION))
+  if (extend)
     {
       /* Extend selection */
       GtkTextIter old_ins, old_bound;
@@ -7197,15 +7367,18 @@ gtk_text_view_start_selection_drag (GtkTextView          *text_view,
            gtk_text_iter_compare (&old_ins, &old_bound) <= 0))
         {
           bound = old_end;
-          orig_start = old_end;
-          orig_end = old_end;
         }
       else
         {
           ins = bound;
           bound = old_start;
-          orig_end = bound;
-          orig_start = bound;
+        }
+
+      /* Store any previous selection */
+      if (gtk_text_iter_compare (&old_start, &old_end) != 0)
+        {
+          orig_start = old_ins;
+          orig_end = old_bound;
         }
     }
 
@@ -7266,7 +7439,9 @@ gtk_text_view_set_attributes_from_style (GtkTextView        *text_view,
   gtk_style_context_save (context);
   gtk_style_context_add_class (context, GTK_STYLE_CLASS_VIEW);
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
   gtk_style_context_get_background_color (context, state, &bg_color);
+G_GNUC_END_IGNORE_DEPRECATIONS
   gtk_style_context_get_color (context, state, &fg_color);
 
   values->appearance.bg_color.red = CLAMP (bg_color.red * 65535. + 0.5, 0, 65535);
@@ -7424,7 +7599,7 @@ gtk_text_view_ensure_layout (GtkTextView *text_view)
  * attributes in effect at a given text position.
  *
  * The return value is a copy owned by the caller of this function,
- * and should be freed.
+ * and should be freed with gtk_text_attributes_unref().
  * 
  * Returns: a new #GtkTextAttributes
  **/
@@ -8331,6 +8506,20 @@ gtk_text_view_value_changed (GtkAdjustment *adjustment,
       priv->first_validate_idle = 0;
     }
 
+  /* Allow to extend selection with mouse scrollwheel. Bug 710612 */
+  if (gtk_gesture_is_active (priv->drag_gesture))
+    {
+      GdkEvent *current_event;
+      current_event = gtk_get_current_event ();
+      if (current_event != NULL)
+        {
+          if (current_event->type == GDK_SCROLL)
+            move_mark_to_pointer_and_scroll (text_view, "insert");
+
+          gdk_event_free (current_event);
+        }
+    }
+
   /* Finally we update the IM cursor location again, to ensure any
    * changes made by the validation are pushed through.
    */
@@ -8598,7 +8787,7 @@ gtk_text_view_get_virtual_cursor_pos (GtkTextView *text_view,
 
   if (y)
     {
-      if (priv->virtual_cursor_x != -1)
+      if (priv->virtual_cursor_y != -1)
         *y = priv->virtual_cursor_y;
       else
         *y = pos.y + pos.height / 2;
@@ -9017,9 +9206,7 @@ bubble_targets_received (GtkClipboard     *clipboard,
 
   priv->selection_bubble = gtk_popover_new (GTK_WIDGET (text_view));
   gtk_style_context_add_class (gtk_widget_get_style_context (priv->selection_bubble),
-                               GTK_STYLE_CLASS_OSD);
-  gtk_style_context_add_class (gtk_widget_get_style_context (priv->selection_bubble),
-                               "touch-selection");
+                               GTK_STYLE_CLASS_TOUCH_SELECTION);
   gtk_popover_set_position (GTK_POPOVER (priv->selection_bubble),
                             GTK_POS_TOP);
   gtk_popover_set_modal (GTK_POPOVER (priv->selection_bubble), FALSE);
@@ -10563,4 +10750,59 @@ gtk_text_view_get_input_hints (GtkTextView *text_view)
                 NULL);
 
   return hints;
+}
+
+/**
+ * gtk_text_view_set_monospace:
+ * @text_view: a #GtkTextView
+ * @monospace: %TRUE to request monospace styling
+ *
+ * Sets the #GtkTextView:monospace property, which
+ * indicates that the text view should use monospace
+ * fonts.
+ *
+ * Since: 3.16
+ */
+void
+gtk_text_view_set_monospace (GtkTextView *text_view,
+                             gboolean     monospace)
+{
+  GtkStyleContext *context;
+  gboolean has_monospace;
+
+  g_return_if_fail (GTK_IS_TEXT_VIEW (text_view));
+
+  context = gtk_widget_get_style_context (GTK_WIDGET (text_view));  
+  has_monospace = gtk_style_context_has_class (context, GTK_STYLE_CLASS_MONOSPACE);
+
+  if (has_monospace != monospace)
+    {
+      if (monospace)
+        gtk_style_context_add_class (context, GTK_STYLE_CLASS_MONOSPACE);
+      else
+        gtk_style_context_remove_class (context, GTK_STYLE_CLASS_MONOSPACE);
+      g_object_notify (G_OBJECT (text_view), "monospace");
+    }
+}
+
+/**
+ * gtk_text_view_get_monospace:
+ * @text_view: a #GtkTextView
+ *
+ * Gets the value of the #GtkTextView:monospace property.
+ *
+ * Return: %TRUE if monospace fonts are desired
+ *
+ * Since: 3.16
+ */
+gboolean
+gtk_text_view_get_monospace (GtkTextView *text_view)
+{
+  GtkStyleContext *context;
+
+  g_return_val_if_fail (GTK_IS_TEXT_VIEW (text_view), FALSE);
+
+  context = gtk_widget_get_style_context (GTK_WIDGET (text_view));
+  
+  return gtk_style_context_has_class (context, GTK_STYLE_CLASS_MONOSPACE);
 }

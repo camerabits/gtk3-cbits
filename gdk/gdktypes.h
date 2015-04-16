@@ -128,6 +128,8 @@ typedef struct _GdkWindow             GdkWindow;
 typedef struct _GdkKeymap             GdkKeymap;
 typedef struct _GdkAppLaunchContext   GdkAppLaunchContext;
 
+typedef struct _GdkGLContext          GdkGLContext;
+
 /**
  * GdkByteOrder:
  * @GDK_LSB_FIRST: The values are stored with the least-significant byte
@@ -308,6 +310,7 @@ typedef enum
  * @GDK_GRAB_NOT_VIEWABLE: the grab window or the @confine_to window are not
  *  viewable.
  * @GDK_GRAB_FROZEN: the resource is frozen by an active grab of another client.
+ * @GDK_GRAB_FAILED: the grab failed for some other reason.
  *
  * Returned by gdk_device_grab(), gdk_pointer_grab() and gdk_keyboard_grab() to
  * indicate success or the reason for the failure of the grab attempt.
@@ -318,7 +321,8 @@ typedef enum
   GDK_GRAB_ALREADY_GRABBED = 1,
   GDK_GRAB_INVALID_TIME    = 2,
   GDK_GRAB_NOT_VIEWABLE    = 3,
-  GDK_GRAB_FROZEN          = 4
+  GDK_GRAB_FROZEN          = 4,
+  GDK_GRAB_FAILED          = 5
 } GdkGrabStatus;
 
 /**
@@ -367,6 +371,9 @@ typedef enum
  * A set of bit-flags to indicate which events a window is to receive.
  * Most of these masks map onto one or more of the #GdkEventType event types
  * above.
+ *
+ * See the [input handling overview][chap-input-handling] for details of
+ * [event masks][event-masks] and [event propagation][event-propagation].
  *
  * %GDK_POINTER_MOTION_HINT_MASK is deprecated. It is a special mask
  * to reduce the number of %GDK_MOTION_NOTIFY events received. When using
@@ -429,8 +436,22 @@ struct _GdkPoint
   gint y;
 };
 
+/**
+ * GdkGLError:
+ * @GDK_GL_ERROR_NOT_AVAILABLE: OpenGL support is not available
+ * @GDK_GL_ERROR_UNSUPPORTED_FORMAT: The requested visual format is not supported
+ * @GDK_GL_ERROR_UNSUPPORTED_PROFILE: The requested profile is not supported
+ *
+ * Error enumeration for #GdkGLContext.
+ *
+ * Since: 3.16
+ */
+typedef enum {
+  GDK_GL_ERROR_NOT_AVAILABLE,
+  GDK_GL_ERROR_UNSUPPORTED_FORMAT,
+  GDK_GL_ERROR_UNSUPPORTED_PROFILE
+} GdkGLError;
 
 G_END_DECLS
-
 
 #endif /* __GDK_TYPES_H__ */

@@ -37,7 +37,6 @@
 #include "gtksettingsprivate.h"
 #include "gtkstyleprovider.h"
 #include "gtkstylecontextprivate.h"
-#include "gtkstylepropertiesprivate.h"
 #include "gtkstylepropertyprivate.h"
 #include "gtkstyleproviderprivate.h"
 #include "gtkwidgetpath.h"
@@ -45,6 +44,7 @@
 #include "gtkmarshalers.h"
 #include "gtkprivate.h"
 #include "gtkintl.h"
+#include "gtkversion.h"
 
 /**
  * SECTION:gtkcssprovider
@@ -1058,7 +1058,7 @@
  * text or icon itself, which is always rendered on top of the shadow layer.
  *
  * |[
- *   text-shadow: text-shadow: 1 1 0 blue, -4 -4 red;
+ *   text-shadow: 1 1 0 blue, -4 -4 red;
  * ]|
 
  * ## box-shadow: [ inset ] horizontal_offset vertical_offset [ blur_radius ] [ spread ] color;
@@ -1646,7 +1646,7 @@ verify_tree_get_change_results (GtkCssProvider *provider,
 
 	ruleset = tree_rules->pdata[i];
 
-	verify_change |= _gtk_css_selector_tree_match_get_change (ruleset->selector_match);
+	verify_change |= _gtk_css_selector_get_change (ruleset->selector);
       }
 
     if (change != verify_change)
@@ -1727,8 +1727,8 @@ gtk_css_provider_get_style_property (GtkStyleProvider *provider,
 					     val->section != NULL ? gtk_css_section_get_file (val->section) : NULL,
 					     val->value);
 
-	      found = _gtk_css_style_parse_value (value,
-						  scanner->parser);
+	      found = _gtk_css_style_funcs_parse_value (value,
+					                scanner->parser);
 
 	      gtk_css_scanner_destroy (scanner);
 
@@ -1774,7 +1774,8 @@ gtk_css_style_provider_get_keyframes (GtkStyleProviderPrivate *provider,
 static void
 gtk_css_style_provider_lookup (GtkStyleProviderPrivate *provider,
                                const GtkCssMatcher     *matcher,
-                               GtkCssLookup            *lookup)
+                               GtkCssLookup            *lookup,
+                               GtkCssChange            *change)
 {
   GtkCssProvider *css_provider;
   GtkCssProviderPrivate *priv;
@@ -1819,24 +1820,16 @@ gtk_css_style_provider_lookup (GtkStyleProviderPrivate *provider,
     }
 
   g_ptr_array_free (tree_rules, TRUE);
-}
 
-static GtkCssChange
-gtk_css_style_provider_get_change (GtkStyleProviderPrivate *provider,
-                                   const GtkCssMatcher     *matcher)
-{
-  GtkCssProvider *css_provider;
-  GtkCssProviderPrivate *priv;
-  GtkCssChange change;
+  if (change)
+    {
+      GtkCssMatcher change_matcher;
 
-  css_provider = GTK_CSS_PROVIDER (provider);
-  priv = css_provider->priv;
+      _gtk_css_matcher_superset_init (&change_matcher, matcher, GTK_CSS_CHANGE_NAME | GTK_CSS_CHANGE_CLASS);
 
-  change = _gtk_css_selector_tree_get_change_all (priv->tree, matcher);
-
-  verify_tree_get_change_results (css_provider, matcher, change);
-
-  return change;
+      *change = _gtk_css_selector_tree_get_change_all (priv->tree, &change_matcher);
+      verify_tree_get_change_results (css_provider, &change_matcher, *change);
+    }
 }
 
 static void
@@ -1845,7 +1838,6 @@ gtk_css_style_provider_private_iface_init (GtkStyleProviderPrivateInterface *ifa
   iface->get_color = gtk_css_style_provider_get_color;
   iface->get_keyframes = gtk_css_style_provider_get_keyframes;
   iface->lookup = gtk_css_style_provider_lookup;
-  iface->get_change = gtk_css_style_provider_get_change;
 }
 
 static void
@@ -2780,7 +2772,7 @@ gtk_css_provider_load_internal (GtkCssProvider *css_provider,
  * Returns: %TRUE. The return value is deprecated and %FALSE will only be
  *     returned for backwards compatibility reasons if an @error is not 
  *     %NULL and a loading error occured. To track errors while loading
- *     CSS, connect to the GtkCssProvider::parsing-error signal.
+ *     CSS, connect to the #GtkCssProvider::parsing-error signal.
  **/
 gboolean
 gtk_css_provider_load_from_data (GtkCssProvider  *css_provider,
@@ -2828,7 +2820,7 @@ gtk_css_provider_load_from_data (GtkCssProvider  *css_provider,
  * Returns: %TRUE. The return value is deprecated and %FALSE will only be
  *     returned for backwards compatibility reasons if an @error is not 
  *     %NULL and a loading error occured. To track errors while loading
- *     CSS, connect to the GtkCssProvider::parsing-error signal.
+ *     CSS, connect to the #GtkCssProvider::parsing-error signal.
  **/
 gboolean
 gtk_css_provider_load_from_file (GtkCssProvider  *css_provider,
@@ -2861,7 +2853,7 @@ gtk_css_provider_load_from_file (GtkCssProvider  *css_provider,
  * Returns: %TRUE. The return value is deprecated and %FALSE will only be
  *     returned for backwards compatibility reasons if an @error is not 
  *     %NULL and a loading error occured. To track errors while loading
- *     CSS, connect to the GtkCssProvider::parsing-error signal.
+ *     CSS, connect to the #GtkCssProvider::parsing-error signal.
  **/
 gboolean
 gtk_css_provider_load_from_path (GtkCssProvider  *css_provider,
@@ -2883,12 +2875,25 @@ gtk_css_provider_load_from_path (GtkCssProvider  *css_provider,
   return result;
 }
 
-static void
-gtk_css_provider_load_from_resource (GtkCssProvider  *css_provider,
-			             const gchar     *resource_path)
+/**
+ * gtk_css_provider_load_from_resource:
+ * @css_provider: a #GtkCssProvider
+ * @resource_path: a #GResource resource path
+ *
+ * Loads the data contained in the resource at @resource_path into
+ * the #GtkCssProvider, clearing any previously loaded information.
+ *
+ * To track errors while loading CSS, connect to the
+ * #GtkCssProvider::parsing-error signal.
+ *
+ * Since: 3.16
+ */
+void
+gtk_css_provider_load_from_resource (GtkCssProvider *css_provider,
+			             const gchar    *resource_path)
 {
   GFile *file;
-  char *uri, *escaped;
+  gchar *uri, *escaped;
 
   g_return_if_fail (GTK_IS_CSS_PROVIDER (css_provider));
   g_return_if_fail (resource_path != NULL);
@@ -2935,11 +2940,100 @@ _gtk_css_provider_get_theme_dir (void)
   gchar *path;
 
   var = g_getenv ("GTK_DATA_PREFIX");
-
   if (var)
     path = g_build_filename (var, "share", "themes", NULL);
   else
     path = g_build_filename (_gtk_get_data_prefix (), "share", "themes", NULL);
+
+  return path;
+}
+
+#if (GTK_MINOR_VERSION % 2)
+#define MINOR (GTK_MINOR_VERSION + 1)
+#else
+#define MINOR GTK_MINOR_VERSION
+#endif
+
+/*
+ * Look for
+ * $dir/$subdir/gtk-3.16/gtk-$variant.css
+ * $dir/$subdir/gtk-3.14/gtk-$variant.css
+ *  ...
+ * $dir/$subdir/gtk-3.0/gtk-$variant.css
+ * and return the first found file.
+ * We don't check versions before 3.14,
+ * since those GTK+ versions didn't have
+ * the versioned loading mechanism.
+ */
+static gchar *
+_gtk_css_find_theme_dir (const gchar *dir,
+                         const gchar *subdir,
+                         const gchar *name,
+                         const gchar *variant)
+{
+  gchar *file;
+  gchar *base;
+  gchar *subsubdir;
+  gint i;
+  gchar *path;
+
+  if (variant)
+    file = g_strconcat ("gtk-", variant, ".css", NULL);
+  else
+    file = g_strdup ("gtk.css");
+
+  if (subdir)
+    base = g_build_filename (dir, subdir, name, NULL);
+  else
+    base = g_build_filename (dir, name, NULL);
+
+  for (i = MINOR; i >= 0; i = i - 2)
+    {
+      if (i < 14)
+        i = 0;
+
+      subsubdir = g_strdup_printf ("gtk-3.%d", i);
+      path = g_build_filename (base, subsubdir, file, NULL);
+      g_free (subsubdir);
+
+      if (g_file_test (path, G_FILE_TEST_EXISTS))
+        break;
+
+      g_free (path);
+      path = NULL;
+    }
+
+  g_free (file);
+  g_free (base);
+
+  return path;
+}
+
+#undef MINOR
+
+static gchar *
+_gtk_css_find_theme (const gchar *name,
+                     const gchar *variant)
+{
+  gchar *path;
+  const gchar *var;
+
+  /* First look in the user's config directory */
+  path = _gtk_css_find_theme_dir (g_get_user_data_dir (), "themes", name, variant);
+  if (path)
+    return path;
+
+  /* Next look in the user's home directory */
+  path = _gtk_css_find_theme_dir (g_get_home_dir (), ".themes", name, variant);
+  if (path)
+    return path;
+
+  /* Finally, try in the default theme directory */
+  var = g_getenv ("GTK_DATA_PREFIX");
+  if (!var)
+    var = _gtk_get_data_prefix ();
+
+  path = _gtk_css_find_theme_dir (var, "share" G_DIR_SEPARATOR_S "themes", name, variant);
 
   return path;
 }
@@ -2961,7 +3055,7 @@ _gtk_css_provider_load_named (GtkCssProvider *provider,
                               const gchar    *name,
                               const gchar    *variant)
 {
-  gchar *subpath, *path;
+  gchar *path;
   gchar *resource_path;
 
   g_return_if_fail (GTK_IS_CSS_PROVIDER (provider));
@@ -2985,44 +3079,8 @@ _gtk_css_provider_load_named (GtkCssProvider *provider,
     }
   g_free (resource_path);
 
-
-  /* Next try looking for files in the various theme directories.
-   */
-  if (variant)
-    subpath = g_strdup_printf ("gtk-3.0" G_DIR_SEPARATOR_S "gtk-%s.css", variant);
-  else
-    subpath = g_strdup ("gtk-3.0" G_DIR_SEPARATOR_S "gtk.css");
-
-  /* First look in the user's config directory
-   */
-  path = g_build_filename (g_get_user_data_dir (), "themes", name, subpath, NULL);
-  if (!g_file_test (path, G_FILE_TEST_EXISTS))
-    {
-      g_free (path);
-      /* Next look in the user's home directory
-       */
-      path = g_build_filename (g_get_home_dir (), ".themes", name, subpath, NULL);
-      if (!g_file_test (path, G_FILE_TEST_EXISTS))
-        {
-          gchar *theme_dir;
-
-          g_free (path);
-
-          /* Finally, try in the default theme directory */
-          theme_dir = _gtk_css_provider_get_theme_dir ();
-          path = g_build_filename (theme_dir, name, subpath, NULL);
-          g_free (theme_dir);
-
-          if (!g_file_test (path, G_FILE_TEST_EXISTS))
-            {
-              g_free (path);
-              path = NULL;
-            }
-        }
-    }
-
-  g_free (subpath);
-
+  /* Next try looking for files in the various theme directories. */
+  path = _gtk_css_find_theme (name, variant);
   if (path)
     {
       char *dir, *resource_file;

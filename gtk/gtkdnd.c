@@ -48,7 +48,7 @@
 #include "gtkicontheme.h"
 #include "gtkmain.h"
 #include "gtkplug.h"
-#include "gtktooltip.h"
+#include "gtktooltipprivate.h"
 #include "gtkwindow.h"
 #include "gtkintl.h"
 #include "gtkselectionprivate.h"
@@ -846,9 +846,7 @@ get_surface_size (cairo_surface_t *surface,
 
   x_scale = y_scale = 1;
 
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
   cairo_surface_get_device_scale (surface, &x_scale, &y_scale);
-#endif
 
   /* Assume any set scaling is icon scale */
   *width =
@@ -1031,8 +1029,8 @@ gtk_drag_update_cursor (GtkDragSourceInfo *info)
  * @context: the drag context
  * @target: the target (form of the data) to retrieve
  * @time_: a timestamp for retrieving the data. This will
- *   generally be the time received in a #GtkWidget::drag-motion"
- *   or #GtkWidget::drag-drop" signal
+ *   generally be the time received in a #GtkWidget::drag-motion
+ *   or #GtkWidget::drag-drop signal
  *
  * Gets the data associated with a drag. When the data
  * is received or the retrieval fails, GTK+ will emit a
@@ -3103,6 +3101,7 @@ gtk_drag_set_icon_window (GdkDragContext *context,
                           gboolean        destroy_on_release)
 {
   GtkDragSourceInfo *info;
+  GdkDisplay *display;
 
   info = gtk_drag_get_source_info (context, FALSE);
   if (info == NULL)
@@ -3121,6 +3120,19 @@ gtk_drag_set_icon_window (GdkDragContext *context,
   info->hot_x = hot_x;
   info->hot_y = hot_y;
   info->destroy_icon = destroy_on_release;
+
+  display = gdk_window_get_display (gdk_drag_context_get_source_window (context));
+
+#ifdef GDK_WINDOWING_WAYLAND
+  if (GTK_IS_WINDOW (widget) && GDK_IS_WAYLAND_DISPLAY (display))
+    {
+      if (gtk_widget_get_realized (widget))
+        gtk_widget_unrealize (widget);
+
+      gtk_window_set_hardcoded_window (GTK_WINDOW (widget),
+                                       gdk_wayland_drag_context_get_dnd_window (context));
+    }
+#endif
 
   if (widget && info->icon_helper)
     g_clear_object (&info->icon_helper);
@@ -3160,57 +3172,12 @@ gtk_drag_set_icon_widget (GdkDragContext *context,
 }
 
 static void
-icon_window_realize (GtkWidget     *window,
-                     GtkIconHelper *helper)
+gtk_drag_draw_icon_pattern (GtkWidget *window,
+                            cairo_t   *cr,
+                            gpointer   pattern)
 {
-  cairo_surface_t *surface;
-  cairo_pattern_t *pattern;
-  cairo_t *cr;
-  GdkPixbuf *pixbuf;
-
-  pixbuf = _gtk_icon_helper_ensure_pixbuf (helper, gtk_widget_get_style_context (window));
-  surface = gdk_window_create_similar_surface (gtk_widget_get_window (window),
-                                               CAIRO_CONTENT_COLOR,
-                                               gdk_pixbuf_get_width (pixbuf),
-                                               gdk_pixbuf_get_height (pixbuf));
-
-  cr = cairo_create (surface);
-  cairo_push_group_with_content (cr, CAIRO_CONTENT_COLOR_ALPHA);
-  gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
+  cairo_set_source (cr, pattern);
   cairo_paint (cr);
-  cairo_set_operator (cr, CAIRO_OPERATOR_SATURATE);
-  cairo_paint (cr);
-  cairo_pop_group_to_source (cr);
-  cairo_paint (cr);
-  cairo_destroy (cr);
-
-  pattern = cairo_pattern_create_for_surface (surface);
-  gdk_window_set_background_pattern (gtk_widget_get_window (window), pattern);
-  cairo_pattern_destroy (pattern);
-
-  cairo_surface_destroy (surface);
-
-  if (gdk_pixbuf_get_has_alpha (pixbuf))
-    {
-      cairo_region_t *region;
-
-      surface = cairo_image_surface_create (CAIRO_FORMAT_A1,
-                                            gdk_pixbuf_get_width (pixbuf),
-                                            gdk_pixbuf_get_height (pixbuf));
-      
-      cr = cairo_create (surface);
-      gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
-      cairo_paint (cr);
-      cairo_destroy (cr);
-
-      region = gdk_cairo_region_create_from_surface (surface);
-      gtk_widget_shape_combine_region (window, region);
-      cairo_region_destroy (region);
-
-      cairo_surface_destroy (surface);
-    }
-
-  g_object_unref (pixbuf);
 }
 
 static void
@@ -3243,12 +3210,6 @@ set_icon_helper (GdkDragContext *context,
                              gtk_widget_get_style_context (window),
                              &width, &height);
 
-#ifdef GDK_WINDOWING_WAYLAND
-  if (GDK_IS_WAYLAND_DISPLAY (display))
-    gtk_window_set_hardcoded_window (GTK_WINDOW (window),
-                                     gdk_wayland_drag_context_get_dnd_window (context));
-#endif
-
   if (!force_window &&
       gtk_drag_can_use_rgba_cursor (display, width + 2, height + 2))
     {
@@ -3266,14 +3227,62 @@ set_icon_helper (GdkDragContext *context,
     }
   else
     {
+      cairo_surface_t *surface;
+      cairo_pattern_t *pattern;
+      cairo_t *cr;
+      GdkPixbuf *pixbuf;
+
       gtk_widget_set_size_request (window, width, height);
 
-      g_signal_connect_closure (window, "realize",
-                                g_cclosure_new (G_CALLBACK (icon_window_realize),
-                                                g_object_ref (helper),
-                                                (GClosureNotify)g_object_unref),
-                                FALSE);
-                    
+      pixbuf = _gtk_icon_helper_ensure_pixbuf (helper, gtk_widget_get_style_context (window));
+      surface = gdk_window_create_similar_surface (gdk_screen_get_root_window (screen),
+                                                   CAIRO_CONTENT_COLOR,
+                                                   gdk_pixbuf_get_width (pixbuf),
+                                                   gdk_pixbuf_get_height (pixbuf));
+
+      cr = cairo_create (surface);
+      cairo_push_group_with_content (cr, CAIRO_CONTENT_COLOR_ALPHA);
+      gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
+      cairo_paint (cr);
+      cairo_set_operator (cr, CAIRO_OPERATOR_SATURATE);
+      cairo_paint (cr);
+      cairo_pop_group_to_source (cr);
+      cairo_paint (cr);
+      cairo_destroy (cr);
+
+      pattern = cairo_pattern_create_for_surface (surface);
+
+      cairo_surface_destroy (surface);
+
+      if (gdk_pixbuf_get_has_alpha (pixbuf))
+        {
+          cairo_region_t *region;
+
+          surface = cairo_image_surface_create (CAIRO_FORMAT_A1,
+                                                gdk_pixbuf_get_width (pixbuf),
+                                                gdk_pixbuf_get_height (pixbuf));
+          
+          cr = cairo_create (surface);
+          gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
+          cairo_paint (cr);
+          cairo_destroy (cr);
+
+          region = gdk_cairo_region_create_from_surface (surface);
+          gtk_widget_shape_combine_region (window, region);
+          cairo_region_destroy (region);
+
+          cairo_surface_destroy (surface);
+        }
+
+      g_object_unref (pixbuf);
+
+      g_signal_connect_data (window,
+                             "draw",
+                             G_CALLBACK (gtk_drag_draw_icon_pattern),
+                             pattern,
+                             (GClosureNotify) cairo_pattern_destroy,
+                             G_CONNECT_AFTER);
+
       gtk_drag_set_icon_window (context, window, hot_x, hot_y, TRUE);
    }
 }
@@ -3412,18 +3421,15 @@ gtk_drag_set_icon_surface (GdkDragContext  *context,
   has_rgba =
     rgba_visual != NULL &&
     gdk_screen_is_composited (screen);
+
+
+  gtk_window_set_screen (GTK_WINDOW (window), screen);
+
   if (has_rgba)
     gtk_widget_set_visual (GTK_WIDGET (window), rgba_visual);
 
   gtk_window_set_type_hint (GTK_WINDOW (window), GDK_WINDOW_TYPE_HINT_DND);
-  gtk_window_set_screen (GTK_WINDOW (window), screen);
   set_can_change_screen (window, TRUE);
-
-#ifdef GDK_WINDOWING_WAYLAND
-  if (GDK_IS_WAYLAND_DISPLAY (gdk_screen_get_display (screen)))
-    gtk_window_set_hardcoded_window (GTK_WINDOW (window),
-                                     gdk_wayland_drag_context_get_dnd_window (context));
-#endif
 
   gtk_widget_set_events (window, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
   gtk_widget_set_app_paintable (window, TRUE);
@@ -3474,8 +3480,12 @@ gtk_drag_set_icon_surface (GdkDragContext  *context,
       cairo_pattern_set_matrix (pattern, &matrix);
     }
 
-  gdk_window_set_background_pattern (gtk_widget_get_window (window), pattern);
-  cairo_pattern_destroy (pattern);
+  g_signal_connect_data (window,
+                         "draw",
+                         G_CALLBACK (gtk_drag_draw_icon_pattern),
+                         pattern,
+                         (GClosureNotify) cairo_pattern_destroy,
+                         G_CONNECT_AFTER);
 
   gtk_drag_set_icon_window (context, window, extents.x, extents.y, TRUE);
 }
@@ -4487,6 +4497,25 @@ gtk_drag_check_threshold (GtkWidget *widget,
           ABS (current_y - start_y) > drag_threshold);
 }
 
+/**
+ * gtk_drag_cancel:
+ * @context: a #GdkDragContext, as e.g. returned by gtk_drag_begin_with_coordinates()
+ *
+ * Cancels an ongoing drag operation on the source side.
+ *
+ * If you want to be able to cancel a drag operation in this way,
+ * you need to keep a pointer to the drag context, either from an
+ * explicit call to gtk_drag_begin_with_coordinates(), or by
+ * connecting to #GtkWidget::drag-begin.
+ *
+ * If @context does not refer to an ongoing drag operation, this
+ * function does nothing.
+ *
+ * If a drag is cancelled in this way, the @result argument of
+ * #GtkWidget::drag-failed is set to @GTK_DRAG_RESULT_ERROR.
+ *
+ * Since: 3.16
+ */
 void
 gtk_drag_cancel (GdkDragContext *context)
 {

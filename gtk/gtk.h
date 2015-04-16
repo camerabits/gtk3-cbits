@@ -114,6 +114,7 @@
 #include <gtk/gtkgesturesingle.h>
 #include <gtk/gtkgestureswipe.h>
 #include <gtk/gtkgesturezoom.h>
+#include <gtk/gtkglarea.h>
 #include <gtk/gtkgrid.h>
 #include <gtk/gtkheaderbar.h>
 #include <gtk/gtkicontheme.h>
@@ -140,6 +141,7 @@
 #include <gtk/gtkmenushell.h>
 #include <gtk/gtkmenutoolbutton.h>
 #include <gtk/gtkmessagedialog.h>
+#include <gtk/gtkmodelbutton.h>
 #include <gtk/gtkmodules.h>
 #include <gtk/gtkmountoperation.h>
 #include <gtk/gtknotebook.h>
@@ -151,6 +153,7 @@
 #include <gtk/gtkpaned.h>
 #include <gtk/gtkplacessidebar.h>
 #include <gtk/gtkpopover.h>
+#include <gtk/gtkpopovermenu.h>
 #include <gtk/gtkprintcontext.h>
 #include <gtk/gtkprintoperation.h>
 #include <gtk/gtkprintoperationpreview.h>
@@ -166,6 +169,7 @@
 #include <gtk/gtkrecentchooserwidget.h>
 #include <gtk/gtkrecentfilter.h>
 #include <gtk/gtkrecentmanager.h>
+#include <gtk/gtkrender.h>
 #include <gtk/gtkrevealer.h>
 #include <gtk/gtkscale.h>
 #include <gtk/gtkscalebutton.h>
@@ -180,6 +184,7 @@
 #include <gtk/gtkseparatortoolitem.h>
 #include <gtk/gtksettings.h>
 #include <gtk/gtkshow.h>
+#include <gtk/gtkstacksidebar.h>
 #include <gtk/gtksizegroup.h>
 #include <gtk/gtksizerequest.h>
 #include <gtk/gtkspinbutton.h>
@@ -188,7 +193,6 @@
 #include <gtk/gtkstackswitcher.h>
 #include <gtk/gtkstatusbar.h>
 #include <gtk/gtkstylecontext.h>
-#include <gtk/gtkstyleproperties.h>
 #include <gtk/gtkstyleprovider.h>
 #include <gtk/gtkswitch.h>
 #include <gtk/gtktextattributes.h>
@@ -257,6 +261,7 @@
 #include <gtk/deprecated/gtkstatusicon.h>
 #include <gtk/deprecated/gtkstock.h>
 #include <gtk/deprecated/gtkstyle.h>
+#include <gtk/deprecated/gtkstyleproperties.h>
 #include <gtk/deprecated/gtksymboliccolor.h>
 #include <gtk/deprecated/gtktable.h>
 #include <gtk/deprecated/gtktearoffmenuitem.h>
@@ -270,6 +275,8 @@
 #include <gtk/deprecated/gtkvscrollbar.h>
 #include <gtk/deprecated/gtkvseparator.h>
 #endif /* GTK_DISABLE_DEPRECATED */
+
+#include <gtk/gtk-autocleanups.h>
 
 #undef __GTK_H_INSIDE__
 

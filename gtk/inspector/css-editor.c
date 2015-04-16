@@ -31,7 +31,8 @@
 #include "gtktextview.h"
 #include "gtkmessagedialog.h"
 #include "gtkfilechooserdialog.h"
-#include "gtktoggletoolbutton.h"
+#include "gtktogglebutton.h"
+#include "gtklabel.h"
 
 #define GTK_INSPECTOR_CSS_EDITOR_TEXT "inspector-css-editor-text"
 #define GTK_INSPECTOR_CSS_EDITOR_PROVIDER "inspector-css-editor-provider"
@@ -57,13 +58,13 @@ typedef struct
 
 struct _GtkInspectorCssEditorPrivate
 {
-  GtkWidget *toolbar;
   GtkWidget *view;
+  GtkWidget *object_title;
   GtkTextBuffer *text;
   GtkCssProvider *provider;
   gboolean global;
   GtkStyleContext *context;
-  GtkToggleToolButton *disable_button;
+  GtkToggleButton *disable_button;
   guint timeout;
 };
 
@@ -87,13 +88,13 @@ set_initial_text (GtkInspectorCssEditor *ce)
       if (ce->priv->global)
         initial_text = g_strconcat ("/*\n",
                                     _("You can type here any CSS rule recognized by GTK+."), "\n",
-                                    _("You can temporarily disable this custom CSS by clicking on the \"Pause\" button above."), "\n\n",
+                                    _("You can temporarily disable this custom CSS by clicking on the “Pause” button above."), "\n\n",
                                     _("Changes are applied instantly and globally, for the whole application."), "\n",
                                     "*/\n\n", NULL);
       else
         initial_text = g_strconcat ("/*\n",
                                     _("You can type here any CSS rule recognized by GTK+."), "\n",
-                                    _("You can temporarily disable this custom CSS by clicking on the \"Pause\" button above."), "\n\n",
+                                    _("You can temporarily disable this custom CSS by clicking on the “Pause” button above."), "\n\n",
                                     _("Changes are applied instantly, only for this selected widget."), "\n",
                                     "*/\n\n", NULL);
       gtk_text_buffer_set_text (GTK_TEXT_BUFFER (ce->priv->text), initial_text, -1);
@@ -102,10 +103,10 @@ set_initial_text (GtkInspectorCssEditor *ce)
 }
 
 static void
-disable_toggled (GtkToggleToolButton   *button,
+disable_toggled (GtkToggleButton       *button,
                  GtkInspectorCssEditor *ce)
 {
-  if (gtk_toggle_tool_button_get_active (button))
+  if (gtk_toggle_button_get_active (button))
     {
       if (ce->priv->global)
         gtk_style_context_remove_provider_for_screen (gdk_screen_get_default (),
@@ -187,7 +188,7 @@ save_response (GtkWidget             *dialog,
 }
 
 static void
-save_clicked (GtkToolButton         *button,
+save_clicked (GtkButton             *button,
               GtkInspectorCssEditor *ce)
 {
   GtkWidget *dialog;
@@ -204,32 +205,6 @@ save_clicked (GtkToolButton         *button,
   gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (dialog), TRUE);
   g_signal_connect (dialog, "response", G_CALLBACK (save_response), ce);
   gtk_widget_show (dialog);
-}
-
-static void
-apply_system_font (GtkInspectorCssEditor *ce)
-{
-  GSettingsSchemaSource *source;
-  GSettingsSchema *schema;
-  GSettings *s;
-  gchar *font_name;
-  PangoFontDescription *font_desc;
-
-  source = g_settings_schema_source_get_default ();
-  schema = g_settings_schema_source_lookup (source, "org.gnome.desktop.interace", FALSE);
-  if (schema == NULL)
-    return;
-
-  s = g_settings_new_full (schema, NULL, NULL);
-
-  font_name = g_settings_get_string (s, "monospace-font-name");
-  font_desc = pango_font_description_from_string (font_name);
-
-  gtk_widget_override_font (ce->priv->view, font_desc);
-
-  pango_font_description_free (font_desc);
-  g_free (font_name);
-  g_object_unref (s);
 }
 
 static void
@@ -384,7 +359,6 @@ constructed (GObject *object)
   GtkInspectorCssEditor *ce = GTK_INSPECTOR_CSS_EDITOR (object);
 
   create_provider (ce);
-  apply_system_font (ce);
   set_initial_text (ce);
 }
 
@@ -464,11 +438,11 @@ gtk_inspector_css_editor_class_init (GtkInspectorCssEditorClass *klass)
       g_param_spec_boolean ("global", "Global", "Whether this editor changes the whole application or just the selected widget",
                             TRUE, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
-  gtk_widget_class_set_template_from_resource (widget_class, "/org/gtk/inspector/css-editor.ui");
-  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorCssEditor, toolbar);
+  gtk_widget_class_set_template_from_resource (widget_class, "/org/gtk/libgtk/inspector/css-editor.ui");
   gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorCssEditor, text);
   gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorCssEditor, view);
   gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorCssEditor, disable_button);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorCssEditor, object_title);
   gtk_widget_class_bind_template_callback (widget_class, disable_toggled);
   gtk_widget_class_bind_template_callback (widget_class, save_clicked);
   gtk_widget_class_bind_template_callback (widget_class, text_changed);
@@ -489,6 +463,7 @@ gtk_inspector_css_editor_set_object (GtkInspectorCssEditor *ce,
 {
   gchar *text;
   GtkCssProvider *provider;
+  const gchar *title;
 
   g_return_if_fail (GTK_INSPECTOR_IS_CSS_EDITOR (ce));
   g_return_if_fail (!ce->priv->global);
@@ -510,6 +485,9 @@ gtk_inspector_css_editor_set_object (GtkInspectorCssEditor *ce,
     }
 
   gtk_widget_show (GTK_WIDGET (ce));
+
+  title = (const gchar *)g_object_get_data (object, "gtk-inspector-object-title");
+  gtk_label_set_label (GTK_LABEL (ce->priv->object_title), title);
 
   ce->priv->context = gtk_widget_get_style_context (GTK_WIDGET (object));
 

@@ -82,6 +82,7 @@ mkdir $(CopyDir)\include\gtk-$(ApiVersion)\gtk\a11y&#x0D;&#x0A;
 mkdir $(CopyDir)\include\gtk-$(ApiVersion)\gtk\deprecated&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk&#x0D;&#x0A;
 copy ..\..\..\gdk\gdk.h $(CopyDir)\include\gtk-3.0\gdk\gdk.h&#x0D;&#x0A;
+copy ..\..\..\gdk\gdk-autocleanup.h $(CopyDir)\include\gtk-3.0\gdk\gdk-autocleanup.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkapplaunchcontext.h $(CopyDir)\include\gtk-3.0\gdk\gdkapplaunchcontext.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkcairo.h $(CopyDir)\include\gtk-3.0\gdk\gdkcairo.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkcursor.h $(CopyDir)\include\gtk-3.0\gdk\gdkcursor.h&#x0D;&#x0A;
@@ -92,6 +93,7 @@ copy ..\..\..\gdk\gdkdisplaymanager.h $(CopyDir)\include\gtk-3.0\gdk\gdkdisplaym
 copy ..\..\..\gdk\gdkdnd.h $(CopyDir)\include\gtk-3.0\gdk\gdkdnd.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkevents.h $(CopyDir)\include\gtk-3.0\gdk\gdkevents.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkframetimings.h $(CopyDir)\include\gtk-3.0\gdk\gdkframetimings.h&#x0D;&#x0A;
+copy ..\..\..\gdk\gdkglcontext.h $(CopyDir)\include\gtk-3.0\gdk\gdkglcontext.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkkeys.h $(CopyDir)\include\gtk-3.0\gdk\gdkkeys.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkkeysyms.h $(CopyDir)\include\gtk-3.0\gdk\gdkkeysyms.h&#x0D;&#x0A;
 copy ..\..\..\gdk\gdkkeysyms-compat.h $(CopyDir)\include\gtk-3.0\gdk\gdkkeysyms-compat.h&#x0D;&#x0A;
@@ -118,12 +120,15 @@ copy ..\..\..\gdk\win32\gdkwin32cursor.h $(CopyDir)\include\gtk-3.0\gdk\win32\gd
 copy ..\..\..\gdk\win32\gdkwin32display.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32display.h&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32displaymanager.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32displaymanager.h&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32dnd.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32dnd.h&#x0D;&#x0A;
+copy ..\..\..\gdk\win32\gdkwin32glcontext.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32glcontext.h&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32keys.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32keys.h&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32misc.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32misc.h&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32screen.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32screen.h&#x0D;&#x0A;
 copy ..\..\..\gdk\win32\gdkwin32window.h $(CopyDir)\include\gtk-3.0\gdk\win32\gdkwin32window.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtk.h $(CopyDir)\include\gtk-3.0\gtk\gtk.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtk-autocleanups.h $(CopyDir)\include\gtk-3.0\gtk\gtk-autocleanups.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkx.h $(CopyDir)\include\gtk-3.0\gtk\gtkx.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtkx-autocleanups.h $(CopyDir)\include\gtk-3.0\gtk\gtkx-autocleanups.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtk-a11y.h $(CopyDir)\include\gtk-3.0\gtk\gtk-a11y.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkaboutdialog.h $(CopyDir)\include\gtk-3.0\gtk\gtkaboutdialog.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkaccelgroup.h $(CopyDir)\include\gtk-3.0\gtk\gtkaccelgroup.h&#x0D;&#x0A;
@@ -211,6 +216,7 @@ copy ..\..\..\gtk\gtkgesturerotate.h $(CopyDir)\include\gtk-3.0\gtk\gtkgesturero
 copy ..\..\..\gtk\gtkgesturesingle.h $(CopyDir)\include\gtk-3.0\gtk\gtkgesturesingle.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkgestureswipe.h $(CopyDir)\include\gtk-3.0\gtk\gtkgestureswipe.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkgesturezoom.h $(CopyDir)\include\gtk-3.0\gtk\gtkgesturezoom.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtkglarea.h $(CopyDir)\include\gtk-3.0\gtk\gtkglarea.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkgrid.h $(CopyDir)\include\gtk-3.0\gtk\gtkgrid.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkheaderbar.h $(CopyDir)\include\gtk-3.0\gtk\gtkheaderbar.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkicontheme.h $(CopyDir)\include\gtk-3.0\gtk\gtkicontheme.h&#x0D;&#x0A;
@@ -238,6 +244,7 @@ copy ..\..\..\gtk\gtkmenuitem.h $(CopyDir)\include\gtk-3.0\gtk\gtkmenuitem.h&#x0
 copy ..\..\..\gtk\gtkmenushell.h $(CopyDir)\include\gtk-3.0\gtk\gtkmenushell.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkmenutoolbutton.h $(CopyDir)\include\gtk-3.0\gtk\gtkmenutoolbutton.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkmessagedialog.h $(CopyDir)\include\gtk-3.0\gtk\gtkmessagedialog.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtkmodelbutton.h $(CopyDir)\include\gtk-3.0\gtk\gtkmodelbutton.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkmodules.h $(CopyDir)\include\gtk-3.0\gtk\gtkmodules.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkmountoperation.h $(CopyDir)\include\gtk-3.0\gtk\gtkmountoperation.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtknotebook.h $(CopyDir)\include\gtk-3.0\gtk\gtknotebook.h&#x0D;&#x0A;
@@ -250,6 +257,7 @@ copy ..\..\..\gtk\gtkpapersize.h $(CopyDir)\include\gtk-3.0\gtk\gtkpapersize.h&#
 copy ..\..\..\gtk\gtkplacessidebar.h $(CopyDir)\include\gtk-3.0\gtk\gtkplacessidebar.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkplug.h $(CopyDir)\include\gtk-3.0\gtk\gtkplug.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkpopover.h $(CopyDir)\include\gtk-3.0\gtk\gtkpopover.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtkpopovermenu.h $(CopyDir)\include\gtk-3.0\gtk\gtkpopovermenu.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkprintcontext.h $(CopyDir)\include\gtk-3.0\gtk\gtkprintcontext.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkprintoperation.h $(CopyDir)\include\gtk-3.0\gtk\gtkprintoperation.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkprintoperationpreview.h $(CopyDir)\include\gtk-3.0\gtk\gtkprintoperationpreview.h&#x0D;&#x0A;
@@ -265,6 +273,7 @@ copy ..\..\..\gtk\gtkrecentchoosermenu.h $(CopyDir)\include\gtk-3.0\gtk\gtkrecen
 copy ..\..\..\gtk\gtkrecentchooserwidget.h $(CopyDir)\include\gtk-3.0\gtk\gtkrecentchooserwidget.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkrecentfilter.h $(CopyDir)\include\gtk-3.0\gtk\gtkrecentfilter.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkrecentmanager.h $(CopyDir)\include\gtk-3.0\gtk\gtkrecentmanager.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtkrender.h  $(CopyDir)\include\gtk-3.0\gtk\gtkrender.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkrevealer.h $(CopyDir)\include\gtk-3.0\gtk\gtkrevealer.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkscale.h $(CopyDir)\include\gtk-3.0\gtk\gtkscale.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkscalebutton.h $(CopyDir)\include\gtk-3.0\gtk\gtkscalebutton.h&#x0D;&#x0A;
@@ -279,6 +288,7 @@ copy ..\..\..\gtk\gtkseparatormenuitem.h $(CopyDir)\include\gtk-3.0\gtk\gtksepar
 copy ..\..\..\gtk\gtkseparatortoolitem.h $(CopyDir)\include\gtk-3.0\gtk\gtkseparatortoolitem.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtksettings.h $(CopyDir)\include\gtk-3.0\gtk\gtksettings.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkshow.h $(CopyDir)\include\gtk-3.0\gtk\gtkshow.h&#x0D;&#x0A;
+copy ..\..\..\gtk\gtkstacksidebar.h $(CopyDir)\include\gtk-3.0\gtk\gtkstacksidebar.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtksizegroup.h $(CopyDir)\include\gtk-3.0\gtk\gtksizegroup.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtksizerequest.h $(CopyDir)\include\gtk-3.0\gtk\gtksizerequest.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtksocket.h $(CopyDir)\include\gtk-3.0\gtk\gtksocket.h&#x0D;&#x0A;
@@ -288,7 +298,6 @@ copy ..\..\..\gtk\gtkstack.h $(CopyDir)\include\gtk-3.0\gtk\gtkstack.h&#x0D;&#x0
 copy ..\..\..\gtk\gtkstackswitcher.h $(CopyDir)\include\gtk-3.0\gtk\gtkstackswitcher.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkstatusbar.h $(CopyDir)\include\gtk-3.0\gtk\gtkstatusbar.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkstylecontext.h $(CopyDir)\include\gtk-3.0\gtk\gtkstylecontext.h&#x0D;&#x0A;
-copy ..\..\..\gtk\gtkstyleproperties.h $(CopyDir)\include\gtk-3.0\gtk\gtkstyleproperties.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkstyleprovider.h $(CopyDir)\include\gtk-3.0\gtk\gtkstyleprovider.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkswitch.h $(CopyDir)\include\gtk-3.0\gtk\gtkswitch.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtktestutils.h $(CopyDir)\include\gtk-3.0\gtk\gtktestutils.h&#x0D;&#x0A;
@@ -330,6 +339,7 @@ copy ..\..\..\gtk\gtkwindowgroup.h $(CopyDir)\include\gtk-3.0\gtk\gtkwindowgroup
 copy ..\..\..\gtk\gtktextlayout.h $(CopyDir)\include\gtk-3.0\gtk\gtktextlayout.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtktypebuiltins.h $(CopyDir)\include\gtk-3.0\gtk\gtktypebuiltins.h&#x0D;&#x0A;
 copy ..\..\..\gtk\gtkversion.h $(CopyDir)\include\gtk-3.0\gtk\gtkversion.h&#x0D;&#x0A;
+copy ..\..\..\gtk\a11y\gtk-a11y-autocleanups.h $(CopyDir)\include\gtk-3.0\gtk\a11y\gtk-a11y-autocleanups.h&#x0D;&#x0A;
 copy ..\..\..\gtk\a11y\gtkarrowaccessible.h $(CopyDir)\include\gtk-3.0\gtk\a11y\gtkarrowaccessible.h&#x0D;&#x0A;
 copy ..\..\..\gtk\a11y\gtkbooleancellaccessible.h $(CopyDir)\include\gtk-3.0\gtk\a11y\gtkbooleancellaccessible.h&#x0D;&#x0A;
 copy ..\..\..\gtk\a11y\gtkbuttonaccessible.h $(CopyDir)\include\gtk-3.0\gtk\a11y\gtkbuttonaccessible.h&#x0D;&#x0A;
@@ -407,6 +417,7 @@ copy ..\..\..\gtk\deprecated\gtkrecentaction.h $(CopyDir)\include\gtk-3.0\gtk\de
 copy ..\..\..\gtk\deprecated\gtkstatusicon.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtkstatusicon.h&#x0D;&#x0A;
 copy ..\..\..\gtk\deprecated\gtkstock.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtkstock.h&#x0D;&#x0A;
 copy ..\..\..\gtk\deprecated\gtkstyle.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtkstyle.h&#x0D;&#x0A;
+copy ..\..\..\gtk\deprecated\gtkstyleproperties.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtkstyleproperties.h&#x0D;&#x0A;
 copy ..\..\..\gtk\deprecated\gtksymboliccolor.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtksymboliccolor.h&#x0D;&#x0A;
 copy ..\..\..\gtk\deprecated\gtktable.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtktable.h&#x0D;&#x0A;
 copy ..\..\..\gtk\deprecated\gtktearoffmenuitem.h $(CopyDir)\include\gtk-3.0\gtk\deprecated\gtktearoffmenuitem.h&#x0D;&#x0A;
@@ -449,9 +460,10 @@ $(CopyDir)\bin\glib-compile-schemas.exe $(CopyDir)\share\glib-2.0\schemas&#x0D;&
   Value="
 copy ..\..\..\gdk\broadway\gdkbroadway.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk&#x0D;&#x0A;
 mkdir $(CopyDir)\include\gtk-$(ApiVersion)\gdk\broadway&#x0D;&#x0A;
-copy ..\..\..\gdk\broadway\gdkbroadwaywindow.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk\broadway&#x0D;&#x0A;
 copy ..\..\..\gdk\broadway\gdkbroadwaycursor.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk\broadway&#x0D;&#x0A;
+copy ..\..\..\gdk\broadway\gdkbroadwaydisplay.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk\broadway&#x0D;&#x0A;
 copy ..\..\..\gdk\broadway\gdkbroadwayvisual.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk\broadway&#x0D;&#x0A;
+copy ..\..\..\gdk\broadway\gdkbroadwaywindow.h $(CopyDir)\include\gtk-$(ApiVersion)\gdk\broadway&#x0D;&#x0A;
         "
  />
 </VisualStudioPropertySheet>

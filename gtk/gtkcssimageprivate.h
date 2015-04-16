@@ -58,14 +58,13 @@ struct _GtkCssImageClass
   GtkCssImage *(* compute)                         (GtkCssImage                *image,
                                                     guint                       property_id,
                                                     GtkStyleProviderPrivate    *provider,
-						    int                         scale,
-                                                    GtkCssComputedValues       *values,
-                                                    GtkCssComputedValues       *parent_values,
+                                                    GtkCssStyle                *style,
+                                                    GtkCssStyle                *parent_style,
                                                     GtkCssDependencies         *dependencies);
   /* compare two images for equality */
   gboolean     (* equal)                           (GtkCssImage                *image1,
                                                     GtkCssImage                *image2);
-  /* transition between start and end image (end may be NULL), returns new reference */
+  /* transition between start and end image (end may be NULL), returns new reference (optional) */
   GtkCssImage *(* transition)                      (GtkCssImage                *start,
                                                     GtkCssImage                *end,
                                                     guint                       property_id,
@@ -96,9 +95,8 @@ double         _gtk_css_image_get_aspect_ratio     (GtkCssImage                *
 GtkCssImage *  _gtk_css_image_compute              (GtkCssImage                *image,
                                                     guint                       property_id,
                                                     GtkStyleProviderPrivate    *provider,
-						    int                        scale,
-                                                    GtkCssComputedValues       *values,
-                                                    GtkCssComputedValues       *parent_values,
+                                                    GtkCssStyle                *style,
+                                                    GtkCssStyle                *parent_style,
                                                     GtkCssDependencies         *dependencies);
 gboolean       _gtk_css_image_equal                (GtkCssImage                *image1,
                                                     GtkCssImage                *image2);

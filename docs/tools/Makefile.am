@@ -5,6 +5,7 @@ AM_CPPFLAGS = \
 	-I$(top_builddir)/gdk		\
 	-I$(top_srcdir)/gdk		\
 	-I$(top_srcdir)/gdk/x11		\
+	-I$(top_srcdir)/tests		\
 	$(GTK_DEBUG_FLAGS)		\
 	$(GTK_DEP_CFLAGS)
 
@@ -14,6 +15,7 @@ DEPS = \
 LDADDS = \
 	$(top_builddir)/gtk/libgtk-3.la	\
 	$(top_builddir)/gdk/libgdk-3.la	\
+	$(top_builddir)/tests/gtkgears.o \
 	$(GTK_DEP_LIBS)			\
 	$(GDK_DEP_LIBS)			\
 	-lm
@@ -25,7 +27,7 @@ endif
 
 doc_shooter_DEPENDENCIES = $(DEPS)
 doc_shooter_LDADD = $(LDADDS)
-doc_shooter_SOURCES=	\
+doc_shooter_SOURCES =	\
 	shadow.c	\
 	shadow.h	\
 	shooter.c	\

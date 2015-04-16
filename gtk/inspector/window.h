@@ -41,14 +41,20 @@ typedef struct
 {
   GtkWindow parent;
 
-  GtkWidget *top_notebook;
-  GtkWidget *widget_tree;
+  GtkWidget *top_stack;
+  GtkWidget *object_stack;
+  GtkWidget *button_stack;
+  GtkWidget *object_tree;
+  GtkWidget *object_id;
+  GtkWidget *object_details;
+  GtkWidget *object_buttons;
+  GtkWidget *object_details_button;
+  GtkWidget *select_object;
   GtkWidget *prop_list;
   GtkWidget *child_prop_list;
+  GtkWidget *selector;
   GtkWidget *signals_list;
   GtkWidget *style_prop_list;
-  GtkWidget *python_shell;
-  GtkWidget *button_path;
   GtkWidget *classes_list;
   GtkWidget *widget_css_editor;
   GtkWidget *object_hierarchy;
@@ -58,11 +64,15 @@ typedef struct
   GtkWidget *menu;
   GtkWidget *misc_info;
   GtkWidget *gestures;
+  GtkWidget *magnifier;
 
-  GtkWidget *widget_popup;
-
+  GtkWidget *invisible;
   GtkWidget *selected_widget;
   GtkWidget *flash_widget;
+
+  GList *extra_pages;
+
+  gboolean grabbed;
 
   gint flash_count;
   gint flash_cnx;
@@ -90,7 +100,6 @@ void       gtk_inspector_on_inspect         (GtkWidget          *widget,
 
 void       gtk_inspector_window_select_widget_under_pointer (GtkInspectorWindow *iw);
 
-                                            
 
 G_END_DECLS
 

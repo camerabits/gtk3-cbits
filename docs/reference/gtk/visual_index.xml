@@ -42,6 +42,9 @@
     <link linkend="GtkScale">
       <inlinegraphic fileref="scales.png" format="PNG"></inlinegraphic>
     </link>
+    <link linkend="GtkGLArea">
+      <inlinegraphic fileref="glarea.png" format="PNG"></inlinegraphic>
+    </link>
   </para>
 </section>
 
@@ -140,6 +143,9 @@
     </link>
     <link linkend="GtkStackSwitcher">
       <inlinegraphic fileref="stackswitcher.png" format="PNG"></inlinegraphic>
+    </link>
+    <link linkend="GtkStackSidebar">
+      <inlinegraphic fileref="sidebar.png" format="PNG"></inlinegraphic>
     </link>
     <link linkend="GtkTreeView">
       <inlinegraphic fileref="list-and-tree.png" format="PNG"></inlinegraphic>

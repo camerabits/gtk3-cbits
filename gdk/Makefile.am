@@ -13,7 +13,7 @@ INTROSPECTION_COMPILER_ARGS = \
 
 SUBDIRS = $(GDK_BACKENDS) .
 
-DIST_SUBDIRS = win32 x11 quartz broadway wayland
+DIST_SUBDIRS = win32 x11 quartz broadway wayland mir
 
 CLEANFILES =
 
@@ -61,6 +61,7 @@ LDADD = 					\
 #
 gdk_public_h_sources = 				\
 	gdk.h					\
+	gdk-autocleanup.h			\
 	gdkapplaunchcontext.h			\
 	gdkcairo.h				\
 	gdkcursor.h				\
@@ -71,6 +72,7 @@ gdk_public_h_sources = 				\
 	gdkdnd.h				\
 	gdkevents.h				\
 	gdkframetimings.h			\
+	gdkglcontext.h				\
 	gdkkeys.h				\
 	gdkkeysyms.h				\
 	gdkkeysyms-compat.h			\
@@ -98,6 +100,7 @@ gdk_h_sources =					\
 	$(deprecated_h_sources)
 
 gdk_private_headers = 				\
+	gdk-private.h				\
 	gdkapplaunchcontextprivate.h		\
 	gdkcursorprivate.h			\
 	gdkdevicemanagerprivate.h		\
@@ -107,6 +110,7 @@ gdk_private_headers = 				\
 	gdkdndprivate.h				\
 	gdkframeclockidle.h			\
 	gdkframeclockprivate.h			\
+	gdkglcontextprivate.h			\
 	gdkscreenprivate.h			\
 	gdkinternals.h				\
 	gdkintl.h				\
@@ -119,6 +123,7 @@ deprecated_c_sources =				\
 
 gdk_c_sources = 				\
 	$(deprecated_c_sources)			\
+	gdk-private.c				\
 	gdk.c					\
 	gdkapplaunchcontext.c			\
 	gdkcairo.c				\
@@ -131,6 +136,8 @@ gdk_c_sources = 				\
 	gdkdnd.c				\
 	gdkevents.c     			\
 	gdkframetimings.c			\
+	gdkgl.c					\
+	gdkglcontext.c				\
 	gdkglobals.c				\
 	gdkkeys.c				\
 	gdkkeyuni.c				\
@@ -199,6 +206,10 @@ endif # USE_BROADWAY
 
 if USE_WAYLAND
 libgdk_3_la_LIBADD += wayland/libgdk-wayland.la
+endif
+
+if USE_MIR
+libgdk_3_la_LIBADD += mir/libgdk-mir.la
 endif
 
 if HAVE_INTROSPECTION
@@ -419,8 +430,8 @@ gdkconfig.h: stamp-gc-h
 	$(AM_V_GEN) if test -f gdkconfig.h; then :; \
 	else rm -f stamp-gc-h; $(MAKE) stamp-gc-h; fi
 stamp-gc-h: $(top_builddir)/config.status
-	$(AM_V_at) cd $(top_builddir) && $(SHELL) ./config.status gdk/gdkconfig.h
-	echo timestamp > stamp-gc-h
+	$(AM_V_at) cd $(top_builddir) && $(SHELL) ./config.status gdk/gdkconfig.h \
+	&& echo timestamp > gdk/$(@F)
 
 dist-hook: ../build/win32/vs9/gdk.vcproj ../build/win32/vs10/gdk.vcxproj ../build/win32/vs10/gdk.vcxproj.filters
 

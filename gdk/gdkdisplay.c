@@ -24,6 +24,8 @@
 #include "gdkdisplay.h"
 #include "gdkdisplayprivate.h"
 
+#include "gdk-private.h"
+
 #include "gdkdeviceprivate.h"
 #include "gdkdisplaymanagerprivate.h"
 #include "gdkevents.h"
@@ -111,6 +113,19 @@ gdk_display_real_opened (GdkDisplay *display)
 }
 
 static void
+gdk_display_real_event_data_copy (GdkDisplay     *display,
+                                  const GdkEvent *src,
+                                  GdkEvent       *dst)
+{
+}
+
+static void
+gdk_display_real_event_data_free (GdkDisplay     *display,
+                                  GdkEvent       *dst)
+{
+}
+
+static void
 gdk_display_class_init (GdkDisplayClass *class)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (class);
@@ -123,6 +138,8 @@ gdk_display_class_init (GdkDisplayClass *class)
 
   class->opened = gdk_display_real_opened;
   class->make_default = gdk_display_real_make_default;
+  class->event_data_copy = gdk_display_real_event_data_copy;
+  class->event_data_free = gdk_display_real_event_data_free;
 
   /**
    * GdkDisplay::opened:
@@ -206,6 +223,8 @@ gdk_display_init (GdkDisplay *display)
 
   display->multiple_click_info = g_hash_table_new_full (NULL, NULL, NULL,
                                                         (GDestroyNotify) g_free);
+
+  display->rendering_mode = _gdk_rendering_mode;
 }
 
 static void
@@ -1278,8 +1297,8 @@ _gdk_display_pointer_info_foreach (GdkDisplay                   *display,
     }
 }
 
-/**
- * gdk_device_grab_info_libgtk_only:
+/*< private >
+ * gdk_device_grab_info:
  * @display: the display for which to get the grab information
  * @device: device to get the grab information from
  * @grab_window: (out) (transfer none): location to store current grab window
@@ -1292,12 +1311,12 @@ _gdk_display_pointer_info_foreach (GdkDisplay                   *display,
  *
  * Returns: %TRUE if this application currently has the
  *  keyboard grabbed.
- **/
+ */
 gboolean
-gdk_device_grab_info_libgtk_only (GdkDisplay  *display,
-                                  GdkDevice   *device,
-                                  GdkWindow  **grab_window,
-                                  gboolean    *owner_events)
+gdk_device_grab_info (GdkDisplay  *display,
+                      GdkDevice   *device,
+                      GdkWindow  **grab_window,
+                      gboolean    *owner_events)
 {
   GdkDeviceGrabInfo *info;
 
@@ -1317,6 +1336,33 @@ gdk_device_grab_info_libgtk_only (GdkDisplay  *display,
     }
   else
     return FALSE;
+}
+
+/**
+ * gdk_device_grab_info_libgtk_only:
+ * @display: the display for which to get the grab information
+ * @device: device to get the grab information from
+ * @grab_window: (out) (transfer none): location to store current grab window
+ * @owner_events: (out): location to store boolean indicating whether
+ *   the @owner_events flag to gdk_keyboard_grab() or
+ *   gdk_pointer_grab() was %TRUE.
+ *
+ * Determines information about the current keyboard grab.
+ * This is not public API and must not be used by applications.
+ *
+ * Returns: %TRUE if this application currently has the
+ *  keyboard grabbed.
+ *
+ * Deprecated: 3.16: The symbol was never meant to be used outside
+ *   of GTK+
+ */
+gboolean
+gdk_device_grab_info_libgtk_only (GdkDisplay  *display,
+                                  GdkDevice   *device,
+                                  GdkWindow  **grab_window,
+                                  gboolean    *owner_events)
+{
+  return gdk_device_grab_info (display, device, grab_window, owner_events);
 }
 
 /**
@@ -1714,6 +1760,9 @@ gdk_display_supports_input_shapes (GdkDisplay *display)
  * Returns: %TRUE if windows may be composited.
  *
  * Since: 2.12
+ *
+ * Deprecated: 3.16: Compositing is an outdated technology that
+ *   only ever worked on X11.
  */
 gboolean
 gdk_display_supports_composite (GdkDisplay *display)
@@ -2224,4 +2273,49 @@ gint
 gdk_error_trap_pop (void)
 {
   return gdk_error_trap_pop_internal (TRUE);
+}
+
+/*< private >
+ * gdk_display_make_gl_context_current:
+ * @display: a #GdkDisplay
+ * @context: (optional): a #GdkGLContext, or %NULL
+ *
+ * Makes the given @context the current GL context, or unsets
+ * the current GL context if @context is %NULL.
+ */
+gboolean
+gdk_display_make_gl_context_current (GdkDisplay   *display,
+                                     GdkGLContext *context)
+{
+  return GDK_DISPLAY_GET_CLASS (display)->make_gl_context_current (display, context);
+}
+
+GdkRenderingMode
+gdk_display_get_rendering_mode (GdkDisplay *display)
+{
+  return display->rendering_mode;
+}
+
+void
+gdk_display_set_rendering_mode (GdkDisplay       *display,
+                                GdkRenderingMode  mode)
+{
+  display->rendering_mode = mode;
+}
+
+void
+gdk_display_set_debug_updates (GdkDisplay *display,
+                               gboolean    debug_updates)
+{
+  display->debug_updates = debug_updates;
+  display->debug_updates_set = TRUE;
+}
+
+gboolean
+gdk_display_get_debug_updates (GdkDisplay *display)
+{
+  if (display->debug_updates_set)
+    return display->debug_updates;
+  else
+    return _gdk_debug_updates;
 }

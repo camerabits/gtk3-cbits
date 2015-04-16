@@ -6,6 +6,13 @@
     <property name="step-increment">1</property>
     <property name="page-increment">1</property>
   </object>
+  <object class="GtkAdjustment" id="cursor_size_adjustment">
+    <property name="lower">24</property>
+    <property name="upper">64</property>
+    <property name="step-increment">8</property>
+    <property name="page-increment">8</property>
+    <property name="page-size">0</property>
+  </object>
   <template class="GtkInspectorVisual" parent="GtkScrolledWindow">
     <property name="hscrollbar-policy">never</property>
     <property name="vscrollbar-policy">automatic</property>
@@ -72,7 +79,7 @@
                         <child>
                           <object class="GtkLabel" id="dark_label">
                             <property name="visible">True</property>
-                            <property name="label" translatable="yes">Dark variant</property>
+                            <property name="label" translatable="yes">Dark Variant</property>
                             <property name="halign">start</property>
                             <property name="valign">baseline</property>
                             <property name="xalign">0.0</property>
@@ -83,6 +90,74 @@
                             <property name="visible">True</property>
                             <property name="halign">end</property>
                             <property name="valign">baseline</property>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
+                          <object class="GtkLabel" id="cursor_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Cursor Theme</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkComboBoxText" id="cursor_combo">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
+                          <object class="GtkLabel" id="cursor_size_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Cursor Size</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSpinButton" id="cursor_size_spin">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                            <property name="adjustment">cursor_size_adjustment</property>
+                            <property name="snap-to-ticks">True</property>
                           </object>
                           <packing>
                             <property name="expand">True</property>
@@ -287,6 +362,45 @@
                         <property name="margin">10</property>
                         <property name="spacing">40</property>
                         <child>
+                          <object class="GtkLabel" id="rendering_mode_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Rendering Mode</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkComboBoxText" id="rendering_mode_combo">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                            <signal name="changed" handler="rendering_mode_changed"/>
+                            <items>
+                              <item translatable="yes" id="similar">Similar</item>
+                              <item translatable="yes" id="image">Image</item>
+                              <item translatable="yes" id="recording">Recording</item>
+                            </items>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
                           <object class="GtkLabel" id="updates_label">
                             <property name="visible">True</property>
                             <property name="label" translatable="yes">Show Graphic Updates</property>
@@ -415,6 +529,158 @@
             </child>
           </object>
         </child>
+        <child>
+          <object class="GtkFrame" id="gl_frame">
+            <property name="visible">True</property>
+            <property name="halign">center</property>
+            <child>
+              <object class="GtkListBox" id="gl_box">
+                <property name="visible">True</property>
+                <property name="selection-mode">none</property>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
+                          <object class="GtkLabel" id="gl_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">GL Rendering</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkComboBoxText" id="gl_combo">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                            <items>
+                              <item translatable="yes" id="maybe">When needed</item>
+                              <item translatable="yes" id="always">Always</item>
+                              <item translatable="yes" id="disable">Disabled</item>
+                            </items>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
+                          <object class="GtkLabel" id="software_gl_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Software GL</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSwitch" id="software_gl_switch">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                            <signal name="notify::active" handler="software_gl_activate"/>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
+                          <object class="GtkLabel" id="software_surface_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Software Surfaces</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSwitch" id="software_surface_switch">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                            <signal name="notify::active" handler="software_surface_activate"/>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkListBoxRow">
+                    <property name="visible">True</property>
+                    <property name="activatable">False</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <property name="margin">10</property>
+                        <property name="spacing">40</property>
+                        <child>
+                          <object class="GtkLabel" id="texture_rectangle_label">
+                            <property name="visible">True</property>
+                            <property name="label" translatable="yes">Texture Rectangle Extension</property>
+                            <property name="halign">start</property>
+                            <property name="valign">baseline</property>
+                            <property name="xalign">0.0</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkSwitch" id="texture_rectangle_switch">
+                            <property name="visible">True</property>
+                            <property name="halign">end</property>
+                            <property name="valign">baseline</property>
+                            <signal name="notify::active" handler="texture_rectangle_activate"/>
+                          </object>
+                          <packing>
+                            <property name="expand">True</property>
+                          </packing>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
       </object>
     </child>
   </template>
@@ -424,14 +690,21 @@
       <widget name="theme_label"/>
       <widget name="dark_label"/>
       <widget name="icon_label"/>
+      <widget name="cursor_label"/>
+      <widget name="cursor_size_label"/>
       <widget name="font_label"/>
       <widget name="direction_label"/>
       <widget name="hidpi_label"/>
       <widget name="animation_label"/>
+      <widget name="rendering_mode_label"/>
       <widget name="updates_label"/>
       <widget name="baselines_label"/>
       <widget name="pixelcache_label"/>
       <widget name="touchscreen_label"/>
+      <widget name="gl_label"/>
+      <widget name="software_gl_label"/>
+      <widget name="software_surface_label"/>
+      <widget name="texture_rectangle_label"/>
     </widgets>
   </object>
   <object class="GtkSizeGroup">
@@ -439,8 +712,11 @@
     <widgets>
       <widget name="theme_combo"/>
       <widget name="icon_combo"/>
+      <widget name="cursor_combo"/>
       <widget name="font_button"/>
       <widget name="direction_combo"/>
+      <widget name="rendering_mode_combo"/>
+      <widget name="gl_combo"/>
     </widgets>
   </object>
   <object class="GtkSizeGroup">
@@ -448,6 +724,7 @@
     <widgets>
       <widget name="visual_frame"/>
       <widget name="debug_frame"/>
+      <widget name="gl_frame"/>
     </widgets>
   </object>
 </interface>

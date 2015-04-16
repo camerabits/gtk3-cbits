@@ -135,6 +135,7 @@ gtk_css_image_linear_draw (GtkCssImage        *image,
 {
   GtkCssImageLinear *linear = GTK_CSS_IMAGE_LINEAR (image);
   cairo_pattern_t *pattern;
+  double angle; /* actual angle of the gradiant line in degrees */
   double x, y; /* coordinates of start point */
   double length; /* distance in pixels for 100% */
   double start, end; /* position of first/last point on gradient line - with gradient line being [0, 1] */
@@ -145,26 +146,36 @@ gtk_css_image_linear_draw (GtkCssImage        *image,
     {
       guint side = _gtk_css_number_value_get (linear->angle, 100);
 
-      if (side & (1 << GTK_CSS_RIGHT))
-        x = width;
-      else if (side & (1 << GTK_CSS_LEFT))
-        x = -width;
-      else
-        x = 0;
-
-      if (side & (1 << GTK_CSS_TOP))
-        y = -height;
-      else if (side & (1 << GTK_CSS_BOTTOM))
-        y = height;
-      else
-        y = 0;
+      /* special casing the regular cases here so we don't get rounding errors */
+      switch (side)
+      {
+        case 1 << GTK_CSS_RIGHT:
+          angle = 90;
+          break;
+        case 1 << GTK_CSS_LEFT:
+          angle = 270;
+          break;
+        case 1 << GTK_CSS_TOP:
+          angle = 0;
+          break;
+        case 1 << GTK_CSS_BOTTOM:
+          angle = 180;
+          break;
+        default:
+          angle = atan2 (side & 1 << GTK_CSS_TOP ? -width : width,
+                         side & 1 << GTK_CSS_LEFT ? -height : height);
+          angle = 180 * angle / G_PI + 90;
+          break;
+      }
     }
   else
     {
-      gtk_css_image_linear_compute_start_point (_gtk_css_number_value_get (linear->angle, 100),
-                                                width, height,
-                                                &x, &y);
+      angle = _gtk_css_number_value_get (linear->angle, 100);
     }
+
+  gtk_css_image_linear_compute_start_point (angle,
+                                            width, height,
+                                            &x, &y);
 
   length = sqrt (x * x + y * y);
   gtk_css_image_linear_get_start_end (linear, length, &start, &end);
@@ -420,9 +431,8 @@ static GtkCssImage *
 gtk_css_image_linear_compute (GtkCssImage             *image,
                               guint                    property_id,
                               GtkStyleProviderPrivate *provider,
-			      int                      scale,
-                              GtkCssComputedValues    *values,
-                              GtkCssComputedValues    *parent_values,
+                              GtkCssStyle             *style,
+                              GtkCssStyle             *parent_style,
                               GtkCssDependencies      *dependencies)
 {
   GtkCssImageLinear *linear = GTK_CSS_IMAGE_LINEAR (image);
@@ -432,7 +442,7 @@ gtk_css_image_linear_compute (GtkCssImage             *image,
   copy = g_object_new (GTK_TYPE_CSS_IMAGE_LINEAR, NULL);
   copy->repeating = linear->repeating;
 
-  copy->angle = _gtk_css_value_compute (linear->angle, property_id, provider, scale, values, parent_values, dependencies);
+  copy->angle = _gtk_css_value_compute (linear->angle, property_id, provider, style, parent_style, dependencies);
   
   g_array_set_size (copy->stops, linear->stops->len);
   for (i = 0; i < linear->stops->len; i++)
@@ -443,12 +453,12 @@ gtk_css_image_linear_compute (GtkCssImage             *image,
       stop = &g_array_index (linear->stops, GtkCssImageLinearColorStop, i);
       scopy = &g_array_index (copy->stops, GtkCssImageLinearColorStop, i);
               
-      scopy->color = _gtk_css_value_compute (stop->color, property_id, provider, scale, values, parent_values, &child_deps);
+      scopy->color = _gtk_css_value_compute (stop->color, property_id, provider, style, parent_style, &child_deps);
       *dependencies = _gtk_css_dependencies_union (*dependencies, child_deps);
       
       if (stop->offset)
         {
-          scopy->offset = _gtk_css_value_compute (stop->offset, property_id, provider, scale, values, parent_values, &child_deps);
+          scopy->offset = _gtk_css_value_compute (stop->offset, property_id, provider, style, parent_style, &child_deps);
           *dependencies = _gtk_css_dependencies_union (*dependencies, child_deps);
         }
       else

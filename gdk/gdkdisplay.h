@@ -123,7 +123,7 @@ void             gdk_display_warp_pointer          (GdkDisplay             *disp
                                                     gint                   y);
 #endif /* GDK_MULTIDEVICE_SAFE */
 
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 GdkDisplay *gdk_display_open_default_libgtk_only (void);
 
 GDK_AVAILABLE_IN_ALL
@@ -159,7 +159,7 @@ GDK_AVAILABLE_IN_ALL
 gboolean gdk_display_supports_shapes           (GdkDisplay    *display);
 GDK_AVAILABLE_IN_ALL
 gboolean gdk_display_supports_input_shapes     (GdkDisplay    *display);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 gboolean gdk_display_supports_composite        (GdkDisplay    *display);
 GDK_AVAILABLE_IN_ALL
 void     gdk_display_notify_startup_complete   (GdkDisplay    *display,

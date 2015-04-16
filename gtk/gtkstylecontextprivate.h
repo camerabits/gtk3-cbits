@@ -29,9 +29,14 @@ G_BEGIN_DECLS
 
 void            _gtk_style_context_set_widget                (GtkStyleContext *context,
                                                               GtkWidget       *widget);
+void            gtk_style_context_set_id                     (GtkStyleContext *context,
+                                                              const char      *id);
+const char *    gtk_style_context_get_id                     (GtkStyleContext *context);
+
 const GtkBitmask *
                 _gtk_style_context_get_changes               (GtkStyleContext *context);
 
+GtkCssStyle *   gtk_style_context_lookup_style               (GtkStyleContext *context);
 GtkCssValue   * _gtk_style_context_peek_property             (GtkStyleContext *context,
                                                               guint            property_id);
 const GValue * _gtk_style_context_peek_style_property        (GtkStyleContext *context,
@@ -61,7 +66,6 @@ void           _gtk_style_context_get_icon_extents           (GtkStyleContext   
                                                               gint                y,
                                                               gint                width,
                                                               gint                height);
-GtkIconLookupFlags _gtk_style_context_get_icon_lookup_flags  (GtkStyleContext    *context);
 
 /* Accessibility support */
 AtkAttributeSet *_gtk_style_context_get_attributes           (AtkAttributeSet    *attributes,

@@ -25,7 +25,10 @@ LDADD = \
 
 noinst_PROGRAMS = $(TEST_PROGS)
 
-TESTS_ENVIRONMENT = G_ENABLE_DIAGNOSTIC=0
+TESTS_ENVIRONMENT = \
+	G_ENABLE_DIAGNOSTIC=0 	\
+	GIO_USE_VFS=local 	\
+	GSETTINGS_BACKEND=memory
 
 TEST_PROGS += 			\
 	accel			\
@@ -34,6 +37,7 @@ TEST_PROGS += 			\
 	adjustment		\
 	bitmask			\
 	builder			\
+	builderparser		\
 	cellarea		\
 	check-icon-names	\
 	clipboard		\
@@ -161,10 +165,21 @@ test_icontheme =					\
 	icons2/index.theme				\
 	$(NULL)
 
+test_ui =						\
+	ui/test1.ui ui/test1.expected			\
+	ui/test2.ui ui/test2.expected			\
+	ui/test3.ui ui/test3.expected			\
+	ui/test4.ui ui/test4.expected			\
+	ui/test5.ui ui/test5.expected			\
+	ui/test6.ui ui/test6.expected			\
+	ui/test7.ui ui/test7.expected			\
+	$(NULL)
+
 EXTRA_DIST +=				\
 	file-chooser-test-dir/empty     \
 	file-chooser-test-dir/text.txt	\
 	$(test_icontheme)		\
+	$(test_ui)			\
 	$(NULL)
 
 GTK_GSETTINGS_SCHEMAS = \
@@ -177,7 +192,7 @@ BUILT_SOURCES = gschemas.compiled
 CLEANFILES = gschemas.compiled
 
 gschemas.compiled: $(GTK_GSETTINGS_SCHEMAS)
-	$(GLIB_COMPILE_SCHEMAS) \
+	$(AM_V_GEN) $(GLIB_COMPILE_SCHEMAS) \
 		$(addprefix --schema-file=,$(GTK_GSETTINGS_SCHEMAS)) \
 		--targetdir=$(builddir)
 
@@ -186,7 +201,7 @@ all-am: gschemas.compiled
 if BUILDOPT_INSTALL_TESTS
 insttestdir = $(libexecdir)/installed-tests/$(PACKAGE)
 insttest_PROGRAMS = $(TEST_PROGS)
-nobase_insttest_DATA = $(test_icontheme)
+nobase_insttest_DATA = $(test_icontheme) $(test_ui)
 
 %.test: %$(EXEEXT) Makefile
 	$(AM_V_GEN) (echo '[Test]' > $@.tmp; \

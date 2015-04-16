@@ -51,6 +51,7 @@
 #include "gtkwidgetpath.h"
 #include "a11y/gtkcontaineraccessible.h"
 #include "a11y/gtkcontaineraccessibleprivate.h"
+#include "gtkpopovermenu.h"
 
 /**
  * SECTION:gtkcontainer
@@ -221,21 +222,33 @@
  * a <packing> element for children, which can contain multiple <property>
  * elements that specify child properties for the child.
  * 
- * An example of child properties in UI definitions:
+ * Since 2.16, child properties can also be marked as translatable using
+ * the same “translatable”, “comments” and “context” attributes that are used
+ * for regular properties.
+ *
+ * Since 3.16, containers can have a <focus-chain> element containing multiple
+ * <widget> elements, one for each child that should be added to the focus
+ * chain. The ”name” attribute gives the id of the widget.
+ *
+ * An example of these properties in UI definitions:
  * |[
- * <object class="GtkVBox">
+ * <object class="GtkBox">
  *   <child>
- *     <object class="GtkLabel"/>
+ *     <object class="GtkEntry" id="entry1"/>
  *     <packing>
  *       <property name="pack-type">start</property>
  *     </packing>
  *   </child>
+ *   <child>
+ *     <object class="GtkEntry" id="entry2"/>
+ *   </child>
+ *   <focus-chain>
+ *     <widget name="entry1"/>
+ *     <widget name="entry2"/>
+ *   </focus-chain>
  * </object>
  * ]|
  *
- * Since 2.16, child properties can also be marked as translatable using
- * the same “translatable”, “comments” and “context” attributes that are used
- * for regular properties.
  */
 
 
@@ -353,6 +366,11 @@ static void    gtk_container_buildable_custom_tag_end (GtkBuildable *buildable,
                                                        GObject      *child,
                                                        const gchar  *tagname,
                                                        gpointer     *data);
+static void    gtk_container_buildable_custom_finished (GtkBuildable *buildable,
+                                                        GtkBuilder   *builder,
+                                                        GObject      *child,
+                                                        const gchar  *tagname,
+                                                        gpointer      data);
 
 static gboolean gtk_container_should_propagate_draw (GtkContainer   *container,
                                                      GtkWidget      *child,
@@ -557,6 +575,7 @@ gtk_container_buildable_init (GtkBuildableIface *iface)
   iface->add_child = gtk_container_buildable_add_child;
   iface->custom_tag_start = gtk_container_buildable_custom_tag_start;
   iface->custom_tag_end = gtk_container_buildable_custom_tag_end;
+  iface->custom_finished = gtk_container_buildable_custom_finished;
 }
 
 static void
@@ -590,7 +609,10 @@ gtk_container_buildable_set_child_property (GtkContainer *container,
   GValue gvalue = G_VALUE_INIT;
   GError *error = NULL;
 
-  if (gtk_widget_get_parent (child) != (GtkWidget *)container && !GTK_IS_ASSISTANT (container) && !GTK_IS_ACTION_BAR (container))
+  if (gtk_widget_get_parent (child) != (GtkWidget *)container &&
+      !GTK_IS_ASSISTANT (container) &&
+      !GTK_IS_ACTION_BAR (container) &&
+      !GTK_IS_POPOVER_MENU (container))
     {
       /* This can happen with internal children of complex widgets.
        * Silently ignore the child properties in this case. We explicitly
@@ -727,6 +749,46 @@ static const GMarkupParser attributes_parser =
     attributes_text_element,
   };
 
+typedef struct
+  {
+    GSList *items;
+    GObject *object;
+  } FocusChainData;
+
+static void
+focus_chain_start_element (GMarkupParseContext *context,
+                           const gchar         *element_name,
+                           const gchar        **names,
+                           const gchar        **values,
+                           gpointer            user_data,
+                           GError            **error)
+{
+  guint i;
+  FocusChainData *data = (FocusChainData*)user_data;
+
+  if (strcmp (element_name, "widget") == 0)
+    {
+      for (i = 0; names[i]; i++)
+        {
+          if (strcmp (names[i], "name") == 0)
+            data->items = g_slist_prepend (data->items, g_strdup (values[i]));
+        }
+    }
+  else if (strcmp (element_name, "focus-chain") == 0)
+    {
+      return;
+    }
+  else
+    {
+      g_warning ("Unsupported type tag for GtkContainer %s\n", element_name);
+    }
+}
+
+static const GMarkupParser focus_chain_parser =
+  {
+    focus_chain_start_element
+  };
+
 static gboolean
 gtk_container_buildable_custom_tag_start (GtkBuildable  *buildable,
                                           GtkBuilder    *builder,
@@ -735,14 +797,14 @@ gtk_container_buildable_custom_tag_start (GtkBuildable  *buildable,
                                           GMarkupParser *parser,
                                           gpointer      *data)
 {
-  PackingPropertiesData *parser_data;
-
   if (parent_buildable_iface->custom_tag_start (buildable, builder, child,
                                                 tagname, parser, data))
     return TRUE;
 
   if (child && strcmp (tagname, "packing") == 0)
     {
+      PackingPropertiesData *parser_data;
+
       parser_data = g_slice_new0 (PackingPropertiesData);
       parser_data->string = g_string_new ("");
       parser_data->builder = builder;
@@ -751,6 +813,17 @@ gtk_container_buildable_custom_tag_start (GtkBuildable  *buildable,
       parser_data->child_prop_name = NULL;
 
       *parser = attributes_parser;
+      *data = parser_data;
+      return TRUE;
+    }
+  else if (!child && strcmp (tagname, "focus-chain") == 0)
+    {
+      FocusChainData *parser_data;
+      parser_data = g_slice_new0 (FocusChainData);
+      parser_data->items = NULL;
+      parser_data->object = G_OBJECT (buildable);
+
+      *parser = focus_chain_parser;
       *data = parser_data;
       return TRUE;
     }
@@ -776,6 +849,48 @@ gtk_container_buildable_custom_tag_end (GtkBuildable *buildable,
   if (parent_buildable_iface->custom_tag_end)
     parent_buildable_iface->custom_tag_end (buildable, builder,
                                             child, tagname, data);
+}
+
+static void
+gtk_container_buildable_custom_finished (GtkBuildable *buildable,
+                                         GtkBuilder   *builder,
+                                         GObject      *child,
+                                         const gchar  *tagname,
+                                         gpointer      data)
+{
+   if (strcmp (tagname, "focus-chain") == 0)
+    {
+      FocusChainData *parser_data = (FocusChainData*)data;
+      GSList *l;
+      GList *chain;
+      GObject *object;
+
+      chain = NULL;
+      for (l = parser_data->items; l; l = l->next)
+        {
+          object = gtk_builder_get_object (builder, l->data);
+          if (!object)
+            {
+              g_warning ("Unknown object %s specified in focus-chain for %s",
+                         (const gchar*)l->data,
+                         gtk_buildable_get_name (GTK_BUILDABLE (parser_data->object)));
+              continue;
+            }
+          chain = g_list_prepend (chain, object);
+        }
+
+      gtk_container_set_focus_chain (GTK_CONTAINER (parser_data->object), chain);
+      g_list_free (chain);
+
+      g_slist_free_full (parser_data->items, g_free);
+      g_slice_free (FocusChainData, parser_data);
+
+      return;
+    }
+
+  if (parent_buildable_iface->custom_finished)
+    parent_buildable_iface->custom_finished (buildable, builder,
+                                             child, tagname, data);
 }
 
 /**
@@ -1607,7 +1722,10 @@ gtk_container_remove (GtkContainer *container,
 {
   g_return_if_fail (GTK_IS_CONTAINER (container));
   g_return_if_fail (GTK_IS_WIDGET (widget));
-  g_return_if_fail (gtk_widget_get_parent (widget) == GTK_WIDGET (container) || GTK_IS_ASSISTANT (container) || GTK_IS_ACTION_BAR (container));
+  g_return_if_fail (gtk_widget_get_parent (widget) == GTK_WIDGET (container) ||
+                    GTK_IS_ASSISTANT (container) ||
+                    GTK_IS_ACTION_BAR (container) ||
+                    GTK_IS_POPOVER_MENU (container));
 
   g_object_ref (container);
   g_object_ref (widget);
@@ -2224,7 +2342,7 @@ gtk_container_foreach (GtkContainer *container,
  * default behaviour by overriding the class closure of this signal.
  *
  * This is function is mostly meant to be used by widgets. Applications can use
- * gtk_widget_grab_focus() to manualy set the focus to a specific widget.
+ * gtk_widget_grab_focus() to manually set the focus to a specific widget.
  */
 void
 gtk_container_set_focus_child (GtkContainer *container,

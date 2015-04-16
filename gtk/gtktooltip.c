@@ -20,6 +20,7 @@
 #include "config.h"
 
 #include "gtktooltip.h"
+#include "gtktooltipprivate.h"
 
 #include <math.h>
 #include <string.h>
@@ -39,6 +40,9 @@
 
 #ifdef GDK_WINDOWING_WAYLAND
 #include "wayland/gdkwayland.h"
+#endif
+#ifdef GDK_WINDOWING_MIR
+#include "mir/gdkmir.h"
 #endif
 
 
@@ -1174,6 +1178,19 @@ found:
                                           GTK_WINDOW (toplevel));
         }
 #endif
+#ifdef GDK_WINDOWING_MIR
+      /* Set the transient parent on the tooltip when running with the Mir
+       * backend to allow correct positioning of the tooltip windows */
+      if (GDK_IS_MIR_DISPLAY (display))
+        {
+          GtkWidget *toplevel;
+
+          toplevel = gtk_widget_get_toplevel (tooltip->tooltip_widget);
+          if (GTK_IS_WINDOW (toplevel))
+            gtk_window_set_transient_for (GTK_WINDOW (tooltip->current_window),
+                                          GTK_WINDOW (toplevel));
+        }
+#endif
 
       x -= border.left;
       y -= border.top;
@@ -1192,7 +1209,6 @@ gtk_tooltip_show_tooltip (GdkDisplay *display)
   GdkWindow *window;
   GtkWidget *tooltip_widget;
   GtkTooltip *tooltip;
-  gboolean has_tooltip;
   gboolean return_value = FALSE;
 
   tooltip = g_object_get_data (G_OBJECT (display),
@@ -1226,8 +1242,6 @@ gtk_tooltip_show_tooltip (GdkDisplay *display)
 
   if (!tooltip_widget)
     return;
-
-  g_object_get (tooltip_widget, "has-tooltip", &has_tooltip, NULL);
 
   return_value = gtk_tooltip_run_requery (&tooltip_widget, tooltip, &x, &y);
   if (!return_value)

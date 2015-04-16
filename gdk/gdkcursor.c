@@ -192,11 +192,13 @@ gdk_cursor_unref (GdkCursor *cursor)
  * To make the cursor invisible, use %GDK_BLANK_CURSOR.
  *
  * Returns: a new #GdkCursor
+ *
+ * Deprecated: 3.16: Use gdk_cursor_new_for_display() instead.
  */
 GdkCursor*
 gdk_cursor_new (GdkCursorType cursor_type)
 {
-  return gdk_cursor_new_for_display (gdk_display_get_default(), cursor_type);
+  return gdk_cursor_new_for_display (gdk_display_get_default (), cursor_type);
 }
 
 /**
@@ -448,9 +450,7 @@ gdk_cursor_get_image (GdkCursor *cursor)
   h = cairo_image_surface_get_height (surface);
 
   x_scale = y_scale = 1;
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
   cairo_surface_get_device_scale (surface, &x_scale, &y_scale);
-#endif
 
   pixbuf = gdk_pixbuf_get_from_surface (surface, 0, 0, w, h);
   cairo_surface_destroy (surface);

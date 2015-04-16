@@ -24,7 +24,7 @@
 G_BEGIN_DECLS
 
 /* forward declaration for GtkCssValue */
-typedef struct _GtkCssComputedValues GtkCssComputedValues;
+typedef struct _GtkCssStyle GtkCssStyle;
 typedef struct _GtkStyleProviderPrivate GtkStyleProviderPrivate; /* dummy typedef */
 
 typedef enum { /*< skip >*/
@@ -70,10 +70,49 @@ typedef enum /*< skip >*/ {
   GTK_CSS_DEPENDS_ON_FONT_SIZE = (1 << 3)
 } GtkCssDependencies;
 
+/*
+ * GtkCssAffects:
+ * @GTK_CSS_AFFECTS_FOREGROUND: The foreground rendering is affected.
+ *   This does not include things that affect the font. For those,
+ *   see @GTK_CSS_AFFECTS_FONT.
+ * @GTK_CSS_AFFECTS_BACKGROUND: The background rendering is affected.
+ * @GTK_CSS_AFFECTS_BORDER: The border styling is affected.
+ * @GTK_CSS_AFFECTS_PANGO_LAYOUT: Font rendering is affected.
+ * @GTK_CSS_AFFECTS_FONT: The font is affected and should be reloaded
+ *   if it was cached.
+ * @GTK_CSS_AFFECTS_TEXT: Text rendering is affected.
+ * @GTK_CSS_AFFECTS_ICON: Icons and icon rendering is affected.
+ * @GTK_CSS_AFFECTS_OUTLINE: The outline styling is affected. Outlines
+ *   only affect elements that can be focused.
+ * @GTK_CSS_AFFECTS_CLIP: Changes in this property may have an effect
+ *   on the clipping area of the element. Changes in these properties
+ *   should cause a reevaluation of the element's clip area.
+ * @GTK_CSS_AFFECTS_SIZE: Changes in this property may have an effect
+ *   on the allocated size of the element. Changes in these properties
+ *   should cause a recomputation of the element's allocated size.
+ *
+ * The generic effects that a CSS property can have. If a value is
+ * set, then the property will have an influence on that feature.
+ *
+ * Note that multiple values can be set.
+ */
+typedef enum {
+  GTK_CSS_AFFECTS_FOREGROUND = (1 << 0),
+  GTK_CSS_AFFECTS_BACKGROUND = (1 << 1),
+  GTK_CSS_AFFECTS_BORDER = (1 << 2),
+  GTK_CSS_AFFECTS_FONT = (1 << 3),
+  GTK_CSS_AFFECTS_TEXT = (1 << 4),
+  GTK_CSS_AFFECTS_ICON = (1 << 5),
+  GTK_CSS_AFFECTS_OUTLINE = (1 << 6),
+  GTK_CSS_AFFECTS_CLIP = (1 << 7),
+  GTK_CSS_AFFECTS_SIZE = (1 << 8)
+} GtkCssAffects;
+
 enum { /*< skip >*/
   GTK_CSS_PROPERTY_COLOR,
   GTK_CSS_PROPERTY_DPI,
   GTK_CSS_PROPERTY_FONT_SIZE,
+  GTK_CSS_PROPERTY_ICON_THEME,
   GTK_CSS_PROPERTY_BACKGROUND_COLOR,
   GTK_CSS_PROPERTY_FONT_FAMILY,
   GTK_CSS_PROPERTY_FONT_STYLE,
@@ -81,10 +120,6 @@ enum { /*< skip >*/
   GTK_CSS_PROPERTY_FONT_WEIGHT,
   GTK_CSS_PROPERTY_FONT_STRETCH,
   GTK_CSS_PROPERTY_TEXT_SHADOW,
-  GTK_CSS_PROPERTY_ICON_SOURCE,
-  GTK_CSS_PROPERTY_ICON_SHADOW,
-  GTK_CSS_PROPERTY_ICON_STYLE,
-  GTK_CSS_PROPERTY_ICON_TRANSFORM,
   GTK_CSS_PROPERTY_BOX_SHADOW,
   GTK_CSS_PROPERTY_MARGIN_TOP,
   GTK_CSS_PROPERTY_MARGIN_LEFT,
@@ -128,6 +163,10 @@ enum { /*< skip >*/
   GTK_CSS_PROPERTY_BORDER_IMAGE_REPEAT,
   GTK_CSS_PROPERTY_BORDER_IMAGE_SLICE,
   GTK_CSS_PROPERTY_BORDER_IMAGE_WIDTH,
+  GTK_CSS_PROPERTY_ICON_SOURCE,
+  GTK_CSS_PROPERTY_ICON_SHADOW,
+  GTK_CSS_PROPERTY_ICON_STYLE,
+  GTK_CSS_PROPERTY_ICON_TRANSFORM,
   GTK_CSS_PROPERTY_TRANSITION_PROPERTY,
   GTK_CSS_PROPERTY_TRANSITION_DURATION,
   GTK_CSS_PROPERTY_TRANSITION_TIMING_FUNCTION,
@@ -243,6 +282,9 @@ GtkCssChange            _gtk_css_change_for_child                (GtkCssChange  
 GtkCssDependencies      _gtk_css_dependencies_union              (GtkCssDependencies first,
                                                                   GtkCssDependencies second);
 
+/* for lack of better place to put it */
+/* mirror what cairo does */
+#define gtk_rgba_is_clear(rgba) ((rgba)->alpha < ((double)0x00ff / (double)0xffff))
 
 G_END_DECLS
 

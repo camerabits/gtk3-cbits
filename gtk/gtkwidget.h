@@ -1149,24 +1149,24 @@ GDK_AVAILABLE_IN_ALL
 gboolean     gtk_widget_hide_on_delete	(GtkWidget	*widget);
 
 /* Functions to override widget styling */
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void         gtk_widget_override_color            (GtkWidget     *widget,
                                                    GtkStateFlags  state,
                                                    const GdkRGBA *color);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void         gtk_widget_override_background_color (GtkWidget     *widget,
                                                    GtkStateFlags  state,
                                                    const GdkRGBA *color);
 
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void         gtk_widget_override_font             (GtkWidget                  *widget,
                                                    const PangoFontDescription *font_desc);
 
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void         gtk_widget_override_symbolic_color   (GtkWidget     *widget,
                                                    const gchar   *name,
                                                    const GdkRGBA *color);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void         gtk_widget_override_cursor           (GtkWidget       *widget,
                                                    const GdkRGBA   *cursor,
                                                    const GdkRGBA   *secondary_cursor);
@@ -1474,6 +1474,13 @@ void    gtk_widget_class_bind_template_child_full       (GtkWidgetClass        *
 						         const gchar           *name,
 						         gboolean               internal_child,
 						         gssize                 struct_offset);
+
+GDK_AVAILABLE_IN_3_16
+GActionGroup           *gtk_widget_get_action_group                     (GtkWidget    *widget,
+                                                                         const gchar  *prefix);
+
+GDK_AVAILABLE_IN_3_16
+const gchar **          gtk_widget_list_action_prefixes                 (GtkWidget    *widget);
 
 G_END_DECLS
 

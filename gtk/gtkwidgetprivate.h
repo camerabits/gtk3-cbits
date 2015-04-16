@@ -151,10 +151,8 @@ void              _gtk_widget_invalidate_style_context     (GtkWidget    *widget
 void              _gtk_widget_style_context_invalidated    (GtkWidget    *widget);
 
 void              _gtk_widget_update_parent_muxer          (GtkWidget    *widget);
-GtkActionMuxer *  _gtk_widget_get_action_muxer             (GtkWidget    *widget);
-gchar **          _gtk_widget_list_action_prefixes         (GtkWidget    *widget);
-GActionGroup *    _gtk_widget_get_action_group             (GtkWidget    *widget,
-                                                            const gchar  *prefix);
+GtkActionMuxer *  _gtk_widget_get_action_muxer             (GtkWidget    *widget,
+                                                            gboolean      create);
 
 void              _gtk_widget_add_controller               (GtkWidget           *widget,
                                                             GtkEventController  *controller);
@@ -162,6 +160,13 @@ void              _gtk_widget_remove_controller            (GtkWidget           
                                                             GtkEventController  *controller);
 GList *           _gtk_widget_list_controllers             (GtkWidget           *widget,
                                                             GtkPropagationPhase  phase);
+gboolean          _gtk_widget_consumes_motion              (GtkWidget           *widget,
+                                                            GdkEventSequence    *sequence);
+
+gboolean          gtk_widget_has_tick_callback             (GtkWidget *widget);
+
+void              gtk_widget_set_csd_input_shape           (GtkWidget            *widget,
+                                                            const cairo_region_t *region);
 
 void              gtk_drag_cancel                          (GdkDragContext *context);
 

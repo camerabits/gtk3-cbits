@@ -24,6 +24,8 @@
 #include <gtk/gtkprintjob.h>
 #include <gtk/gtkprintunixdialog.h>
 
+#include <gtk/gtkunixprint-autocleanups.h>
+
 #undef __GTK_UNIX_PRINT_H_INSIDE__
 
 #endif /* __GTK_UNIX_PRINT_H__ */

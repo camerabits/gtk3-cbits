@@ -389,7 +389,8 @@ test_type (gconstpointer data)
       g_str_equal (g_type_name (type), "GdkX11DeviceManagerXI2") ||
       g_str_equal (g_type_name (type), "GdkX11Display") ||
       g_str_equal (g_type_name (type), "GdkX11DisplayManager") ||
-      g_str_equal (g_type_name (type), "GdkX11Screen"))
+      g_str_equal (g_type_name (type), "GdkX11Screen") ||
+      g_str_equal (g_type_name (type), "GdkX11GLContext"))
     return;
 
   /* This throws a critical when the connection is dropped */
@@ -601,6 +602,10 @@ test_type (gconstpointer data)
           g_str_equal (pspec->name, "visible-child-name"))
         continue;
 
+      if (pspec->owner_type == GTK_TYPE_POPOVER_MENU &&
+          g_str_equal (pspec->name, "visible-submenu"))
+        continue;
+
       if (pspec->owner_type == GTK_TYPE_TEXT_VIEW &&
           g_str_equal (pspec->name, "im-module"))
         continue;
@@ -626,6 +631,10 @@ test_type (gconstpointer data)
 	  g_str_equal (pspec->name, "use-header-bar"))
 	continue;
 
+      if (type == GTK_TYPE_MODEL_BUTTON &&
+          pspec->owner_type == GTK_TYPE_BUTTON)
+        continue;
+
       if (g_test_verbose ())
         g_print ("Property %s.%s\n", g_type_name (pspec->owner_type), pspec->name);
 
@@ -647,13 +656,7 @@ main (int argc, char **argv)
   const GType *otypes;
   guint i;
   gchar *schema_dir;
-  GTestDBus *bus;
   gint result;
-
-  /* These must be set before before gtk_test_init */
-  g_setenv ("GIO_USE_VFS", "local", TRUE);
-  g_setenv ("GSETTINGS_BACKEND", "memory", TRUE);
-  g_setenv ("G_ENABLE_DIAGNOSTIC", "0", TRUE);
 
   gtk_test_init (&argc, &argv);
   gtk_test_register_all_types();
@@ -661,12 +664,6 @@ main (int argc, char **argv)
   /* g_test_build_filename must be called after gtk_test_init */
   schema_dir = g_test_build_filename (G_TEST_BUILT, "", NULL);
   g_setenv ("GSETTINGS_SCHEMA_DIR", schema_dir, TRUE);
-
-  /* Create one test bus for all tests, as we have a lot of very small
-   * and quick tests.
-   */
-  bus = g_test_dbus_new (G_TEST_DBUS_NONE);
-  g_test_dbus_up (bus);
 
   otypes = gtk_test_list_all_types (NULL);
   for (i = 0; otypes[i]; i++)
@@ -680,8 +677,6 @@ main (int argc, char **argv)
 
   result = g_test_run ();
 
-  g_test_dbus_down (bus);
-  g_object_unref (bus);
   g_free (schema_dir);
 
   return result;

@@ -19,7 +19,12 @@
  */
 
 #include "config.h"
+
+#include <glib/gi18n.h>
 #include <gtk/gtk.h>
+#ifdef HAVE_LIBCANBERRA
+#include <canberra-gtk.h>
+#endif
 
 static void
 change_theme_state (GSimpleAction *action,
@@ -154,6 +159,12 @@ spin_value_reset (GtkWidget *button, GtkAdjustment *adjustment)
 static gint pulse_time = 250;
 static gint pulse_entry_mode = 0;
 
+static void
+remove_pulse (gpointer pulse_id)
+{
+  g_source_remove (GPOINTER_TO_UINT (pulse_id));
+}
+
 static gboolean
 pulse_it (GtkWidget *widget)
 {
@@ -165,7 +176,7 @@ pulse_it (GtkWidget *widget)
     gtk_progress_bar_pulse (GTK_PROGRESS_BAR (widget));
 
   pulse_id = g_timeout_add (pulse_time, (GSourceFunc)pulse_it, widget);
-  g_object_set_data (G_OBJECT (widget), "pulse_id", GUINT_TO_POINTER (pulse_id));
+  g_object_set_data_full (G_OBJECT (widget), "pulse_id", GUINT_TO_POINTER (pulse_id), remove_pulse);
 
   return G_SOURCE_REMOVE;
 }
@@ -185,18 +196,14 @@ update_pulse_time (GtkAdjustment *adjustment, GtkWidget *widget)
 
   if (value == 100)
     {
-      if (pulse_id != 0)
-        {
-          g_source_remove (pulse_id);
-          g_object_set_data (G_OBJECT (widget), "pulse_id", NULL);
-        }
+      g_object_set_data (G_OBJECT (widget), "pulse_id", NULL);
     }
   else if (value < 100)
     {
       if (pulse_id == 0 && (GTK_IS_PROGRESS_BAR (widget) || pulse_entry_mode % 3 == 2))
         {
           pulse_id = g_timeout_add (pulse_time, (GSourceFunc)pulse_it, widget);
-          g_object_set_data (G_OBJECT (widget), "pulse_id", GUINT_TO_POINTER (pulse_id));
+          g_object_set_data_full (G_OBJECT (widget), "pulse_id", GUINT_TO_POINTER (pulse_id), remove_pulse);
         }
     }
 }
@@ -207,8 +214,6 @@ on_entry_icon_release (GtkEntry            *entry,
                        GdkEvent            *event,
                        gpointer             user_data)
 {
-  guint pulse_id;
-
   if (icon_pos != GTK_ENTRY_ICON_SECONDARY)
     return;
 
@@ -216,12 +221,7 @@ on_entry_icon_release (GtkEntry            *entry,
 
   if (pulse_entry_mode % 3 == 0)
     {
-      pulse_id = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (entry), "pulse_id"));
-      if (pulse_id != 0)
-        {
-          g_source_remove (pulse_id);
-          g_object_set_data (G_OBJECT (entry), "pulse_id", NULL);
-        }
+      g_object_set_data (G_OBJECT (entry), "pulse_id", NULL);
       gtk_entry_set_progress_fraction (entry, 0);
     }
   else if (pulse_entry_mode % 3 == 1)
@@ -234,7 +234,144 @@ on_entry_icon_release (GtkEntry            *entry,
           pulse_it (GTK_WIDGET (entry));
         }
     }
+}
 
+#define EPSILON (1e-10)
+
+static gboolean
+on_scale_button_query_tooltip (GtkWidget  *button,
+                               gint        x,
+                               gint        y,
+                               gboolean    keyboard_mode,
+                               GtkTooltip *tooltip,
+                               gpointer    user_data)
+{
+  GtkScaleButton *scale_button = GTK_SCALE_BUTTON (button);
+  GtkAdjustment *adjustment;
+  gdouble val;
+  gchar *str;
+  AtkImage *image;
+
+  image = ATK_IMAGE (gtk_widget_get_accessible (button));
+
+  adjustment = gtk_scale_button_get_adjustment (scale_button);
+  val = gtk_scale_button_get_value (scale_button);
+
+  if (val < (gtk_adjustment_get_lower (adjustment) + EPSILON))
+    {
+      str = g_strdup (_("Muted"));
+    }
+  else if (val >= (gtk_adjustment_get_upper (adjustment) - EPSILON))
+    {
+      str = g_strdup (_("Full Volume"));
+    }
+  else
+    {
+      gint percent;
+
+      percent = (gint) (100. * val / (gtk_adjustment_get_upper (adjustment) - gtk_adjustment_get_lower (adjustment)) + .5);
+
+      str = g_strdup_printf (C_("volume percentage", "%d %%"), percent);
+    }
+
+  gtk_tooltip_set_text (tooltip, str);
+  atk_image_set_image_description (image, str);
+  g_free (str);
+
+  return TRUE;
+}
+
+static void
+on_scale_button_value_changed (GtkScaleButton *button,
+                               gdouble         value,
+                               gpointer        user_data)
+{
+  gtk_widget_trigger_tooltip_query (GTK_WIDGET (button));
+}
+
+static void
+on_record_button_toggled (GtkToggleButton *button,
+                          gpointer         user_data)
+{
+  GtkStyleContext *context;
+
+  context = gtk_widget_get_style_context (GTK_WIDGET (button));
+  if (gtk_toggle_button_get_active (button))
+    gtk_style_context_remove_class (context, "destructive-action");
+  else
+    gtk_style_context_add_class (context, "destructive-action");
+}
+
+static void
+on_page_combo_changed (GtkComboBox *combo,
+                       gpointer     user_data)
+{
+  GtkWidget *from;
+  GtkWidget *to;
+  GtkWidget *print;
+
+  from = GTK_WIDGET (g_object_get_data (G_OBJECT (combo), "range_from_spin"));
+  to = GTK_WIDGET (g_object_get_data (G_OBJECT (combo), "range_to_spin"));
+  print = GTK_WIDGET (g_object_get_data (G_OBJECT (combo), "print_button"));
+
+  switch (gtk_combo_box_get_active (combo))
+    {
+    case 0: /* Range */
+      gtk_widget_set_sensitive (from, TRUE);
+      gtk_widget_set_sensitive (to, TRUE);
+      gtk_widget_set_sensitive (print, TRUE);
+      break;
+    case 1: /* All */
+      gtk_widget_set_sensitive (from, FALSE);
+      gtk_widget_set_sensitive (to, FALSE);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (from), 1);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (to), 99);
+      gtk_widget_set_sensitive (print, TRUE);
+      break;
+    case 2: /* Current */
+      gtk_widget_set_sensitive (from, FALSE);
+      gtk_widget_set_sensitive (to, FALSE);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (from), 7);
+      gtk_spin_button_set_value (GTK_SPIN_BUTTON (to), 7);
+      gtk_widget_set_sensitive (print, TRUE);
+      break;
+    case 4:
+      gtk_widget_set_sensitive (from, FALSE);
+      gtk_widget_set_sensitive (to, FALSE);
+      gtk_widget_set_sensitive (print, FALSE);
+      break;
+    default:;
+    }
+}
+
+static void
+on_range_from_changed (GtkSpinButton *from)
+{
+  GtkSpinButton *to;
+  gint v1, v2;
+
+  to = GTK_SPIN_BUTTON (g_object_get_data (G_OBJECT (from), "range_to_spin"));
+
+  v1 = gtk_spin_button_get_value_as_int (from);
+  v2 = gtk_spin_button_get_value_as_int (to);
+
+  if (v1 > v2)
+    gtk_spin_button_set_value (to, v1);
+}
+
+static void
+on_range_to_changed (GtkSpinButton *to)
+{
+  GtkSpinButton *from;
+  gint v1, v2;
+
+  from = GTK_SPIN_BUTTON (g_object_get_data (G_OBJECT (to), "range_from_spin"));
+
+  v1 = gtk_spin_button_get_value_as_int (from);
+  v2 = gtk_spin_button_get_value_as_int (to);
+
+  if (v1 > v2)
+    gtk_spin_button_set_value (from, v2);
 }
 
 static void
@@ -415,6 +552,24 @@ populate_model (GtkTreeStore *store)
   gtk_tree_store_set (store, &iter,
                       0, "Gisele of Aquitaine",
                       -1);
+  gtk_tree_store_append (store, &iter, NULL);
+  gtk_tree_store_set (store, &iter, 3, TRUE, -1);
+  gtk_tree_store_append (store, &iter, NULL);
+  gtk_tree_store_set (store, &iter,
+                      0, "Attila the Hun",
+                      1, "ca. 390",
+                      2, "453",
+                      -1);
+}
+
+static gboolean
+row_separator_func (GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
+{
+  gboolean is_sep;
+
+  gtk_tree_model_get (model, iter, 3, &is_sep, -1);
+
+  return is_sep;
 }
 
 static void
@@ -444,6 +599,82 @@ update_title_header (GtkListBoxRow *row,
 
       g_free (title);
     }
+}
+
+static void
+overshot (GtkScrolledWindow *sw, GtkPositionType pos, GtkWidget *widget)
+{
+  GtkWidget *box, *row, *label, *swatch;
+  GdkRGBA rgba;
+  const gchar *color;
+  gchar *text;
+  GtkWidget *silver;
+  GtkWidget *gold;
+
+  silver = GTK_WIDGET (g_object_get_data (G_OBJECT (widget), "Silver"));
+  gold = GTK_WIDGET (g_object_get_data (G_OBJECT (widget), "Gold"));
+
+  if (pos == GTK_POS_TOP)
+    {
+      if (silver)
+        {
+          gtk_container_remove (GTK_CONTAINER (widget), silver);
+          g_object_set_data (G_OBJECT (widget), "Silver", NULL);
+        }
+      if (gold)
+        {
+          gtk_container_remove (GTK_CONTAINER (widget), gold);
+          g_object_set_data (G_OBJECT (widget), "Gold", NULL);
+        }
+
+#ifdef HAVE_LIBCANBERRA
+      if (silver || gold)
+        ca_gtk_play_for_widget (widget, 0, "event.id", "message", NULL); 
+#endif
+
+      return;
+    }
+
+
+  if (gold)
+    return;
+  else if (silver)
+    color = "Gold";
+  else
+    color = "Silver";
+
+  row = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 20);
+  text = g_strconcat ("<b>", color, "</b>", NULL);
+  label = gtk_label_new (text);
+  g_free (text);
+  g_object_set (label,
+                "use-markup", TRUE,
+                "halign", GTK_ALIGN_START,
+                "valign", GTK_ALIGN_CENTER,
+                "margin", 6,
+                "xalign", 0.0,
+                NULL);
+  gtk_box_pack_start (GTK_BOX (row), label, TRUE, TRUE, 0);
+  gdk_rgba_parse (&rgba, color);
+  swatch = g_object_new (g_type_from_name ("GtkColorSwatch"),
+                         "rgba", &rgba,
+                         "selectable", FALSE,
+                         "halign", GTK_ALIGN_END,
+                         "valign", GTK_ALIGN_CENTER,
+                         "margin", 6,
+                         "height-request", 24,
+                         NULL);
+  box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_container_add (GTK_CONTAINER (box), swatch);
+  gtk_box_pack_start (GTK_BOX (row), box, FALSE, FALSE, 0);
+  gtk_widget_show_all (row);
+  gtk_list_box_insert (GTK_LIST_BOX (widget), row, -1);
+  row = gtk_widget_get_parent (row);
+  gtk_list_box_row_set_activatable (GTK_LIST_BOX_ROW (row), FALSE);
+  g_object_set_data (G_OBJECT (widget), color, row);
+#ifdef HAVE_LIBCANBERRA
+  ca_gtk_play_for_widget (widget, 0, "event.id", "complete", NULL); 
+#endif
 }
 
 static void
@@ -493,10 +724,11 @@ populate_colors (GtkWidget *widget)
   };
   gint i;
   GtkWidget *row, *box, *label, *swatch;
+  GtkWidget *sw;
   GdkRGBA rgba;
 
   gtk_list_box_set_header_func (GTK_LIST_BOX (widget), update_title_header, NULL, NULL);
-                             
+
   for (i = 0; i < G_N_ELEMENTS (colors); i++)
     {
       row = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 20);
@@ -529,6 +761,9 @@ populate_colors (GtkWidget *widget)
     }
 
   gtk_list_box_invalidate_headers (GTK_LIST_BOX (widget));
+
+  sw = gtk_widget_get_ancestor (widget, GTK_TYPE_SCROLLED_WINDOW);
+  g_signal_connect (sw, "edge-overshot", G_CALLBACK (overshot), widget);
 }
 
 typedef struct {
@@ -549,7 +784,7 @@ background_loaded_cb (GObject      *source,
   pixbuf = gdk_pixbuf_new_from_stream_finish (res, &error);
   if (error)
     {
-      g_warning ("%s", error->message);
+      g_warning ("Error loading '%s': %s", bd->filename, error->message);
       g_error_free (error);
       return;
     }
@@ -789,15 +1024,119 @@ toggle_selection_mode (GtkSwitch  *sw,
 }
 
 static void
+handle_insert (GtkWidget *button, GtkWidget *textview)
+{
+  GtkTextBuffer *buffer;
+  const gchar *id;
+  const gchar *text;
+
+  id = gtk_buildable_get_name (GTK_BUILDABLE (button));
+
+  if (strcmp (id, "toolbutton1") == 0)
+    text = "⌘";
+  else if (strcmp (id, "toolbutton2") == 0)
+    text = "⚽";
+  else if (strcmp (id, "toolbutton3") == 0)
+    text = "⤢";
+  else if (strcmp (id, "toolbutton4") == 0)
+    text = "☆";
+  else
+    text = "";
+
+  buffer = gtk_text_view_get_buffer (GTK_TEXT_VIEW (textview));
+  gtk_text_buffer_insert_at_cursor (buffer, text, -1);
+}
+
+static void
+handle_cutcopypaste (GtkWidget *button, GtkWidget *textview)
+{
+  GtkTextBuffer *buffer;
+  GtkClipboard *clipboard;
+  const gchar *id;
+
+  clipboard = gtk_widget_get_clipboard (textview, GDK_SELECTION_CLIPBOARD);
+  buffer = gtk_text_view_get_buffer (GTK_TEXT_VIEW (textview));
+  id = gtk_buildable_get_name (GTK_BUILDABLE (button));
+
+  if (strcmp (id, "cutbutton") == 0)
+    gtk_text_buffer_cut_clipboard (buffer, clipboard, TRUE);
+  else if (strcmp (id, "copybutton") == 0)
+    gtk_text_buffer_copy_clipboard (buffer, clipboard);
+  else if (strcmp (id, "pastebutton") == 0)
+    gtk_text_buffer_paste_clipboard (buffer, clipboard, NULL, TRUE);
+  else if (strcmp (id, "deletebutton") == 0)
+    gtk_text_buffer_delete_selection (buffer, TRUE, TRUE);
+}
+
+static void
+clipboard_owner_change (GtkClipboard *clipboard, GdkEvent *event, GtkWidget *button)
+{
+  const gchar *id;
+  gboolean has_text;
+
+  id = gtk_buildable_get_name (GTK_BUILDABLE (button));
+  has_text = gtk_clipboard_wait_is_text_available (clipboard);
+
+  if (strcmp (id, "pastebutton") == 0)
+    gtk_widget_set_sensitive (button, has_text);
+}
+
+static void
+textbuffer_notify_selection (GObject *object, GParamSpec *pspec, GtkWidget *button)
+{
+  const gchar *id;
+  gboolean has_selection;
+
+  id = gtk_buildable_get_name (GTK_BUILDABLE (button));
+  has_selection = gtk_text_buffer_get_has_selection (GTK_TEXT_BUFFER (object));
+
+  if (strcmp (id, "cutbutton") == 0 ||
+      strcmp (id, "copybutton") == 0 ||
+      strcmp (id, "deletebutton") == 0)
+    gtk_widget_set_sensitive (button, has_selection);
+}
+
+static gboolean
+osd_frame_button_press (GtkWidget *frame, GdkEventButton *event, gpointer data)
+{
+  GtkWidget *osd;
+  gboolean visible;
+
+  osd = g_object_get_data (G_OBJECT (frame), "osd");
+  visible = gtk_widget_get_visible (osd);
+  gtk_widget_set_visible (osd, !visible);
+
+  return GDK_EVENT_STOP;
+}
+
+static gboolean
+page_combo_separator_func (GtkTreeModel *model,
+                           GtkTreeIter  *iter,
+                           gpointer      data)
+{
+  gchar *text;
+  gboolean res;
+
+  gtk_tree_model_get (model, iter, 0, &text, -1);
+  res = g_strcmp0 (text, "-") == 0;
+  g_free (text);
+
+  return res;
+}
+
+static void
 activate (GApplication *app)
 {
   GtkBuilder *builder;
   GtkWindow *window;
   GtkWidget *widget;
   GtkWidget *widget2;
+  GtkWidget *widget3;
+  GtkWidget *widget4;
   GtkWidget *stack;
   GtkWidget *dialog;
   GtkAdjustment *adj;
+  GtkCssProvider *provider;
   static GActionEntry win_entries[] = {
     { "dark", NULL, NULL, "false", change_theme_state },
     { "search", activate_search, NULL, NULL, NULL },
@@ -817,8 +1156,23 @@ activate (GApplication *app)
 
   g_type_ensure (my_text_view_get_type ());
 
+  provider = gtk_css_provider_new ();
+  gtk_css_provider_load_from_resource (provider, "/org/gtk/WidgetFactory/widget-factory.css");
+  gtk_style_context_add_provider_for_screen (gdk_screen_get_default (),
+                                             GTK_STYLE_PROVIDER (provider),
+                                             GTK_STYLE_PROVIDER_PRIORITY_USER);
+  g_object_unref (provider);
+
   builder = gtk_builder_new_from_resource ("/org/gtk/WidgetFactory/widget-factory.ui");
   gtk_builder_add_callback_symbol (builder, "on_entry_icon_release", (GCallback)on_entry_icon_release);
+  gtk_builder_add_callback_symbol (builder, "on_scale_button_value_changed", (GCallback)on_scale_button_value_changed);
+  gtk_builder_add_callback_symbol (builder, "on_scale_button_query_tooltip", (GCallback)on_scale_button_query_tooltip);
+  gtk_builder_add_callback_symbol (builder, "on_record_button_toggled", (GCallback)on_record_button_toggled);
+  gtk_builder_add_callback_symbol (builder, "on_page_combo_changed", (GCallback)on_page_combo_changed);
+  gtk_builder_add_callback_symbol (builder, "on_range_from_changed", (GCallback)on_range_from_changed);
+  gtk_builder_add_callback_symbol (builder, "on_range_to_changed", (GCallback)on_range_to_changed);
+  gtk_builder_add_callback_symbol (builder, "osd_frame_button_press", (GCallback)osd_frame_button_press);
+
   gtk_builder_connect_signals (builder, NULL);
 
   window = (GtkWindow *)gtk_builder_get_object (builder, "window");
@@ -920,15 +1274,58 @@ activate (GApplication *app)
 
   widget = (GtkWidget *)gtk_builder_get_object (builder, "charletree");
   populate_model ((GtkTreeStore *)gtk_tree_view_get_model (GTK_TREE_VIEW (widget)));
+  gtk_tree_view_set_row_separator_func (GTK_TREE_VIEW (widget), row_separator_func, NULL, NULL);
   gtk_tree_view_expand_all (GTK_TREE_VIEW (widget));
 
   populate_colors ((GtkWidget *)gtk_builder_get_object (builder, "munsell"));
+
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "page_combo");
+  gtk_combo_box_set_row_separator_func (GTK_COMBO_BOX (widget), page_combo_separator_func, NULL, NULL);
+  widget2 = (GtkWidget *)gtk_builder_get_object (builder, "range_from_spin");
+  widget3 = (GtkWidget *)gtk_builder_get_object (builder, "range_to_spin");
+  widget4 = (GtkWidget *)gtk_builder_get_object (builder, "print_button");
+  g_object_set_data (G_OBJECT (widget), "range_from_spin", widget2);
+  g_object_set_data (G_OBJECT (widget3), "range_from_spin", widget2);
+  g_object_set_data (G_OBJECT (widget), "range_to_spin", widget3);
+  g_object_set_data (G_OBJECT (widget2), "range_to_spin", widget3);
+  g_object_set_data (G_OBJECT (widget), "print_button", widget4);
 
   set_accel (GTK_APPLICATION (app), GTK_WIDGET (gtk_builder_get_object (builder, "quitmenuitem")));
   set_accel (GTK_APPLICATION (app), GTK_WIDGET (gtk_builder_get_object (builder, "deletemenuitem")));
   set_accel (GTK_APPLICATION (app), GTK_WIDGET (gtk_builder_get_object (builder, "searchmenuitem")));
   set_accel (GTK_APPLICATION (app), GTK_WIDGET (gtk_builder_get_object (builder, "darkmenuitem")));
   set_accel (GTK_APPLICATION (app), GTK_WIDGET (gtk_builder_get_object (builder, "aboutmenuitem")));
+
+  widget2 = (GtkWidget *)gtk_builder_get_object (builder, "tooltextview");
+
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "toolbutton1");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_insert), widget2);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "toolbutton2");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_insert), widget2);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "toolbutton3");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_insert), widget2);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "toolbutton4");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_insert), widget2);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "cutbutton");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_cutcopypaste), widget2);
+  g_signal_connect (gtk_text_view_get_buffer (GTK_TEXT_VIEW (widget2)), "notify::has-selection",
+                    G_CALLBACK (textbuffer_notify_selection), widget);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "copybutton");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_cutcopypaste), widget2);
+  g_signal_connect (gtk_text_view_get_buffer (GTK_TEXT_VIEW (widget2)), "notify::has-selection",
+                    G_CALLBACK (textbuffer_notify_selection), widget);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "deletebutton");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_cutcopypaste), widget2);
+  g_signal_connect (gtk_text_view_get_buffer (GTK_TEXT_VIEW (widget2)), "notify::has-selection",
+                    G_CALLBACK (textbuffer_notify_selection), widget);
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "pastebutton");
+  g_signal_connect (widget, "clicked", G_CALLBACK (handle_cutcopypaste), widget2);
+  g_signal_connect (gtk_widget_get_clipboard (widget2, GDK_SELECTION_CLIPBOARD), "owner-change",
+                    G_CALLBACK (clipboard_owner_change), widget);
+
+  widget = (GtkWidget *)gtk_builder_get_object (builder, "osd_frame");
+  widget2 = (GtkWidget *)gtk_builder_get_object (builder, "totem_like_osd");
+  g_object_set_data (G_OBJECT (widget), "osd", widget2);
 
   gtk_widget_show_all (GTK_WIDGET (window));
 
@@ -939,6 +1336,7 @@ int
 main (int argc, char *argv[])
 {
   GtkApplication *app;
+  GAction *action;
   static GActionEntry app_entries[] = {
     { "about", activate_about, NULL, NULL, NULL },
     { "quit", activate_quit, NULL, NULL, NULL },
@@ -956,6 +1354,8 @@ main (int argc, char *argv[])
   g_action_map_add_action_entries (G_ACTION_MAP (app),
                                    app_entries, G_N_ELEMENTS (app_entries),
                                    app);
+  action = g_action_map_lookup_action (G_ACTION_MAP (app), "wine");
+  g_simple_action_set_enabled (G_SIMPLE_ACTION (action), FALSE);
 
   g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
 

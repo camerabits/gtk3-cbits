@@ -27,27 +27,71 @@
 
 #include "gtkcssproviderprivate.h"
 #include "gtkcssstylepropertyprivate.h"
+#include "gtkcsssectionprivate.h"
+#include "gtkcssstyleprivate.h"
+#include "gtkcssvalueprivate.h"
 #include "gtkliststore.h"
 #include "gtksettings.h"
+#include "gtktreeview.h"
+#include "gtktreeselection.h"
+#include "gtkstack.h"
+#include "gtksearchentry.h"
+#include "gtklabel.h"
 
 enum
 {
   COLUMN_NAME,
   COLUMN_VALUE,
-  COLUMN_LOCATION,
-  COLUMN_URI,
-  COLUMN_LINE
+  COLUMN_LOCATION
 };
 
 struct _GtkInspectorStylePropListPrivate
 {
-  GHashTable *css_files;
   GtkListStore *model;
   GtkWidget *widget;
+  GtkWidget *tree;
+  GtkWidget *search_entry;
+  GtkWidget *search_stack;
+  GtkWidget *object_title;
   GHashTable *prop_iters;
+  GtkTreeViewColumn *name_column;
 };
 
 G_DEFINE_TYPE_WITH_PRIVATE (GtkInspectorStylePropList, gtk_inspector_style_prop_list, GTK_TYPE_BOX)
+
+static void
+search_close_clicked (GtkWidget                 *button,
+                      GtkInspectorStylePropList *pl)
+{
+  gtk_entry_set_text (GTK_ENTRY (pl->priv->search_entry), "");
+  gtk_stack_set_visible_child_name (GTK_STACK (pl->priv->search_stack), "title");
+}
+
+static gboolean
+key_press_event (GtkWidget                 *window,
+                 GdkEvent                  *event,
+                 GtkInspectorStylePropList *pl)
+{
+  if (!gtk_widget_get_mapped (GTK_WIDGET (pl)))
+    return GDK_EVENT_PROPAGATE;
+
+  if (gtk_search_entry_handle_event (GTK_SEARCH_ENTRY (pl->priv->search_entry), event))
+    {
+      gtk_stack_set_visible_child_name (GTK_STACK (pl->priv->search_stack), "search");
+      return GDK_EVENT_STOP;
+    }
+  return GDK_EVENT_PROPAGATE;
+}
+
+static void
+hierarchy_changed (GtkWidget *widget,
+                   GtkWidget *previous_toplevel)
+{
+  if (previous_toplevel)
+    g_signal_handlers_disconnect_by_func (previous_toplevel, key_press_event, widget);
+  g_signal_connect (gtk_widget_get_toplevel (widget), "key-press-event",
+                    G_CALLBACK (key_press_event), widget);
+}
 
 static void
 gtk_inspector_style_prop_list_init (GtkInspectorStylePropList *pl)
@@ -59,9 +103,8 @@ gtk_inspector_style_prop_list_init (GtkInspectorStylePropList *pl)
   gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (pl->priv->model),
                                         COLUMN_NAME,
                                         GTK_SORT_ASCENDING);
-
-  pl->priv->css_files = g_hash_table_new_full (g_file_hash, (GEqualFunc) g_file_equal,
-                                           g_object_unref, (GDestroyNotify) g_strfreev);
+  gtk_tree_view_set_search_entry (GTK_TREE_VIEW (pl->priv->tree),
+                                  GTK_ENTRY (pl->priv->search_entry));
 
   pl->priv->prop_iters = g_hash_table_new_full (g_str_hash,
                                                 g_str_equal,
@@ -102,7 +145,6 @@ finalize (GObject *object)
 {
   GtkInspectorStylePropList *pl = GTK_INSPECTOR_STYLE_PROP_LIST (object);
 
-  g_hash_table_unref (pl->priv->css_files);
   g_hash_table_unref (pl->priv->prop_iters);
 
   G_OBJECT_CLASS (gtk_inspector_style_prop_list_parent_class)->finalize (object);
@@ -132,76 +174,15 @@ gtk_inspector_style_prop_list_class_init (GtkInspectorStylePropListClass *klass)
 
   object_class->finalize = finalize;
 
-  gtk_widget_class_set_template_from_resource (widget_class, "/org/gtk/inspector/style-prop-list.ui");
+  gtk_widget_class_set_template_from_resource (widget_class, "/org/gtk/libgtk/inspector/style-prop-list.ui");
   gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorStylePropList, model);
-}
-
-static gchar *
-strip_property (const gchar *property)
-{
-  gchar **split;
-  gchar *value;
-
-  split = g_strsplit_set (property, ":;", 3);
-  if (!split[0] || !split[1])
-    value = g_strdup ("");
-  else
-    value = g_strdup (split[1]);
-
-  g_strfreev (split);
-
-  return value;
-}
-
-static gchar *
-get_css_content (GtkInspectorStylePropList *self,
-                 GFile                     *file,
-                 guint                      start_line,
-                 guint                      end_line)
-{
-  GtkInspectorStylePropListPrivate *priv = self->priv;
-  guint i;
-  guint contents_lines;
-  gchar *value, *property;
-  gchar **contents;
-
-  contents = g_hash_table_lookup (priv->css_files, file);
-  if (!contents)
-    {
-      gchar *tmp;
-
-      if (g_file_load_contents (file, NULL, &tmp, NULL, NULL, NULL))
-        {
-          contents = g_strsplit_set (tmp, "\n\r", -1);
-          g_free (tmp);
-        }
-      else
-        {
-          contents =  g_strsplit ("", "", -1);
-        }
-
-      g_object_ref (file);
-      g_hash_table_insert (priv->css_files, file, contents);
-    }
-
-  contents_lines = g_strv_length (contents);
-  property = g_strdup ("");
-  for (i = start_line; (i < end_line + 1) && (i < contents_lines); ++i)
-    {
-      gchar *s1, *s2;
-
-      s1 = g_strdup (contents[i]);
-      s1 = g_strstrip (s1);
-      s2 = g_strconcat (property, s1, NULL);
-      g_free (property);
-      g_free (s1);
-      property = s2;
-    }
-
-  value = strip_property (property);
-  g_free (property);
-
-  return value;
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorStylePropList, tree);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorStylePropList, search_stack);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorStylePropList, search_entry);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorStylePropList, object_title);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkInspectorStylePropList, name_column);
+  gtk_widget_class_bind_template_callback (widget_class, search_close_clicked);
+  gtk_widget_class_bind_template_callback (widget_class, hierarchy_changed);
 }
 
 static void
@@ -209,9 +190,11 @@ populate (GtkInspectorStylePropList *self)
 {
   GtkInspectorStylePropListPrivate *priv = self->priv;
   GtkStyleContext *context;
+  GtkCssStyle *style;
   gint i;
 
   context = gtk_widget_get_style_context (priv->widget);
+  style = gtk_style_context_lookup_style (context);
 
   for (i = 0; i < _gtk_css_style_property_get_n_properties (); i++)
     {
@@ -221,71 +204,28 @@ populate (GtkInspectorStylePropList *self)
       GtkCssSection *section;
       gchar *location;
       gchar *value;
-      gchar *uri;
-      guint start_line, end_line;
 
       prop = _gtk_css_style_property_lookup_by_id (i);
       name = _gtk_style_property_get_name (GTK_STYLE_PROPERTY (prop));
 
       iter = (GtkTreeIter *)g_hash_table_lookup (priv->prop_iters, name);
 
-      section = gtk_style_context_get_section (context, name);
+      value = _gtk_css_value_to_string (gtk_css_style_get_value (style, i));
+
+      section = gtk_css_style_get_section (style, i);
       if (section)
-        {
-          GFileInfo *info;
-          GFile *file;
-          const gchar *path;
-
-          start_line = gtk_css_section_get_start_line (section);
-          end_line = gtk_css_section_get_end_line (section);
-
-          file = gtk_css_section_get_file (section);
-          if (file)
-            {
-              info = g_file_query_info (file, G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME, 0, NULL, NULL);
-
-              if (info)
-                path = g_file_info_get_display_name (info);
-              else
-                path = "<broken file>";
-
-              uri = g_file_get_uri (file);
-              value = get_css_content (self, file, start_line, end_line);
-            }
-          else
-            {
-              info = NULL;
-              path = "<data>";
-              uri = NULL;
-              value = NULL;
-            }
-
-          if (end_line != start_line)
-            location = g_strdup_printf ("%s:%u-%u", path, start_line + 1, end_line + 1);
-          else
-            location = g_strdup_printf ("%s:%u", path, start_line + 1);
-          if (info)
-            g_object_unref (info);
-        }
+        location = _gtk_css_section_to_string (section);
       else
-        {
-          location = NULL;
-          value = NULL;
-          uri = NULL;
-          start_line = -1;
-        }
+        location = NULL;
 
       gtk_list_store_set (priv->model,
                           iter,
                           COLUMN_VALUE, value,
                           COLUMN_LOCATION, location,
-                          COLUMN_URI, uri,
-                          COLUMN_LINE, start_line + 1,
                           -1);
 
       g_free (location);
       g_free (value);
-      g_free (uri);
     }
 }
 
@@ -308,6 +248,8 @@ void
 gtk_inspector_style_prop_list_set_object (GtkInspectorStylePropList *self,
                                           GObject                   *object)
 {
+  const gchar *title;
+
   if (self->priv->widget == (GtkWidget *)object)
     {
       gtk_widget_hide (GTK_WIDGET (self));
@@ -326,6 +268,12 @@ gtk_inspector_style_prop_list_set_object (GtkInspectorStylePropList *self,
       gtk_widget_hide (GTK_WIDGET (self));
       return;
     }
+
+  title = (const gchar *)g_object_get_data (object, "gtk-inspector-object-title");
+  gtk_label_set_label (GTK_LABEL (self->priv->object_title), title);
+
+  gtk_entry_set_text (GTK_ENTRY (self->priv->search_entry), "");
+  gtk_stack_set_visible_child_name (GTK_STACK (self->priv->search_stack), "title");
 
   self->priv->widget = (GtkWidget *)object;
   g_object_weak_ref (G_OBJECT (self), disconnect_each_other, object);

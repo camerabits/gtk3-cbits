@@ -54,9 +54,8 @@ static GtkCssValue *
 gtk_css_value_shadows_compute (GtkCssValue             *value,
                                guint                    property_id,
                                GtkStyleProviderPrivate *provider,
-			       int                      scale,
-                               GtkCssComputedValues    *values,
-                               GtkCssComputedValues    *parent_values,
+                               GtkCssStyle             *style,
+                               GtkCssStyle             *parent_style,
                                GtkCssDependencies      *dependencies)
 {
   GtkCssValue *result;
@@ -69,7 +68,7 @@ gtk_css_value_shadows_compute (GtkCssValue             *value,
   result = gtk_css_shadows_value_new (value->values, value->len);
   for (i = 0; i < value->len; i++)
     {
-      result->values[i] = _gtk_css_value_compute (value->values[i], property_id, provider, scale, values, parent_values, &child_deps);
+      result->values[i] = _gtk_css_value_compute (value->values[i], property_id, provider, style, parent_style, &child_deps);
       *dependencies = _gtk_css_dependencies_union (*dependencies, child_deps);
     }
 
@@ -278,22 +277,6 @@ _gtk_css_shadows_value_paint_icon (const GtkCssValue *shadows,
   for (i = 0; i < shadows->len; i++)
     {
       _gtk_css_shadow_value_paint_icon (shadows->values[i], cr);
-    }
-}
-
-void
-_gtk_css_shadows_value_paint_spinner (const GtkCssValue *shadows,
-                                      cairo_t           *cr,
-                                      gdouble            radius,
-                                      gdouble            progress)
-{
-  guint i;
-
-  g_return_if_fail (shadows->class == &GTK_CSS_VALUE_SHADOWS);
-
-  for (i = 0; i < shadows->len; i++)
-    {
-      _gtk_css_shadow_value_paint_spinner (shadows->values[i], cr, radius, progress);
     }
 }
 

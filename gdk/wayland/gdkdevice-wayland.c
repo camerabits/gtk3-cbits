@@ -93,6 +93,8 @@ struct _GdkWaylandDeviceData
   GdkDragContext *drop_context;
 
   struct wl_surface *pointer_surface;
+  guint current_output_scale;
+  GSList *pointer_surface_outputs;
 };
 
 struct _GdkWaylandDevice
@@ -254,10 +256,14 @@ gdk_wayland_device_set_window_cursor (GdkDevice *device,
    */
   if (!cursor)
     {
-      /* FIXME: Is this the best sensible default ? */
-      cursor = _gdk_wayland_display_get_cursor_for_type (device->display,
-                                                         GDK_LEFT_PTR);
+      guint scale = wd->current_output_scale;
+      cursor =
+        _gdk_wayland_display_get_cursor_for_type_with_scale (wd->display,
+                                                             GDK_LEFT_PTR,
+                                                             scale);
     }
+  else
+    _gdk_wayland_cursor_set_scale (cursor, wd->current_output_scale);
 
   if (cursor == wd->cursor)
     return;
@@ -282,8 +288,10 @@ gdk_wayland_device_warp (GdkDevice *device,
 
 static void
 get_coordinates (GdkWaylandDeviceData *data,
-                 double *x, double *y,
-                 double *x_root, double *y_root)
+                 double               *x,
+                 double               *y,
+                 double               *x_root,
+                 double               *y_root)
 {
   int root_x, root_y;
 
@@ -357,7 +365,6 @@ gdk_wayland_device_grab (GdkDevice    *device,
   else
     {
       /* Device is a pointer */
-
       if (wayland_device->pointer_grab_window != NULL &&
           time_ != 0 && wayland_device->pointer_grab_time > time_)
         {
@@ -482,7 +489,7 @@ gdk_wayland_device_init (GdkWaylandDevice *device_core)
  * gdk_wayland_device_get_wl_seat:
  * @device: (type GdkWaylandDevice): a #GdkDevice
  *
- * Returns the Wayland wl_seat of a #GdkDevice
+ * Returns the Wayland wl_seat of a #GdkDevice.
  *
  * Returns: (transfer none): a Wayland wl_seat
  *
@@ -491,7 +498,7 @@ gdk_wayland_device_init (GdkWaylandDevice *device_core)
 struct wl_seat *
 gdk_wayland_device_get_wl_seat (GdkDevice *device)
 {
-  g_return_val_if_fail(GDK_IS_WAYLAND_DEVICE (device), NULL);
+  g_return_val_if_fail (GDK_IS_WAYLAND_DEVICE (device), NULL);
 
   return GDK_WAYLAND_DEVICE (device)->device->wl_seat;
 }
@@ -500,7 +507,7 @@ gdk_wayland_device_get_wl_seat (GdkDevice *device)
  * gdk_wayland_device_get_wl_pointer:
  * @device: (type GdkWaylandDevice): a #GdkDevice
  *
- * Returns the Wayland wl_pointer of a #GdkDevice
+ * Returns the Wayland wl_pointer of a #GdkDevice.
  *
  * Returns: (transfer none): a Wayland wl_pointer
  *
@@ -509,7 +516,7 @@ gdk_wayland_device_get_wl_seat (GdkDevice *device)
 struct wl_pointer *
 gdk_wayland_device_get_wl_pointer (GdkDevice *device)
 {
-  g_return_val_if_fail(GDK_IS_WAYLAND_DEVICE (device), NULL);
+  g_return_val_if_fail (GDK_IS_WAYLAND_DEVICE (device), NULL);
 
   return GDK_WAYLAND_DEVICE (device)->device->wl_pointer;
 }
@@ -518,7 +525,7 @@ gdk_wayland_device_get_wl_pointer (GdkDevice *device)
  * gdk_wayland_device_get_wl_keyboard:
  * @device: (type GdkWaylandDevice): a #GdkDevice
  *
- * Returns the Wayland wl_keyboard of a #GdkDevice
+ * Returns the Wayland wl_keyboard of a #GdkDevice.
  *
  * Returns: (transfer none): a Wayland wl_keyboard
  *
@@ -527,7 +534,7 @@ gdk_wayland_device_get_wl_pointer (GdkDevice *device)
 struct wl_keyboard *
 gdk_wayland_device_get_wl_keyboard (GdkDevice *device)
 {
-  g_return_val_if_fail(GDK_IS_WAYLAND_DEVICE (device), NULL);
+  g_return_val_if_fail (GDK_IS_WAYLAND_DEVICE (device), NULL);
 
   return GDK_WAYLAND_DEVICE (device)->device->wl_keyboard;
 }
@@ -539,11 +546,51 @@ _gdk_wayland_device_get_keymap (GdkDevice *device)
 }
 
 static void
+emit_selection_owner_change (GdkWindow *window,
+                             GdkAtom    atom)
+{
+  GdkEvent *event;
+
+  event = gdk_event_new (GDK_OWNER_CHANGE);
+  event->owner_change.window = g_object_ref (window);
+  event->owner_change.owner = NULL;
+  event->owner_change.reason = GDK_OWNER_CHANGE_NEW_OWNER;
+  event->owner_change.selection = atom;
+  event->owner_change.time = GDK_CURRENT_TIME;
+  event->owner_change.selection_time = GDK_CURRENT_TIME;
+
+  gdk_event_put (event);
+  gdk_event_free (event);
+}
+
+static void
+emit_selection_owner_change_forall (GdkAtom atom)
+{
+  GdkDisplay *display = gdk_display_get_default ();
+  GdkScreen *screen = GDK_WAYLAND_DISPLAY (display)->screen;
+  GList *windows, *l;
+
+  windows = gdk_screen_get_toplevel_windows (screen);
+
+  for (l = windows; l; l = l->next)
+    emit_selection_owner_change (l->data, atom);
+
+  g_list_free (windows);
+}
+
+static void
 data_device_data_offer (void                  *data,
                         struct wl_data_device *data_device,
-                        struct wl_data_offer  *_offer)
+                        struct wl_data_offer  *offer)
 {
-  gdk_wayland_selection_set_offer (_offer);
+  GdkWaylandDeviceData *device = (GdkWaylandDeviceData *)data;
+
+  GDK_NOTE (EVENTS,
+            g_message ("data device data offer, data device %p, offer %p",
+                       data_device, offer));
+
+  gdk_wayland_selection_set_offer (device->display, offer);
+  emit_selection_owner_change_forall (gdk_atom_intern_static_string ("GdkWaylandSelection"));
 }
 
 static void
@@ -563,8 +610,9 @@ data_device_enter (void                  *data,
   if (!GDK_IS_WINDOW (dest_window))
     return;
 
-  g_debug (G_STRLOC ": %s data_device = %p serial = %u, surface = %p, x = %d y = %d, offer = %p",
-           G_STRFUNC, data_device, serial, surface, x, y, offer);
+  GDK_NOTE (EVENTS,
+            g_message ("data device enter, data device %p serial %u, surface %p, x %d y %d, offer %p",
+                       data_device, serial, surface, x, y, offer));
 
   /* Update pointer state, so device state queries work during DnD */
   device->pointer_focus = g_object_ref (dest_window);
@@ -573,7 +621,7 @@ data_device_enter (void                  *data,
 
   gdk_wayland_drop_context_update_targets (device->drop_context);
 
-  dnd_owner = gdk_selection_owner_get (gdk_drag_get_selection (device->drop_context));
+  dnd_owner = gdk_selection_owner_get_for_display (device->display, gdk_drag_get_selection (device->drop_context));
 
   if (dnd_owner)
     _gdk_wayland_drag_context_set_source_window (device->drop_context, dnd_owner);
@@ -585,7 +633,9 @@ data_device_enter (void                  *data,
                                         wl_fixed_to_double (y));
   _gdk_wayland_drag_context_emit_event (device->drop_context, GDK_DRAG_ENTER,
                                         GDK_CURRENT_TIME);
-  gdk_wayland_selection_set_offer (offer);
+  gdk_wayland_selection_set_offer (device->display, offer);
+  emit_selection_owner_change (dest_window,
+                               gdk_atom_intern_static_string ("GdkWaylandSelection"));
 }
 
 static void
@@ -594,8 +644,8 @@ data_device_leave (void                  *data,
 {
   GdkWaylandDeviceData *device = (GdkWaylandDeviceData *) data;
 
-  g_debug (G_STRLOC ": %s data_device = %p",
-           G_STRFUNC, data_device);
+  GDK_NOTE (EVENTS,
+            g_message ("data device leave, data device %p", data_device));
 
   if (!gdk_drag_context_get_dest_window (device->drop_context))
     return;
@@ -642,10 +692,10 @@ data_device_drop (void                  *data,
   GdkWaylandDeviceData *device = (GdkWaylandDeviceData *) data;
   GdkWindow *local_dnd_owner;
 
-  g_debug (G_STRLOC ": %s data_device = %p",
-           G_STRFUNC, data_device);
+  GDK_NOTE (EVENTS,
+            g_message ("data device drop, data device %p", data_device));
 
-  local_dnd_owner = gdk_selection_owner_get (gdk_drag_get_selection (device->drop_context));
+  local_dnd_owner = gdk_selection_owner_get_for_display (device->display, gdk_drag_get_selection (device->drop_context));
 
   if (local_dnd_owner)
     {
@@ -664,10 +714,14 @@ data_device_selection (void                  *data,
                        struct wl_data_device *wl_data_device,
                        struct wl_data_offer  *offer)
 {
-  g_debug (G_STRLOC ": %s wl_data_device = %p wl_data_offer = %p",
-           G_STRFUNC, wl_data_device, offer);
+  GdkWaylandDeviceData *device = (GdkWaylandDeviceData *) data;
 
-  gdk_wayland_selection_set_offer (offer);
+  GDK_NOTE (EVENTS,
+            g_message ("data device selection, data device %p, data offer %p",
+                       wl_data_device, offer));
+
+  gdk_wayland_selection_set_offer (device->display, offer);
+  emit_selection_owner_change_forall (gdk_atom_intern_static_string ("CLIPBOARD"));
 }
 
 static const struct wl_data_device_listener data_device_listener = {
@@ -694,6 +748,7 @@ pointer_handle_enter (void              *data,
 
   if (!surface)
     return;
+
   if (!GDK_IS_WINDOW (wl_surface_get_user_data (surface)))
     return;
 
@@ -740,13 +795,14 @@ pointer_handle_leave (void              *data,
 {
   GdkWaylandDeviceData *device = data;
   GdkEvent *event;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
+  GdkWaylandDisplay *wayland_display = GDK_WAYLAND_DISPLAY (device->display);
 
   if (!surface)
     return;
+
   if (!GDK_IS_WINDOW (wl_surface_get_user_data (surface)))
     return;
+
   if (!device->pointer_focus)
     return;
 
@@ -777,7 +833,7 @@ pointer_handle_leave (void              *data,
             g_message ("leave, device %p surface %p",
                        device, device->pointer_focus));
 
-  g_object_unref(device->pointer_focus);
+  g_object_unref (device->pointer_focus);
   if (device->cursor)
     gdk_wayland_device_stop_window_cursor_animation (device);
 
@@ -821,8 +877,8 @@ pointer_handle_motion (void              *data,
                    &event->motion.y_root);
 
   GDK_NOTE (EVENTS,
-            g_message ("motion %d %d, state %d",
-                       sx, sy, event->button.state));
+            g_message ("motion %d %d, device %p state %d",
+                       sx, sy, device, event->button.state));
 
   _gdk_wayland_display_deliver_event (device->display, event);
 }
@@ -840,25 +896,24 @@ pointer_handle_button (void              *data,
   GdkEvent *event;
   uint32_t modifier;
   int gdk_button;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
 
   if (!device->pointer_focus)
     return;
 
-  _gdk_wayland_display_update_serial (wayland_display, serial);
+  _gdk_wayland_display_update_serial (display, serial);
 
-  switch (button) {
-  case 273:
-    gdk_button = 3;
-    break;
-  case 274:
-    gdk_button = 2;
-    break;
-  default:
-    gdk_button = button - 271;
-    break;
-  }
+  switch (button)
+    {
+    case 273:
+      gdk_button = 3;
+      break;
+    case 274:
+      gdk_button = 2;
+      break;
+    default:
+      gdk_button = button - 271;
+      break;
+    }
 
   device->time = time;
   if (state)
@@ -887,9 +942,11 @@ pointer_handle_button (void              *data,
     device->modifiers &= ~modifier;
 
   GDK_NOTE (EVENTS,
-	    g_message ("button %d %s, state %d",
+	    g_message ("button %d %s, device %p state %d",
 		       event->button.button,
-		       state ? "press" : "release", event->button.state));
+		       state ? "press" : "release",
+                       device,
+                       event->button.state));
 
   _gdk_wayland_display_deliver_event (device->display, event);
 }
@@ -910,18 +967,19 @@ pointer_handle_axis (void              *data,
     return;
 
   /* get the delta and convert it into the expected range */
-  switch (axis) {
-  case WL_POINTER_AXIS_VERTICAL_SCROLL:
-    delta_x = 0;
-    delta_y = wl_fixed_to_double (value) / 10.0;
-    break;
-  case WL_POINTER_AXIS_HORIZONTAL_SCROLL:
-    delta_x = wl_fixed_to_double (value) / 10.0;
-    delta_y = 0;
-    break;
-  default:
-    g_return_if_reached ();
-  }
+  switch (axis)
+    {
+    case WL_POINTER_AXIS_VERTICAL_SCROLL:
+      delta_x = 0;
+      delta_y = wl_fixed_to_double (value) / 10.0;
+      break;
+    case WL_POINTER_AXIS_HORIZONTAL_SCROLL:
+      delta_x = wl_fixed_to_double (value) / 10.0;
+      delta_y = 0;
+      break;
+    default:
+      g_return_if_reached ();
+    }
 
   device->time = time;
   event = gdk_event_new (GDK_SCROLL);
@@ -942,8 +1000,8 @@ pointer_handle_axis (void              *data,
                    &event->scroll.y_root);
 
   GDK_NOTE (EVENTS,
-            g_message ("scroll %f %f",
-                       event->scroll.delta_x, event->scroll.delta_y));
+            g_message ("scroll %f %f, device %p",
+                       event->scroll.delta_x, event->scroll.delta_y, device));
 
   _gdk_wayland_display_deliver_event (device->display, event);
 }
@@ -973,18 +1031,18 @@ keyboard_handle_enter (void               *data,
 {
   GdkWaylandDeviceData *device = data;
   GdkEvent *event;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
+  GdkWaylandDisplay *display = GDK_WAYLAND_DISPLAY (device->display);
 
   if (!surface)
     return;
+
   if (!GDK_IS_WINDOW (wl_surface_get_user_data (surface)))
     return;
 
-  _gdk_wayland_display_update_serial (wayland_display, serial);
+  _gdk_wayland_display_update_serial (display, serial);
 
-  device->keyboard_focus = wl_surface_get_user_data(surface);
-  g_object_ref(device->keyboard_focus);
+  device->keyboard_focus = wl_surface_get_user_data (surface);
+  g_object_ref (device->keyboard_focus);
 
   event = gdk_event_new (GDK_FOCUS_CHANGE);
   event->focus_change.window = g_object_ref (device->keyboard_focus);
@@ -994,7 +1052,7 @@ keyboard_handle_enter (void               *data,
   gdk_event_set_source_device (event, device->keyboard);
 
   GDK_NOTE (EVENTS,
-            g_message ("focus int, device %p surface %p",
+            g_message ("focus in, device %p surface %p",
                        device, device->keyboard_focus));
 
   _gdk_wayland_display_deliver_event (device->display, event);
@@ -1008,17 +1066,18 @@ keyboard_handle_leave (void               *data,
 {
   GdkWaylandDeviceData *device = data;
   GdkEvent *event;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
+  GdkWaylandDisplay *display = GDK_WAYLAND_DISPLAY (device->display);
 
   if (!surface)
     return;
+
   if (!GDK_IS_WINDOW (wl_surface_get_user_data (surface)))
     return;
+
   if (!device->keyboard_focus)
     return;
 
-  _gdk_wayland_display_update_serial (wayland_display, serial);
+  _gdk_wayland_display_update_serial (display, serial);
 
   event = gdk_event_new (GDK_FOCUS_CHANGE);
   event->focus_change.window = g_object_ref (device->keyboard_focus);
@@ -1027,7 +1086,7 @@ keyboard_handle_leave (void               *data,
   gdk_event_set_device (event, device->master_keyboard);
   gdk_event_set_source_device (event, device->keyboard);
 
-  g_object_unref(device->keyboard_focus);
+  g_object_unref (device->keyboard_focus);
   device->keyboard_focus = NULL;
 
   GDK_NOTE (EVENTS,
@@ -1037,8 +1096,7 @@ keyboard_handle_leave (void               *data,
   _gdk_wayland_display_deliver_event (device->display, event);
 }
 
-static gboolean
-keyboard_repeat (gpointer data);
+static gboolean keyboard_repeat (gpointer data);
 
 static void
 translate_keyboard_string (GdkEventKey *event)
@@ -1059,11 +1117,11 @@ translate_keyboard_string (GdkEventKey *event)
       gsize bytes_written;
       gint len;
 
-      /* Apply the control key - Taken from Xlib
-       */
+      /* Apply the control key - Taken from Xlib */
       if (event->state & GDK_CONTROL_MASK)
         {
-          if ((c >= '@' && c < '\177') || c == ' ') c &= 0x1F;
+          if ((c >= '@' && c < '\177') || c == ' ')
+            c &= 0x1F;
           else if (c == '2')
             {
               event->string = g_memdup ("\0\0", 2);
@@ -1071,9 +1129,12 @@ translate_keyboard_string (GdkEventKey *event)
               buf[0] = '\0';
               return;
             }
-          else if (c >= '3' && c <= '7') c -= ('3' - '\033');
-          else if (c == '8') c = '\177';
-          else if (c == '/') c = '_' & 0x1F;
+          else if (c >= '3' && c <= '7')
+            c -= ('3' - '\033');
+          else if (c == '8')
+            c = '\177';
+          else if (c == '/')
+            c = '_' & 0x1F;
         }
 
       len = g_unichar_to_utf8 (c, buf);
@@ -1236,7 +1297,6 @@ deliver_key_event (GdkWaylandDeviceData *device,
               g_source_remove (device->repeat_timer);
               device->repeat_timer = 0;
             }
-
           device->repeat_timer =
             gdk_threads_add_timeout (delay, keyboard_repeat, device);
           g_source_set_name_by_id (device->repeat_timer, "[gtk+] keyboard_repeat");
@@ -1269,14 +1329,13 @@ keyboard_handle_key (void               *data,
                      uint32_t            state_w)
 {
   GdkWaylandDeviceData *device = data;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
+  GdkWaylandDisplay *display = GDK_WAYLAND_DISPLAY (device->display);
 
   if (!device->keyboard_focus)
     return;
 
   device->repeat_count = 0;
-  _gdk_wayland_display_update_serial (wayland_display, serial);
+  _gdk_wayland_display_update_serial (display, serial);
   deliver_key_event (data, time, key + 8, state_w);
 }
 
@@ -1398,12 +1457,11 @@ touch_handle_down (void              *data,
                    wl_fixed_t         y)
 {
   GdkWaylandDeviceData *device = data;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
+  GdkWaylandDisplay *display = GDK_WAYLAND_DISPLAY (device->display);
   GdkWaylandTouchData *touch;
   GdkEvent *event;
 
-  _gdk_wayland_display_update_serial (wayland_display, serial);
+  _gdk_wayland_display_update_serial (display, serial);
 
   touch = gdk_wayland_device_add_touch (device, id, wl_surface);
   touch->x = wl_fixed_to_double (x);
@@ -1426,12 +1484,11 @@ touch_handle_up (void            *data,
                  int32_t          id)
 {
   GdkWaylandDeviceData *device = data;
-  GdkWaylandDisplay *wayland_display =
-    GDK_WAYLAND_DISPLAY (device->display);
+  GdkWaylandDisplay *display = GDK_WAYLAND_DISPLAY (device->display);
   GdkWaylandTouchData *touch;
   GdkEvent *event;
 
-  _gdk_wayland_display_update_serial (wayland_display, serial);
+  _gdk_wayland_display_update_serial (display, serial);
 
   touch = gdk_wayland_device_get_touch (device, id);
   event = _create_touch_event (device, touch, GDK_TOUCH_END, time);
@@ -1527,8 +1584,13 @@ seat_handle_capabilities (void                    *data,
                           enum wl_seat_capability  caps)
 {
   GdkWaylandDeviceData *device = data;
-  GdkWaylandDeviceManager *device_manager =
-    GDK_WAYLAND_DEVICE_MANAGER (device->device_manager);
+  GdkWaylandDeviceManager *device_manager = GDK_WAYLAND_DEVICE_MANAGER (device->device_manager);
+
+  GDK_NOTE (MISC,
+            g_message ("seat %p with %s%s%s", seat,
+                       (caps & WL_SEAT_CAPABILITY_POINTER) ? " pointer, " : "",
+                       (caps & WL_SEAT_CAPABILITY_KEYBOARD) ? " keyboard, " : "",
+                       (caps & WL_SEAT_CAPABILITY_TOUCH) ? " touch" : ""));
 
   if ((caps & WL_SEAT_CAPABILITY_POINTER) && !device->wl_pointer)
     {
@@ -1648,11 +1710,13 @@ seat_handle_capabilities (void                    *data,
 }
 
 static void
-seat_handle_name (void                    *data,
-                  struct wl_seat          *seat,
-                  const char              *name)
+seat_handle_name (void           *data,
+                  struct wl_seat *seat,
+                  const char     *name)
 {
   /* We don't care about the name. */
+  GDK_NOTE (MISC,
+            g_message ("seat %p name %s", seat, name));
 }
 
 static const struct wl_seat_listener seat_listener = {
@@ -1663,8 +1727,7 @@ static const struct wl_seat_listener seat_listener = {
 static void
 init_devices (GdkWaylandDeviceData *device)
 {
-  GdkWaylandDeviceManager *device_manager =
-    GDK_WAYLAND_DEVICE_MANAGER (device->device_manager);
+  GdkWaylandDeviceManager *device_manager = GDK_WAYLAND_DEVICE_MANAGER (device->device_manager);
 
   /* pointer */
   device->master_pointer = g_object_new (GDK_TYPE_WAYLAND_DEVICE,
@@ -1703,6 +1766,78 @@ init_devices (GdkWaylandDeviceData *device)
   _gdk_device_set_associated_device (device->master_keyboard, device->master_pointer);
 }
 
+static void
+pointer_surface_update_scale (GdkWaylandDeviceData *device)
+{
+  GdkWaylandDisplay *wayland_display = GDK_WAYLAND_DISPLAY (device->display);
+  guint32 scale;
+  GSList *l;
+
+  if (wayland_display->compositor_version < WL_SURFACE_HAS_BUFFER_SCALE)
+    {
+      /* We can't set the scale on this surface */
+      return;
+    }
+
+  scale = 1;
+  for (l = device->pointer_surface_outputs; l != NULL; l = l->next)
+    {
+      guint32 output_scale =
+        _gdk_wayland_screen_get_output_scale (wayland_display->screen,
+                                              l->data);
+      scale = MAX (scale, output_scale);
+    }
+
+  device->current_output_scale = scale;
+
+  if (device->grab_cursor)
+    _gdk_wayland_cursor_set_scale (device->grab_cursor, scale);
+  if (device->cursor)
+    _gdk_wayland_cursor_set_scale (device->cursor, scale);
+
+  gdk_wayland_device_update_window_cursor (device);
+}
+
+static void
+pointer_surface_enter (void              *data,
+                       struct wl_surface *wl_surface,
+                       struct wl_output  *output)
+
+{
+  GdkWaylandDeviceData *device = data;
+
+  GDK_NOTE (EVENTS,
+            g_message ("pointer surface of device %p entered output %p",
+                       device, output));
+
+  device->pointer_surface_outputs =
+    g_slist_append (device->pointer_surface_outputs, output);
+
+  pointer_surface_update_scale (device);
+}
+
+static void
+pointer_surface_leave (void              *data,
+                       struct wl_surface *wl_surface,
+                       struct wl_output  *output)
+{
+  GdkWaylandDeviceData *device = data;
+
+  GDK_NOTE (EVENTS,
+            g_message ("pointer surface of device %p left output %p",
+                       device, output));
+
+  device->pointer_surface_outputs =
+    g_slist_remove (device->pointer_surface_outputs, output);
+
+  pointer_surface_update_scale (device);
+}
+
+static const struct wl_surface_listener pointer_surface_listener = {
+  pointer_surface_enter,
+  pointer_surface_leave
+};
+
 void
 _gdk_wayland_device_manager_add_seat (GdkDeviceManager *device_manager,
                                       guint32           id,
@@ -1733,8 +1868,12 @@ _gdk_wayland_device_manager_add_seat (GdkDeviceManager *device_manager,
   wl_data_device_add_listener (device->data_device,
                                &data_device_listener, device);
 
+  device->current_output_scale = 1;
   device->pointer_surface =
     wl_compositor_create_surface (display_wayland->compositor);
+  wl_surface_add_listener (device->pointer_surface,
+                           &pointer_surface_listener,
+                           device);
 
   init_devices (device);
 }
@@ -1791,7 +1930,7 @@ gdk_wayland_device_manager_list_devices (GdkDeviceManager *device_manager,
   GdkWaylandDeviceManager *wayland_device_manager;
   GList *devices = NULL, *l;
 
-  wayland_device_manager = (GdkWaylandDeviceManager *) device_manager;
+  wayland_device_manager = GDK_WAYLAND_DEVICE_MANAGER (device_manager);
 
   for (l = wayland_device_manager->devices; l; l = l->next)
     {
@@ -1808,7 +1947,7 @@ gdk_wayland_device_manager_get_client_pointer (GdkDeviceManager *device_manager)
   GdkWaylandDeviceManager *wayland_device_manager;
   GList *l;
 
-  wayland_device_manager = (GdkWaylandDeviceManager *) device_manager;
+  wayland_device_manager = GDK_WAYLAND_DEVICE_MANAGER (device_manager);
 
   /* Find the first master pointer device */
   for (l = wayland_device_manager->devices; l != NULL; l = l->next)
@@ -1902,6 +2041,7 @@ gdk_wayland_device_unset_touch_grab (GdkDevice        *gdk_device,
   GdkWaylandDeviceData *device;
 
   g_return_if_fail (GDK_IS_WAYLAND_DEVICE (gdk_device));
+
   device = GDK_WAYLAND_DEVICE (gdk_device)->device;
 
   gdk_wayland_device_remove_touch (device, GDK_EVENT_SEQUENCE_TO_SLOT (sequence));
@@ -1912,12 +2052,9 @@ gdk_wayland_device_unset_touch_grab (GdkDevice        *gdk_device,
 struct wl_data_device *
 gdk_wayland_device_get_data_device (GdkDevice *gdk_device)
 {
-  GdkWaylandDeviceData *device;
-
   g_return_val_if_fail (GDK_IS_WAYLAND_DEVICE (gdk_device), NULL);
-  device = GDK_WAYLAND_DEVICE (gdk_device)->device;
 
-  return device->data_device;
+  return GDK_WAYLAND_DEVICE (gdk_device)->device->data_device;
 }
 
 void
@@ -1928,6 +2065,7 @@ gdk_wayland_device_set_selection (GdkDevice             *gdk_device,
   GdkWaylandDisplay *display_wayland;
 
   g_return_if_fail (GDK_IS_WAYLAND_DEVICE (gdk_device));
+
   device = GDK_WAYLAND_DEVICE (gdk_device)->device;
   display_wayland = GDK_WAYLAND_DISPLAY (gdk_device_get_display (gdk_device));
 

@@ -263,11 +263,6 @@ static void gtk_spin_button_get_text_area_size (GtkEntry *entry,
                                                 gint     *y,
                                                 gint     *width,
                                                 gint     *height);
-static void gtk_spin_button_get_frame_size (GtkEntry *entry,
-                                            gint     *x,
-                                            gint     *y,
-                                            gint     *width,
-                                            gint     *height);
 static void gtk_spin_button_unset_adjustment (GtkSpinButton *spin_button);
 static void gtk_spin_button_set_orientation (GtkSpinButton     *spin_button,
                                              GtkOrientation     orientation);
@@ -335,7 +330,6 @@ gtk_spin_button_class_init (GtkSpinButtonClass *class)
 
   entry_class->activate = gtk_spin_button_activate;
   entry_class->get_text_area_size = gtk_spin_button_get_text_area_size;
-  entry_class->get_frame_size = gtk_spin_button_get_frame_size;
 
   class->input = NULL;
   class->output = NULL;
@@ -410,14 +404,13 @@ gtk_spin_button_class_init (GtkSpinButtonClass *class)
                                     PROP_ORIENTATION,
                                     "orientation");
 
-  gtk_widget_class_install_style_property_parser (widget_class,
-                                                  g_param_spec_enum ("shadow-type",
-                                                                     "Shadow Type",
-                                                                     P_("Style of bevel around the spin button"),
-                                                                     GTK_TYPE_SHADOW_TYPE,
-                                                                     GTK_SHADOW_IN,
-                                                                     GTK_PARAM_READABLE),
-                                                  gtk_rc_property_parse_enum);
+  gtk_widget_class_install_style_property (widget_class,
+                                           g_param_spec_enum ("shadow-type",
+                                                              P_("Shadow Type"),
+                                                              P_("Style of bevel around the spin button"),
+                                                              GTK_TYPE_SHADOW_TYPE,
+                                                              GTK_SHADOW_IN,
+                                                              GTK_PARAM_READABLE));
 
   /**
    * GtkSpinButton::input:
@@ -907,7 +900,7 @@ gtk_spin_button_panel_get_state (GtkSpinButton *spin_button,
 
 static GtkStyleContext *
 gtk_spin_button_panel_get_context (GtkSpinButton *spin_button,
-                                   GdkWindow *panel)
+                                   GdkWindow     *panel)
 {
   GtkSpinButtonPrivate *priv = spin_button->priv;
   GtkStyleContext **contextp;
@@ -922,8 +915,13 @@ gtk_spin_button_panel_get_context (GtkSpinButton *spin_button,
                                                  panel == priv->down_panel);
     }
 
+  gtk_style_context_set_screen (*contextp, gtk_widget_get_screen (GTK_WIDGET (spin_button)));
+  gtk_style_context_set_state (*contextp, gtk_spin_button_panel_get_state (spin_button, panel));
+
   return *contextp;
 }
+
+#include "gtkcsssectionprivate.h"
 
 static void
 gtk_spin_button_panel_get_size (GtkSpinButton *spin_button,
@@ -940,7 +938,7 @@ gtk_spin_button_panel_get_size (GtkSpinButton *spin_button,
   icon_size = MAX (w, h);
 
   context = gtk_spin_button_panel_get_context (spin_button, panel);
-  state = gtk_spin_button_panel_get_state (spin_button, panel);
+  state = gtk_style_context_get_state (context);
 
   gtk_style_context_get_padding (context, state, &button_padding);
   gtk_style_context_get_border (context, state, &button_border);
@@ -968,12 +966,14 @@ gtk_spin_button_panel_get_allocations (GtkSpinButton *spin_button,
   gint up_panel_width, up_panel_height;
   GtkStyleContext *context;
   GtkBorder border;
+  GtkStateFlags state;
 
   gtk_widget_get_allocation (widget, &spin_allocation);
   gtk_widget_get_preferred_size (widget, &requisition, NULL);
 
   context = gtk_widget_get_style_context (GTK_WIDGET (spin_button));
-  gtk_style_context_get_border (context, GTK_STATE_FLAG_NORMAL, &border);
+  state = gtk_style_context_get_state (context);
+  gtk_style_context_get_border (context, state, &border);
 
   gtk_spin_button_panel_get_size (spin_button, priv->down_panel, &down_panel_width, &down_panel_height);
   gtk_spin_button_panel_get_size (spin_button, priv->up_panel, &up_panel_width, &up_panel_height);
@@ -1031,7 +1031,6 @@ gtk_spin_button_panel_draw (GtkSpinButton   *spin_button,
 {
   GtkSpinButtonPrivate *priv = spin_button->priv;
   GtkStyleContext *context;
-  GtkStateFlags state;
   GtkWidget *widget;
   gdouble width, height, x, y;
   gint icon_width, icon_height;
@@ -1043,8 +1042,6 @@ gtk_spin_button_panel_draw (GtkSpinButton   *spin_button,
   gtk_cairo_transform_to_window (cr, widget, panel);
 
   context = gtk_spin_button_panel_get_context (spin_button, panel);
-  state = gtk_spin_button_panel_get_state (spin_button, panel);
-  gtk_style_context_set_state (context, state);
 
   height = gdk_window_get_height (panel);
   width = gdk_window_get_width (panel);
@@ -1856,32 +1853,6 @@ gtk_spin_button_activate (GtkEntry *entry)
 }
 
 static void
-gtk_spin_button_get_frame_size (GtkEntry *entry,
-                                gint     *x,
-                                gint     *y,
-                                gint     *width,
-                                gint     *height)
-{
-  GtkSpinButtonPrivate *priv = GTK_SPIN_BUTTON (entry)->priv;
-  gint up_panel_width, up_panel_height;
-  gint down_panel_width, down_panel_height;
-
-  gtk_spin_button_panel_get_size (GTK_SPIN_BUTTON (entry), priv->up_panel, &up_panel_width, &up_panel_height);
-  gtk_spin_button_panel_get_size (GTK_SPIN_BUTTON (entry), priv->down_panel, &down_panel_width, &down_panel_height);
-
-  GTK_ENTRY_CLASS (gtk_spin_button_parent_class)->get_frame_size (entry, x, y, width, height);
-
-  if (priv->orientation == GTK_ORIENTATION_VERTICAL)
-    {
-      if (y)
-        *y += up_panel_height;
-
-      if (height)
-        *height -= up_panel_height + down_panel_height;
-    }
-}
-
-static void
 gtk_spin_button_get_text_area_size (GtkEntry *entry,
                                     gint     *x,
                                     gint     *y,
@@ -1892,13 +1863,13 @@ gtk_spin_button_get_text_area_size (GtkEntry *entry,
   gint up_panel_width, up_panel_height;
   gint down_panel_width, down_panel_height;
 
-  gtk_spin_button_panel_get_size (GTK_SPIN_BUTTON (entry), priv->up_panel, &up_panel_width, &up_panel_height);
-  gtk_spin_button_panel_get_size (GTK_SPIN_BUTTON (entry), priv->down_panel, &down_panel_width, &down_panel_height);
-
   GTK_ENTRY_CLASS (gtk_spin_button_parent_class)->get_text_area_size (entry, x, y, width, height);
 
   if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
     {
+      gtk_spin_button_panel_get_size (GTK_SPIN_BUTTON (entry), priv->up_panel, &up_panel_width, &up_panel_height);
+      gtk_spin_button_panel_get_size (GTK_SPIN_BUTTON (entry), priv->down_panel, &down_panel_width, &down_panel_height);
+
       if (gtk_widget_get_direction (GTK_WIDGET (entry)) == GTK_TEXT_DIR_RTL)
         {
           if (x)
@@ -1907,14 +1878,6 @@ gtk_spin_button_get_text_area_size (GtkEntry *entry,
 
       if (width)
         *width -= up_panel_width + down_panel_width;
-    }
-  else
-    {
-      if (y)
-        *y += up_panel_height;
-
-      if (height)
-        *height -= up_panel_height + down_panel_height;
     }
 }
 

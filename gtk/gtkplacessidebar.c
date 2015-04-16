@@ -848,7 +848,7 @@ typedef struct {
 } BookmarkQueryClosure;
 
 static void
-on_bookmark_query_info_complete (GObject *source,
+on_bookmark_query_info_complete (GObject      *source,
                                  GAsyncResult *result,
                                  gpointer      data)
 {
@@ -1074,7 +1074,7 @@ update_places (GtkPlacesSidebar *sidebar)
                    */
                   icon = g_volume_get_symbolic_icon (volume);
                   name = g_volume_get_name (volume);
-                  tooltip = g_strdup_printf (_("Mount and open %s"), name);
+                  tooltip = g_strdup_printf (_("Mount and open “%s”"), name);
 
                   add_place (sidebar, PLACES_MOUNTED_VOLUME,
                              SECTION_DEVICES,
@@ -1102,7 +1102,7 @@ update_places (GtkPlacesSidebar *sidebar)
                */
               icon = g_drive_get_symbolic_icon (drive);
               name = g_drive_get_name (drive);
-              tooltip = g_strdup_printf (_("Mount and open %s"), name);
+              tooltip = g_strdup_printf (_("Mount and open “%s”"), name);
 
               add_place (sidebar, PLACES_BUILT_IN,
                          SECTION_DEVICES,
@@ -1310,7 +1310,7 @@ update_places (GtkPlacesSidebar *sidebar)
             {
               icon = g_volume_get_symbolic_icon (volume);
               name = g_volume_get_name (volume);
-              tooltip = g_strdup_printf (_("Mount and open %s"), name);
+              tooltip = g_strdup_printf (_("Mount and open “%s”"), name);
 
               add_place (sidebar, PLACES_MOUNTED_VOLUME,
                          SECTION_NETWORK,
@@ -1420,11 +1420,13 @@ static gboolean
 clicked_eject_button (GtkPlacesSidebar  *sidebar,
                       GtkTreePath      **path)
 {
-  GdkEvent *event = gtk_get_current_event ();
-  GdkEventButton *button_event = (GdkEventButton *) event;
+  GdkEvent *event;
 
-  if ((event->type == GDK_BUTTON_PRESS || event->type == GDK_BUTTON_RELEASE) &&
-       over_eject_button (sidebar, button_event->x, button_event->y, path))
+  event = gtk_get_current_event ();
+
+  if (event &&
+      (event->type == GDK_BUTTON_PRESS || event->type == GDK_BUTTON_RELEASE) &&
+       over_eject_button (sidebar, ((GdkEventButton *)event)->x, ((GdkEventButton *)event)->y, path))
     return TRUE;
 
   return FALSE;
@@ -2323,7 +2325,7 @@ drive_start_from_bookmark_cb (GObject      *source_object,
       if (error->code != G_IO_ERROR_FAILED_HANDLED)
         {
           name = g_drive_get_name (G_DRIVE (source_object));
-          primary = g_strdup_printf (_("Unable to start %s"), name);
+          primary = g_strdup_printf (_("Unable to start “%s”"), name);
           g_free (name);
           emit_show_error_message (sidebar, primary, error->message);
           g_free (primary);
@@ -2663,7 +2665,7 @@ unmount_mount_cb (GObject      *source_object,
           gchar *primary;
 
           name = g_mount_get_name (mount);
-          primary = g_strdup_printf (_("Unable to unmount %s"), name);
+          primary = g_strdup_printf (_("Unable to unmount “%s”"), name);
           g_free (name);
           emit_show_error_message (sidebar, primary, error->message);
           g_free (primary);
@@ -2924,7 +2926,7 @@ drive_stop_cb (GObject      *source_object,
       if (error->code != G_IO_ERROR_FAILED_HANDLED)
         {
           name = g_drive_get_name (G_DRIVE (source_object));
-          primary = g_strdup_printf (_("Unable to stop %s"), name);
+          primary = g_strdup_printf (_("Unable to stop “%s”"), name);
           g_free (name);
           emit_show_error_message (sidebar, primary, error->message);
           g_free (primary);
@@ -2953,7 +2955,7 @@ drive_eject_cb (GObject      *source_object,
       if (error->code != G_IO_ERROR_FAILED_HANDLED)
         {
           name = g_drive_get_name (G_DRIVE (source_object));
-          primary = g_strdup_printf (_("Unable to eject %s"), name);
+          primary = g_strdup_printf (_("Unable to eject “%s”"), name);
           g_free (name);
           emit_show_error_message (sidebar, primary, error->message);
           g_free (primary);
@@ -3169,7 +3171,7 @@ drive_poll_for_media_cb (GObject      *source_object,
       if (error->code != G_IO_ERROR_FAILED_HANDLED)
         {
           name = g_drive_get_name (G_DRIVE (source_object));
-          primary = g_strdup_printf (_("Unable to poll %s for media changes"), name);
+          primary = g_strdup_printf (_("Unable to poll “%s” for media changes"), name);
           g_free (name);
           emit_show_error_message (sidebar, primary, error->message);
           g_free (primary);
@@ -3219,7 +3221,7 @@ drive_start_cb (GObject      *source_object,
       if (error->code != G_IO_ERROR_FAILED_HANDLED)
         {
           name = g_drive_get_name (G_DRIVE (source_object));
-          primary = g_strdup_printf (_("Unable to start %s"), name);
+          primary = g_strdup_printf (_("Unable to start “%s”"), name);
           g_free (name);
           emit_show_error_message (sidebar, primary, error->message);
           g_free (primary);
@@ -4021,7 +4023,6 @@ gtk_places_sidebar_init (GtkPlacesSidebar *sidebar)
   /* tree view */
   tree_view = GTK_TREE_VIEW (gtk_tree_view_new ());
   gtk_tree_view_set_headers_visible (tree_view, FALSE);
-  gtk_widget_set_margin_top (GTK_WIDGET (tree_view), 4);
 
   gtk_tree_view_set_row_separator_func (tree_view,
                                         row_separator_func,
@@ -4035,7 +4036,6 @@ gtk_places_sidebar_init (GtkPlacesSidebar *sidebar)
   g_object_set (cell,
                 "xpad", 10,
                 "ypad", 8,
-                "follow-state", TRUE,
                 NULL);
   gtk_tree_view_column_pack_start (col, cell, FALSE);
   gtk_tree_view_column_set_attributes (col, cell,
@@ -4068,7 +4068,6 @@ gtk_places_sidebar_init (GtkPlacesSidebar *sidebar)
                 /* align right, because for some reason gtk+ expands
                    this even though we tell it not to. */
                 "xalign", 1.0,
-                "follow-state", TRUE,
                 "gicon", eject,
                 NULL);
   gtk_tree_view_column_pack_start (col, cell, FALSE);
@@ -4803,7 +4802,9 @@ gtk_places_sidebar_set_location (GtkPlacesSidebar *sidebar,
 
   if (sidebar->current_location != NULL)
     g_object_unref (sidebar->current_location);
-  sidebar->current_location = g_object_ref (location);
+  sidebar->current_location = location;
+  if (sidebar->current_location != NULL)
+    g_object_ref (sidebar->current_location);
 
   if (location == NULL)
           goto out;

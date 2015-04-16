@@ -21,6 +21,7 @@
 #include "gdkdisplay.h"
 #include "gdkwindow.h"
 #include "gdkcursor.h"
+#include "gdkinternals.h"
 
 G_BEGIN_DECLS
 
@@ -116,6 +117,14 @@ struct _GdkDisplay
 
   guint double_click_time;  /* Maximum time between clicks in msecs */
   guint double_click_distance;   /* Maximum distance between clicks in pixels */
+
+  guint has_gl_extension_texture_non_power_of_two : 1;
+  guint has_gl_extension_texture_rectangle : 1;
+
+  guint debug_updates     : 1;
+  guint debug_updates_set : 1;
+
+  GdkRenderingMode rendering_mode;
 };
 
 struct _GdkDisplayClass
@@ -225,6 +234,9 @@ struct _GdkDisplayClass
   gchar *                (*utf8_to_string_target)      (GdkDisplay     *display,
                                                         const gchar    *text);
 
+  gboolean               (*make_gl_context_current)    (GdkDisplay        *display,
+                                                        GdkGLContext      *context);
+
   /* Signals */
   void                   (*opened)                     (GdkDisplay     *display);
   void (*closed) (GdkDisplay *display,
@@ -302,6 +314,9 @@ void                _gdk_display_create_window_impl   (GdkDisplay       *display
                                                        GdkWindowAttr    *attributes,
                                                        gint              attributes_mask);
 GdkWindow *         _gdk_display_create_window        (GdkDisplay       *display);
+
+gboolean            gdk_display_make_gl_context_current  (GdkDisplay        *display,
+                                                          GdkGLContext      *context);
 
 G_END_DECLS
 

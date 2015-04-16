@@ -29,7 +29,7 @@
 #include "gtkcssunsetvalueprivate.h"
 #include "gtkintl.h"
 #include "gtkprivatetypebuiltins.h"
-#include "gtkstylepropertiesprivate.h"
+#include "deprecated/gtkstylepropertiesprivate.h"
 
 /* this is in case round() is not provided by the compiler, 
  * such as in the case of C89 compilers, like MSVC
@@ -39,17 +39,13 @@
 enum {
   PROP_0,
   PROP_ANIMATED,
-  PROP_AFFECTS_SIZE,
-  PROP_AFFECTS_FONT,
+  PROP_AFFECTS,
   PROP_ID,
   PROP_INHERIT,
   PROP_INITIAL
 };
 
 G_DEFINE_TYPE (GtkCssStyleProperty, _gtk_css_style_property, GTK_TYPE_STYLE_PROPERTY)
-
-static GtkBitmask *_properties_affecting_size = NULL;
-static GtkBitmask *_properties_affecting_font = NULL;
 
 static GtkCssStylePropertyClass *gtk_css_style_property_class = NULL;
 
@@ -61,12 +57,6 @@ gtk_css_style_property_constructed (GObject *object)
 
   property->id = klass->style_properties->len;
   g_ptr_array_add (klass->style_properties, property);
-
-  if (property->affects_size)
-    _properties_affecting_size = _gtk_bitmask_set (_properties_affecting_size, property->id, TRUE);
-
-  if (property->affects_font)
-    _properties_affecting_font = _gtk_bitmask_set (_properties_affecting_font, property->id, TRUE);
 
   G_OBJECT_CLASS (_gtk_css_style_property_parent_class)->constructed (object);
 }
@@ -84,11 +74,8 @@ gtk_css_style_property_set_property (GObject      *object,
     case PROP_ANIMATED:
       property->animated = g_value_get_boolean (value);
       break;
-    case PROP_AFFECTS_SIZE:
-      property->affects_size = g_value_get_boolean (value);
-      break;
-    case PROP_AFFECTS_FONT:
-      property->affects_font = g_value_get_boolean (value);
+    case PROP_AFFECTS:
+      property->affects = g_value_get_flags (value);
       break;
     case PROP_INHERIT:
       property->inherit = g_value_get_boolean (value);
@@ -116,11 +103,8 @@ gtk_css_style_property_get_property (GObject    *object,
     case PROP_ANIMATED:
       g_value_set_boolean (value, property->animated);
       break;
-    case PROP_AFFECTS_SIZE:
-      g_value_set_boolean (value, property->affects_size);
-      break;
-    case PROP_AFFECTS_FONT:
-      g_value_set_boolean (value, property->affects_font);
+    case PROP_AFFECTS:
+      g_value_set_flags (value, property->affects);
       break;
     case PROP_ID:
       g_value_set_boolean (value, property->id);
@@ -156,63 +140,6 @@ _gtk_css_style_property_assign (GtkStyleProperty   *property,
   _gtk_css_value_unref (css_value);
 }
 
-static gboolean
-_gtk_css_style_property_query_special_case (GtkCssStyleProperty *property,
-                                            GValue              *value,
-                                            GtkStyleQueryFunc    query_func,
-                                            gpointer             query_data)
-{
-  GtkBorderStyle border_style;
-
-  switch (property->id)
-    {
-      case GTK_CSS_PROPERTY_BORDER_TOP_WIDTH:
-        border_style = _gtk_css_border_style_value_get (query_func (GTK_CSS_PROPERTY_BORDER_TOP_STYLE, query_data));
-        if (border_style == GTK_BORDER_STYLE_NONE || border_style == GTK_BORDER_STYLE_HIDDEN)
-          {
-            g_value_init (value, G_TYPE_INT);
-            return TRUE;
-          }
-        break;
-      case GTK_CSS_PROPERTY_BORDER_RIGHT_WIDTH:
-        border_style = _gtk_css_border_style_value_get (query_func (GTK_CSS_PROPERTY_BORDER_RIGHT_STYLE, query_data));
-        if (border_style == GTK_BORDER_STYLE_NONE || border_style == GTK_BORDER_STYLE_HIDDEN)
-          {
-            g_value_init (value, G_TYPE_INT);
-            return TRUE;
-          }
-        break;
-      case GTK_CSS_PROPERTY_BORDER_BOTTOM_WIDTH:
-        border_style = _gtk_css_border_style_value_get (query_func (GTK_CSS_PROPERTY_BORDER_BOTTOM_STYLE, query_data));
-        if (border_style == GTK_BORDER_STYLE_NONE || border_style == GTK_BORDER_STYLE_HIDDEN)
-          {
-            g_value_init (value, G_TYPE_INT);
-            return TRUE;
-          }
-        break;
-      case GTK_CSS_PROPERTY_BORDER_LEFT_WIDTH:
-        border_style = _gtk_css_border_style_value_get (query_func (GTK_CSS_PROPERTY_BORDER_LEFT_STYLE, query_data));
-        if (border_style == GTK_BORDER_STYLE_NONE || border_style == GTK_BORDER_STYLE_HIDDEN)
-          {
-            g_value_init (value, G_TYPE_INT);
-            return TRUE;
-          }
-        break;
-      case GTK_CSS_PROPERTY_OUTLINE_WIDTH:
-        border_style = _gtk_css_border_style_value_get (query_func (GTK_CSS_PROPERTY_OUTLINE_STYLE, query_data));
-        if (border_style == GTK_BORDER_STYLE_NONE || border_style == GTK_BORDER_STYLE_HIDDEN)
-          {
-            g_value_init (value, G_TYPE_INT);
-            return TRUE;
-          }
-        break;
-      default:
-        break;
-    }
-
-  return FALSE;
-}
-
 static void
 _gtk_css_style_property_query (GtkStyleProperty   *property,
                                GValue             *value,
@@ -221,10 +148,6 @@ _gtk_css_style_property_query (GtkStyleProperty   *property,
 {
   GtkCssStyleProperty *style_property = GTK_CSS_STYLE_PROPERTY (property);
   GtkCssValue *css_value;
-  
-  /* I don't like this special case being here in this generic code path, but no idea where else to put it. */
-  if (_gtk_css_style_property_query_special_case (style_property, value, query_func, query_data))
-    return;
 
   css_value = (* query_func) (GTK_CSS_STYLE_PROPERTY (property)->id, query_data);
   if (css_value == NULL)
@@ -286,19 +209,13 @@ _gtk_css_style_property_class_init (GtkCssStylePropertyClass *klass)
                                                          FALSE,
                                                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
   g_object_class_install_property (object_class,
-                                   PROP_AFFECTS_SIZE,
-                                   g_param_spec_boolean ("affects-size",
-                                                         P_("Affects size"),
-                                                         P_("Set if the value affects the sizing of elements"),
-                                                         TRUE,
-                                                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-  g_object_class_install_property (object_class,
-                                   PROP_AFFECTS_FONT,
-                                   g_param_spec_boolean ("affects-font",
-                                                         P_("Affects font"),
-                                                         P_("Set if the value affects the font"),
-                                                         FALSE,
-                                                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+                                   PROP_AFFECTS,
+                                   g_param_spec_flags ("affects",
+                                                       P_("Affects"),
+                                                       P_("Set if the value affects the sizing of elements"),
+                                                       GTK_TYPE_CSS_AFFECTS,
+                                                       0,
+                                                       G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
   g_object_class_install_property (object_class,
                                    PROP_ID,
                                    g_param_spec_uint ("id",
@@ -326,9 +243,6 @@ _gtk_css_style_property_class_init (GtkCssStylePropertyClass *klass)
   property_class->parse_value = gtk_css_style_property_parse_value;
 
   klass->style_properties = g_ptr_array_new ();
-
-  _properties_affecting_size = _gtk_bitmask_new ();
-  _properties_affecting_font = _gtk_bitmask_new ();
 
   gtk_css_style_property_class = klass;
 }
@@ -429,39 +343,20 @@ _gtk_css_style_property_is_animated (GtkCssStyleProperty *property)
 }
 
 /**
- * _gtk_css_style_property_affects_size:
+ * _gtk_css_style_property_get_affects:
  * @property: the property
  *
- * Queries if the given @property affects the size of elements. This is
- * used for optimizations inside GTK, where a gtk_widget_queue_resize()
- * can be avoided if the property does not affect size.
+ * Returns all the things this property affects. See @GtkCssAffects for what
+ * the flags mean.
  *
- * Returns: %TRUE if the property affects sizing of elements.
+ * Returns: The things this property affects.
  **/
-gboolean
-_gtk_css_style_property_affects_size (GtkCssStyleProperty *property)
+GtkCssAffects
+_gtk_css_style_property_get_affects (GtkCssStyleProperty *property)
 {
-  g_return_val_if_fail (GTK_IS_CSS_STYLE_PROPERTY (property), FALSE);
+  g_return_val_if_fail (GTK_IS_CSS_STYLE_PROPERTY (property), 0);
 
-  return property->affects_size;
-}
-
-/**
- * _gtk_css_style_property_affects_font:
- * @property: the property
- *
- * Queries if the given @property affects the default font. This is
- * used for optimizations inside GTK, where clearing pango
- * layouts can be avoided if the font doesn’t change.
- *
- * Returns: %TRUE if the property affects the font.
- **/
-gboolean
-_gtk_css_style_property_affects_font (GtkCssStyleProperty *property)
-{
-  g_return_val_if_fail (GTK_IS_CSS_STYLE_PROPERTY (property), FALSE);
-
-  return property->affects_font;
+  return property->affects;
 }
 
 /**
@@ -499,14 +394,32 @@ _gtk_css_style_property_get_initial_value (GtkCssStyleProperty *property)
   return property->initial_value;
 }
 
-gboolean
-_gtk_css_style_property_changes_affect_size (const GtkBitmask *changes)
+/**
+ * _gtk_css_style_property_get_mask_affecting:
+ * @flags: the flags that are affected
+ *
+ * Computes a bitmask for all properties that have at least one of @flags
+ * set.
+ *
+ * Returns: (transfer full): A #GtkBitmask with the bit set for every
+ *          property that has at least one of @flags set.
+ */
+GtkBitmask *
+_gtk_css_style_property_get_mask_affecting (GtkCssAffects affects)
 {
-  return _gtk_bitmask_intersects (changes, _properties_affecting_size);
+  GtkBitmask *result;
+  guint i;
+
+  result = _gtk_bitmask_new ();
+
+  for (i = 0; i < _gtk_css_style_property_get_n_properties (); i++)
+    {
+      GtkCssStyleProperty *prop = _gtk_css_style_property_lookup_by_id (i);
+
+      if (_gtk_css_style_property_get_affects (prop) & affects)
+        result = _gtk_bitmask_set (result, i, TRUE);
+    }
+
+  return result;
 }
 
-gboolean
-_gtk_css_style_property_changes_affect_font (const GtkBitmask *changes)
-{
-  return _gtk_bitmask_intersects (changes, _properties_affecting_font);
-}

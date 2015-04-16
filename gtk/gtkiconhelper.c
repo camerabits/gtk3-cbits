@@ -23,6 +23,7 @@
 
 #include <math.h>
 
+#include "gtkcssenumvalueprivate.h"
 #include "gtkiconhelperprivate.h"
 #include "gtkstylecontextprivate.h"
 
@@ -261,14 +262,39 @@ check_invalidate_pixbuf (GtkIconHelper *self,
 static GtkIconLookupFlags
 get_icon_lookup_flags (GtkIconHelper *self, GtkStyleContext *context)
 {
-  GtkIconLookupFlags flags = GTK_ICON_LOOKUP_USE_BUILTIN;
+  GtkIconLookupFlags flags;
+  GtkCssIconStyle icon_style;
+  GtkStateFlags state;
+
+  state = gtk_style_context_get_state (context);
+  flags = GTK_ICON_LOOKUP_USE_BUILTIN;
 
   if (self->priv->use_fallback)
     flags |= GTK_ICON_LOOKUP_GENERIC_FALLBACK;
   if (self->priv->pixel_size != -1 || self->priv->force_scale_pixbuf)
     flags |= GTK_ICON_LOOKUP_FORCE_SIZE;
 
-  flags |= _gtk_style_context_get_icon_lookup_flags (context);
+  icon_style = _gtk_css_icon_style_value_get (_gtk_style_context_peek_property (context, GTK_CSS_PROPERTY_ICON_STYLE));
+
+  switch (icon_style)
+    {
+    case GTK_CSS_ICON_STYLE_REGULAR:
+      flags |= GTK_ICON_LOOKUP_FORCE_REGULAR;
+      break;
+    case GTK_CSS_ICON_STYLE_SYMBOLIC:
+      flags |= GTK_ICON_LOOKUP_FORCE_SYMBOLIC;
+      break;
+    case GTK_CSS_ICON_STYLE_REQUESTED:
+      break;
+    default:
+      g_assert_not_reached ();
+      return 0;
+    }
+
+  if (state & GTK_STATE_FLAG_DIR_LTR)
+    flags |= GTK_ICON_LOOKUP_DIR_LTR;
+  else if (state & GTK_STATE_FLAG_DIR_RTL)
+    flags |= GTK_ICON_LOOKUP_DIR_RTL;
 
   return flags;
 }
@@ -285,7 +311,7 @@ ensure_pixbuf_for_gicon (GtkIconHelper *self,
   if (!check_invalidate_pixbuf (self, context))
     return;
 
-  icon_theme = gtk_icon_theme_get_default ();
+  icon_theme = gtk_icon_theme_get_for_screen (gtk_style_context_get_screen (context));
   flags = get_icon_lookup_flags (self, context);
 
   ensure_icon_size (self, context, &width, &height);
@@ -335,9 +361,7 @@ get_surface_size (GtkIconHelper   *self,
     {
       x_scale = y_scale = 1;
 
-#ifdef HAVE_CAIRO_SURFACE_SET_DEVICE_SCALE
       cairo_surface_get_device_scale (surface, &x_scale, &y_scale);
-#endif
 
       /* Assume any set scaling is icon scale */
       *width =
@@ -450,7 +474,7 @@ _gtk_icon_helper_ensure_pixbuf (GtkIconHelper *self,
 
     case GTK_IMAGE_STOCK:
       G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
-      icon_set = gtk_style_context_lookup_icon_set (context, self->priv->stock_id);
+      icon_set = gtk_icon_factory_lookup_default (self->priv->stock_id);
       if (icon_set != NULL)
 	ensure_pixbuf_for_icon_set (self, context, icon_set);
       else
@@ -674,7 +698,7 @@ ensure_stated_surface_from_info (GtkIconHelper *self,
 
       G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
 
-      icon_set = gtk_style_context_lookup_icon_set (context, GTK_STOCK_MISSING_IMAGE);
+      icon_set = gtk_icon_factory_lookup_default (GTK_STOCK_MISSING_IMAGE);
 
       destination =
         gtk_icon_set_render_icon_pixbuf (icon_set, context, self->priv->icon_size);
@@ -717,7 +741,7 @@ ensure_surface_for_gicon (GtkIconHelper   *self,
   if (!check_invalidate_surface (self, context))
     return;
 
-  icon_theme = gtk_icon_theme_get_default ();
+  icon_theme = gtk_icon_theme_get_for_screen (gtk_style_context_get_screen (context));
   flags = get_icon_lookup_flags (self, context);
 
   ensure_icon_size (self, context, &width, &height);
@@ -761,7 +785,7 @@ _gtk_icon_helper_ensure_surface (GtkIconHelper *self,
 
     case GTK_IMAGE_STOCK:
       G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
-      icon_set = gtk_style_context_lookup_icon_set (context, self->priv->stock_id);
+      icon_set = gtk_icon_factory_lookup_default (self->priv->stock_id);
       if (icon_set != NULL)
 	ensure_surface_for_icon_set (self, context, icon_set);
       else

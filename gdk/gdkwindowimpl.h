@@ -106,8 +106,7 @@ struct _GdkWindowImplClass
                                          gdouble         *x,
                                          gdouble         *y,
                                          GdkModifierType *mask);
-  gboolean    (* begin_paint_region)    (GdkWindow       *window,
-					 const cairo_region_t *region);
+  gboolean    (* begin_paint)           (GdkWindow       *window);
   void        (* end_paint)             (GdkWindow       *window);
 
   cairo_region_t * (* get_shape)        (GdkWindow       *window);
@@ -120,9 +119,6 @@ struct _GdkWindowImplClass
 					       const cairo_region_t *shape_region,
 					       gint             offset_x,
 					       gint             offset_y);
-
-  gboolean     (* set_static_gravities) (GdkWindow       *window,
-				         gboolean         use_static);
 
   /* Called before processing updates for a window. This gives the windowing
    * layer a chance to save the region for later use in avoiding duplicate
@@ -282,6 +278,9 @@ struct _GdkWindowImplClass
                                            GdkAtom         property);
 
   gint         (* get_scale_factor)       (GdkWindow      *window);
+  void         (* get_unscaled_size)      (GdkWindow      *window,
+                                           int            *unscaled_width,
+                                           int            *unscaled_height);
 
   void         (* set_opaque_region)      (GdkWindow      *window,
                                            cairo_region_t *region);
@@ -292,11 +291,19 @@ struct _GdkWindowImplClass
                                            gint            bottom);
   gboolean     (* show_window_menu)       (GdkWindow      *window,
                                            GdkEvent       *event);
+  GdkGLContext *(*create_gl_context)      (GdkWindow      *window,
+					   gboolean        attached,
+                                           GdkGLContext   *share,
+                                           GError        **error);
+  gboolean     (* realize_gl_context)     (GdkWindow      *window,
+                                           GdkGLContext   *context,
+                                           GError        **error);
+  void         (*invalidate_for_new_frame)(GdkWindow      *window,
+                                           cairo_region_t *update_area);
 };
 
 /* Interface Functions */
 GType gdk_window_impl_get_type (void) G_GNUC_CONST;
-
 
 G_END_DECLS
 

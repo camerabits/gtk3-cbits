@@ -19,7 +19,7 @@
  * Modified by the GTK+ Team and others 1997-2000.  See the AUTHORS
  * file for a list of people on the GTK+ Team.  See the ChangeLog
  * files for a list of changes.  These files are distributed with
- * GTK+ at ftp://ftp.gtk.org/pub/gtk/. 
+ * GTK+ at ftp://ftp.gtk.org/pub/gtk/.
  */
 
 #ifndef __GDK_WAYLAND_H__
@@ -33,6 +33,7 @@
 #include <gdk/wayland/gdkwaylanddisplay.h>
 #include <gdk/wayland/gdkwaylandselection.h>
 #include <gdk/wayland/gdkwaylandwindow.h>
+#include <gdk/wayland/gdkwaylandglcontext.h>
 
 #undef __GDKWAYLAND_H_INSIDE__
 

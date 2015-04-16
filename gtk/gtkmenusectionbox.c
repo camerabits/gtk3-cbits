@@ -39,7 +39,6 @@ struct _GtkMenuSectionBox
 {
   GtkBox             parent_instance;
 
-  GtkSizeGroup      *size_group;
   GtkMenuSectionBox *toplevel;
   GtkMenuTracker    *tracker;
   GtkBox            *item_box;
@@ -57,13 +56,14 @@ typedef struct
 
 G_DEFINE_TYPE (GtkMenuSectionBox, gtk_menu_section_box, GTK_TYPE_BOX)
 
-void                    gtk_menu_section_box_sync_separators            (GtkMenuSectionBox  *box,
-                                                                         MenuData           *data);
-void                    gtk_menu_section_box_new_submenu                (GtkMenuTrackerItem *item,
-                                                                         GtkMenuSectionBox  *toplevel,
-                                                                         GtkWidget          *focus);
-GtkWidget *             gtk_menu_section_box_new_section                (GtkMenuTrackerItem *item,
-                                                                         GtkMenuSectionBox  *parent);
+static void        gtk_menu_section_box_sync_separators (GtkMenuSectionBox  *box,
+                                                         MenuData           *data);
+static void        gtk_menu_section_box_new_submenu     (GtkMenuTrackerItem *item,
+                                                         GtkMenuSectionBox  *toplevel,
+                                                         GtkWidget          *focus,
+                                                         const gchar        *name);
+static GtkWidget * gtk_menu_section_box_new_section     (GtkMenuTrackerItem *item,
+                                                         GtkMenuSectionBox  *parent);
 
 static void
 gtk_menu_section_box_sync_item (GtkWidget *widget,
@@ -87,7 +87,7 @@ gtk_menu_section_box_sync_item (GtkWidget *widget,
  * rule 5: never show separators directly above or below an iconic box
  * (rule 6: these rules don't apply exactly the same way for subsections)
  */
-void
+static void
 gtk_menu_section_box_sync_separators (GtkMenuSectionBox *box,
                                       MenuData          *data)
 {
@@ -235,16 +235,12 @@ close_submenu (GtkWidget *button,
                gpointer   data)
 {
   GtkMenuTrackerItem *item = data;
-  GtkWidget *stack;
-  GtkWidget *parent;
   GtkWidget *focus;
 
   if (gtk_menu_tracker_item_get_should_request_show (item))
     gtk_menu_tracker_item_request_submenu_shown (item, FALSE);
 
   focus = GTK_WIDGET (g_object_get_data (G_OBJECT (button), "focus"));
-  get_ancestors (focus, GTK_TYPE_STACK, &stack, &parent);
-  gtk_stack_set_visible_child (GTK_STACK (stack), parent);
   gtk_widget_grab_focus (focus);
 }
 
@@ -253,16 +249,12 @@ open_submenu (GtkWidget *button,
               gpointer   data)
 {
   GtkMenuTrackerItem *item = data;
-  GtkWidget *stack;
-  GtkWidget *child;
   GtkWidget *focus;
 
   if (gtk_menu_tracker_item_get_should_request_show (item))
     gtk_menu_tracker_item_request_submenu_shown (item, TRUE);
 
   focus = GTK_WIDGET (g_object_get_data (G_OBJECT (button), "focus"));
-  get_ancestors (focus, GTK_TYPE_STACK, &stack, &child);
-  gtk_stack_set_visible_child (GTK_STACK (stack), child);
   gtk_widget_grab_focus (focus);
 }
 
@@ -280,17 +272,25 @@ gtk_menu_section_box_insert_func (GtkMenuTrackerItem *item,
     }
   else if (gtk_menu_tracker_item_get_has_link (item, G_MENU_LINK_SUBMENU))
     {
-      widget = g_object_new (GTK_TYPE_MODEL_BUTTON, "has-submenu", TRUE, NULL);
+      GtkWidget *stack = NULL;
+      GtkWidget *parent = NULL;
+      gchar *name;
+
+      widget = g_object_new (GTK_TYPE_MODEL_BUTTON,
+                             "menu-name", gtk_menu_tracker_item_get_label (item), 
+                             NULL);
       g_object_bind_property (item, "label", widget, "text", G_BINDING_SYNC_CREATE);
       g_object_bind_property (item, "icon", widget, "icon", G_BINDING_SYNC_CREATE);
       g_object_bind_property (item, "sensitive", widget, "sensitive", G_BINDING_SYNC_CREATE);
-      gtk_menu_section_box_new_submenu (item, box->toplevel, widget);
-      gtk_widget_show (widget);
+
+      get_ancestors (GTK_WIDGET (box->toplevel), GTK_TYPE_STACK, &stack, &parent);
+      gtk_container_child_get (GTK_CONTAINER (stack), parent, "name", &name, NULL);
+      gtk_menu_section_box_new_submenu (item, box->toplevel, widget, name);
+      g_free (name);
     }
   else
     {
       widget = gtk_model_button_new ();
-
       g_object_bind_property (item, "label", widget, "text", G_BINDING_SYNC_CREATE);
 
       if (box->iconic)
@@ -302,10 +302,8 @@ gtk_menu_section_box_insert_func (GtkMenuTrackerItem *item,
         g_object_bind_property (item, "icon", widget, "icon", G_BINDING_SYNC_CREATE);
 
       g_object_bind_property (item, "sensitive", widget, "sensitive", G_BINDING_SYNC_CREATE);
-      g_object_bind_property (item, "role", widget, "action-role", G_BINDING_SYNC_CREATE);
-      g_object_bind_property (item, "toggled", widget, "toggled", G_BINDING_SYNC_CREATE);
-      g_object_bind_property (item, "accel", widget, "accel", G_BINDING_SYNC_CREATE);
-
+      g_object_bind_property (item, "role", widget, "role", G_BINDING_SYNC_CREATE);
+      g_object_bind_property (item, "toggled", widget, "active", G_BINDING_SYNC_CREATE);
       g_signal_connect (widget, "clicked", G_CALLBACK (gtk_popover_item_activate), item);
     }
 
@@ -356,12 +354,6 @@ gtk_menu_section_box_dispose (GObject *object)
 
   g_clear_object (&box->separator);
 
-  if (box->size_group)
-    {
-      g_object_unref (box->size_group);
-      box->size_group = NULL;
-    }
-
   if (box->tracker)
     {
       gtk_menu_tracker_free (box->tracker);
@@ -385,35 +377,33 @@ gtk_menu_section_box_new_toplevel (GtkStack    *stack,
   GtkMenuSectionBox *box;
 
   box = g_object_new (GTK_TYPE_MENU_SECTION_BOX, "margin", 10,  NULL);
-  box->size_group = gtk_size_group_new (GTK_SIZE_GROUP_HORIZONTAL);
-  gtk_size_group_add_widget (box->size_group, GTK_WIDGET (box));
   gtk_stack_add_named (stack, GTK_WIDGET (box), "main");
 
-  box->tracker = gtk_menu_tracker_new (GTK_ACTION_OBSERVABLE (_gtk_widget_get_action_muxer (GTK_WIDGET (box))),
-                                       model, TRUE, FALSE, action_namespace,
+  box->tracker = gtk_menu_tracker_new (GTK_ACTION_OBSERVABLE (_gtk_widget_get_action_muxer (GTK_WIDGET (box), TRUE)),
+                                       model, TRUE, FALSE, FALSE, action_namespace,
                                        gtk_menu_section_box_insert_func,
                                        gtk_menu_section_box_remove_func, box);
 
   gtk_widget_show (GTK_WIDGET (box));
 }
 
-void
+static void
 gtk_menu_section_box_new_submenu (GtkMenuTrackerItem *item,
                                   GtkMenuSectionBox  *toplevel,
-                                  GtkWidget          *focus)
+                                  GtkWidget          *focus,
+                                  const gchar        *name)
 {
   GtkMenuSectionBox *box;
   GtkWidget *button;
 
   box = g_object_new (GTK_TYPE_MENU_SECTION_BOX, "margin", 10, NULL);
-  box->size_group = g_object_ref (toplevel->size_group);
-  gtk_size_group_add_widget (box->size_group, GTK_WIDGET (box));
 
   button = g_object_new (GTK_TYPE_MODEL_BUTTON,
-                         "has-submenu", TRUE,
+                         "menu-name", name,
                          "inverted", TRUE,
                          "centered", TRUE,
                          NULL);
+
   g_object_bind_property (item, "label", button, "text", G_BINDING_SYNC_CREATE);
   g_object_bind_property (item, "icon", button, "icon", G_BINDING_SYNC_CREATE);
 
@@ -430,13 +420,13 @@ gtk_menu_section_box_new_submenu (GtkMenuTrackerItem *item,
                        GTK_WIDGET (box), gtk_menu_tracker_item_get_label (item));
   gtk_widget_show (GTK_WIDGET (box));
 
-  box->tracker = gtk_menu_tracker_new_for_item_link (item, G_MENU_LINK_SUBMENU, FALSE,
+  box->tracker = gtk_menu_tracker_new_for_item_link (item, G_MENU_LINK_SUBMENU, FALSE, FALSE,
                                                      gtk_menu_section_box_insert_func,
                                                      gtk_menu_section_box_remove_func,
                                                      box);
 }
 
-GtkWidget *
+static GtkWidget *
 gtk_menu_section_box_new_section (GtkMenuTrackerItem *item,
                                   GtkMenuSectionBox  *parent)
 {
@@ -446,7 +436,6 @@ gtk_menu_section_box_new_section (GtkMenuTrackerItem *item,
   const gchar *hint;
 
   box = g_object_new (GTK_TYPE_MENU_SECTION_BOX, NULL);
-  box->size_group = g_object_ref (parent->size_group);
   box->toplevel = parent->toplevel;
   box->depth = parent->depth + 1;
 
@@ -497,7 +486,7 @@ gtk_menu_section_box_new_section (GtkMenuTrackerItem *item,
       gtk_widget_show (box->separator);
     }
 
-  box->tracker = gtk_menu_tracker_new_for_item_link (item, G_MENU_LINK_SECTION, FALSE,
+  box->tracker = gtk_menu_tracker_new_for_item_link (item, G_MENU_LINK_SECTION, FALSE, FALSE,
                                                      gtk_menu_section_box_insert_func,
                                                      gtk_menu_section_box_remove_func,
                                                      box);

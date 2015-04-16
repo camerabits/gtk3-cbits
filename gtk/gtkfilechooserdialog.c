@@ -30,6 +30,9 @@
 #include "gtktypebuiltins.h"
 #include "gtkintl.h"
 #include "gtksettings.h"
+#include "gtktogglebutton.h"
+#include "gtkstylecontext.h"
+#include "gtkheaderbar.h"
 #include "gtkdialogprivate.h"
 
 #include <stdarg.h>
@@ -198,8 +201,11 @@ struct _GtkFileChooserDialogPrivate
 {
   GtkWidget *widget;
 
+  GtkSizeGroup *buttons;
+
   /* for use with GtkFileChooserEmbed */
   gboolean response_requested;
+  gboolean search_setup;
 };
 
 static void     gtk_file_chooser_dialog_set_property (GObject               *object,
@@ -252,6 +258,7 @@ gtk_file_chooser_dialog_class_init (GtkFileChooserDialogClass *class)
 					       "/org/gtk/libgtk/ui/gtkfilechooserdialog.ui");
 
   gtk_widget_class_bind_template_child_private (widget_class, GtkFileChooserDialog, widget);
+  gtk_widget_class_bind_template_child_private (widget_class, GtkFileChooserDialog, buttons);
   gtk_widget_class_bind_template_callback (widget_class, response_cb);
   gtk_widget_class_bind_template_callback (widget_class, file_chooser_widget_file_activated);
   gtk_widget_class_bind_template_callback (widget_class, file_chooser_widget_default_size_changed);
@@ -470,6 +477,52 @@ gtk_file_chooser_dialog_get_property (GObject         *object,
 }
 
 static void
+add_button (GtkWidget *button, gpointer data)
+{
+  GtkFileChooserDialog *dialog = data;
+
+  if (GTK_IS_BUTTON (button))
+    gtk_size_group_add_widget (dialog->priv->buttons, button);
+}
+
+static void
+setup_search (GtkFileChooserDialog *dialog)
+{
+  gboolean use_header;
+
+  if (dialog->priv->search_setup)
+    return;
+
+  dialog->priv->search_setup = TRUE;
+
+  g_object_get (dialog, "use-header-bar", &use_header, NULL);
+  if (use_header)
+    {
+      GtkWidget *button;
+      GtkWidget *image;
+      GtkWidget *header;
+
+      button = gtk_toggle_button_new ();
+      gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
+      image = gtk_image_new_from_icon_name ("edit-find-symbolic", GTK_ICON_SIZE_MENU);
+      gtk_container_add (GTK_CONTAINER (button), image);
+      gtk_style_context_add_class (gtk_widget_get_style_context (button), "image-button");
+      gtk_style_context_remove_class (gtk_widget_get_style_context (button), "text-button");
+      gtk_widget_show (image);
+      gtk_widget_show (button);
+
+      header = gtk_dialog_get_header_bar (GTK_DIALOG (dialog));
+      gtk_header_bar_pack_end (GTK_HEADER_BAR (header), button);
+
+      g_object_bind_property (button, "active",
+                              dialog->priv->widget, "search-mode",
+                              G_BINDING_BIDIRECTIONAL);
+
+      gtk_container_forall (GTK_CONTAINER (header), add_button, dialog);
+    }
+}
+
+static void
 ensure_default_response (GtkFileChooserDialog *dialog)
 {
   GtkWidget *widget;
@@ -486,6 +539,7 @@ gtk_file_chooser_dialog_map (GtkWidget *widget)
   GtkFileChooserDialog *dialog = GTK_FILE_CHOOSER_DIALOG (widget);
   GtkFileChooserDialogPrivate *priv = dialog->priv;
 
+  setup_search (dialog);
   ensure_default_response (dialog);
 
   _gtk_file_chooser_embed_initial_focus (GTK_FILE_CHOOSER_EMBED (priv->widget));
@@ -599,7 +653,7 @@ gtk_file_chooser_dialog_new (const gchar         *title,
 {
   GtkWidget *result;
   va_list varargs;
-  
+
   va_start (varargs, first_button_text);
   result = gtk_file_chooser_dialog_new_valist (title, parent, action,
 					       first_button_text,

@@ -19,7 +19,7 @@
 #include <glib/gi18n-lib.h>
 
 #include "gestures.h"
-#include "widget-tree.h"
+#include "object-tree.h"
 
 #include "gtksizegroup.h"
 #include "gtkcomboboxtext.h"
@@ -32,14 +32,14 @@
 enum
 {
   PROP_0,
-  PROP_WIDGET_TREE
+  PROP_OBJECT_TREE
 };
 
 struct _GtkInspectorGesturesPrivate
 {
   GtkSizeGroup *sizegroup;
   GObject *object;
-  GtkWidget *widget_tree;
+  GtkInspectorObjectTree *object_tree;
 };
 
 G_DEFINE_TYPE_WITH_PRIVATE (GtkInspectorGestures, gtk_inspector_gestures, GTK_TYPE_BOX)
@@ -51,7 +51,9 @@ gtk_inspector_gestures_init (GtkInspectorGestures *sl)
   sl->priv->sizegroup = gtk_size_group_new (GTK_SIZE_GROUP_HORIZONTAL);
   g_object_set (sl,
                 "orientation", GTK_ORIENTATION_VERTICAL,
-                "margin", 60,
+                "margin-start", 60,
+                "margin-end", 60,
+                "margin-bottom", 60,
                 "spacing", 10,
                 NULL);
 }
@@ -92,8 +94,7 @@ row_activated (GtkListBox           *box,
   GObject *gesture;
   
   gesture = G_OBJECT (g_object_get_data (G_OBJECT (row), "gesture"));
-  gtk_inspector_widget_tree_select_object (GTK_INSPECTOR_WIDGET_TREE (sl->priv->widget_tree),
-                                           gesture);
+  gtk_inspector_object_tree_select_object (sl->priv->object_tree, gesture);
 }
 
 static void
@@ -177,40 +178,52 @@ void
 gtk_inspector_gestures_set_object (GtkInspectorGestures *sl,
                                    GObject              *object)
 {
+  GHashTable *hash;
+  GHashTableIter iter;
+  GList *list, *l;
+  gint phase;
+  const gchar *title;
+  GtkWidget *label;
+
   clear_all (sl);
+  gtk_widget_hide (GTK_WIDGET (sl));
 
-  if (GTK_IS_WIDGET (object))
+  if (!GTK_IS_WIDGET (object))
+    return;
+
+  title = (const gchar *)g_object_get_data (object, "gtk-inspector-object-title");
+  label = gtk_label_new (title);
+
+  gtk_widget_set_halign (label, GTK_ALIGN_FILL);
+  gtk_widget_set_valign (label, GTK_ALIGN_CENTER);
+  gtk_widget_set_margin_top (label, 12);
+  gtk_widget_set_margin_bottom (label, 30);
+  gtk_widget_show (label);
+  gtk_container_add (GTK_CONTAINER (sl), label);
+
+  hash = g_hash_table_new (g_direct_hash, g_direct_equal);
+  for (phase = GTK_PHASE_NONE; phase <= GTK_PHASE_TARGET; phase++)
     {
-      GHashTable *hash;
-      GHashTableIter iter;
-      GList *list, *l;
-      gint phase;
-
-      hash = g_hash_table_new (g_direct_hash, g_direct_equal);
-      for (phase = GTK_PHASE_NONE; phase <= GTK_PHASE_TARGET; phase++)
-        {
-          list = _gtk_widget_list_controllers (GTK_WIDGET (object), phase);
-          for (l = list; l; l = l->next)
-            g_hash_table_insert (hash, l->data, GINT_TO_POINTER (phase));
-          g_list_free (list);
-        }
-      
-      while (g_hash_table_size (hash) > 0)
-        {
-          gpointer key, value;
-          GtkGesture *gesture;
-          g_hash_table_iter_init (&iter, hash);
-          g_hash_table_iter_next (&iter, &key, &value);
-          gesture = key;
-          add_gesture_group (sl, object, gesture, hash);
-        }
-
-      g_hash_table_unref (hash);
-
-      gtk_widget_show (GTK_WIDGET (sl));
+      list = _gtk_widget_list_controllers (GTK_WIDGET (object), phase);
+      for (l = list; l; l = l->next)
+        g_hash_table_insert (hash, l->data, GINT_TO_POINTER (phase));
+      g_list_free (list);
     }
-  else
-    gtk_widget_hide (GTK_WIDGET (sl));
+      
+  if (g_hash_table_size (hash))
+    gtk_widget_show (GTK_WIDGET (sl));
+
+  while (g_hash_table_size (hash) > 0)
+    {
+      gpointer key, value;
+      GtkGesture *gesture;
+      g_hash_table_iter_init (&iter, hash);
+      g_hash_table_iter_next (&iter, &key, &value);
+      gesture = key;
+      add_gesture_group (sl, object, gesture, hash);
+    }
+
+  g_hash_table_unref (hash);
 }
 
 static void
@@ -223,8 +236,8 @@ get_property (GObject    *object,
 
   switch (param_id)
     {
-      case PROP_WIDGET_TREE:
-        g_value_take_object (value, sl->priv->widget_tree);
+      case PROP_OBJECT_TREE:
+        g_value_take_object (value, sl->priv->object_tree);
         break;
 
       default:
@@ -243,8 +256,8 @@ set_property (GObject      *object,
 
   switch (param_id)
     {
-      case PROP_WIDGET_TREE:
-        sl->priv->widget_tree = g_value_get_object (value);
+      case PROP_OBJECT_TREE:
+        sl->priv->object_tree = g_value_get_object (value);
         break;
 
       default:
@@ -261,8 +274,8 @@ gtk_inspector_gestures_class_init (GtkInspectorGesturesClass *klass)
   object_class->get_property = get_property;
   object_class->set_property = set_property;
 
-  g_object_class_install_property (object_class, PROP_WIDGET_TREE,
-      g_param_spec_object ("widget-tree", "Widget Tree", "Widget tree",
+  g_object_class_install_property (object_class, PROP_OBJECT_TREE,
+      g_param_spec_object ("object-tree", "Widget Tree", "Widget tree",
                            GTK_TYPE_WIDGET, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 

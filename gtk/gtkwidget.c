@@ -53,7 +53,7 @@
 #include "gtkbindings.h"
 #include "gtkprivate.h"
 #include "gtkaccessible.h"
-#include "gtktooltip.h"
+#include "gtktooltipprivate.h"
 #include "gtkinvisible.h"
 #include "gtkbuildable.h"
 #include "gtkbuilderprivate.h"
@@ -519,7 +519,6 @@ struct _GtkWidgetPrivate
   guint multidevice           : 1;
   guint has_shape_mask        : 1;
   guint in_reparent           : 1;
-  guint supports_clip         : 1;
 
   /* Queue-resize related flags */
   guint alloc_needed          : 1;
@@ -576,7 +575,7 @@ struct _GtkWidgetPrivate
 
   /* The widget's window or its parent window if it does
    * not have a window. (Which will be indicated by the
-   * GTK_NO_WINDOW flag being set).
+   * no_window field being set).
    */
   GdkWindow *window;
   GList *registered_windows;
@@ -942,6 +941,8 @@ static void gtk_cairo_set_event_window (cairo_t        *cr,
 					GdkWindow *window);
 static void gtk_cairo_set_event (cairo_t        *cr,
 				 GdkEventExpose *event);
+
+static void gtk_widget_update_input_shape (GtkWidget *widget);
 
 /* --- variables --- */
 static gint             GtkWidget_private_offset = 0;
@@ -1397,6 +1398,9 @@ G_GNUC_END_IGNORE_DEPRECATIONS
    * will automatically be set to %TRUE and there will be taken care of
    * #GtkWidget::query-tooltip in the default signal handler.
    *
+   * Note that if both #GtkWidget:tooltip-text and #GtkWidget:tooltip-markup
+   * are set, the last one wins.
+   *
    * Since: 2.12
    */
   g_object_class_install_property (gobject_class,
@@ -1417,6 +1421,9 @@ G_GNUC_END_IGNORE_DEPRECATIONS
    * tooltip shown if the given string is not %NULL: #GtkWidget:has-tooltip
    * will automatically be set to %TRUE and there will be taken care of
    * #GtkWidget::query-tooltip in the default signal handler.
+   *
+   * Note that if both #GtkWidget:tooltip-text and #GtkWidget:tooltip-markup
+   * are set, the last one wins.
    *
    * Since: 2.12
    */
@@ -1649,6 +1656,8 @@ G_GNUC_END_IGNORE_DEPRECATIONS
    * Signals that all holders of a reference to the widget should release
    * the reference that they hold. May result in finalization of the widget
    * if all references are released.
+   *
+   * This signal is not suitable for saving widget state.
    */
   widget_signals[DESTROY] =
     g_signal_new (I_("destroy"),
@@ -5406,6 +5415,12 @@ gtk_widget_remove_tick_callback (GtkWidget *widget,
     }
 }
 
+gboolean
+gtk_widget_has_tick_callback (GtkWidget *widget)
+{
+  return widget->priv->tick_callbacks != NULL;
+}
+
 static void
 gtk_widget_connect_frame_clock (GtkWidget     *widget,
                                 GdkFrameClock *frame_clock)
@@ -5519,9 +5534,7 @@ gtk_widget_realize (GtkWidget *widget)
 	  gdk_window_shape_combine_region (priv->window, region, 0, 0);
 	}
 
-      region = g_object_get_qdata (G_OBJECT (widget), quark_input_shape_info);
-      if (region)
-	gdk_window_input_shape_combine_region (priv->window, region, 0, 0);
+      gtk_widget_update_input_shape (widget);
 
       if (priv->multidevice)
         gdk_window_set_support_multidevice (priv->window, TRUE);
@@ -5642,9 +5655,12 @@ gtk_widget_queue_draw_region (GtkWidget            *widget,
  *
  * The region here is specified in widget coordinates.
  * Widget coordinates are a bit odd; for historical reasons, they are
- * defined as @widget->window coordinates for widgets that are not
- * #GTK_NO_WINDOW widgets, and are relative to @widget->allocation.x,
- * @widget->allocation.y for widgets that are #GTK_NO_WINDOW widgets.
+ * defined as @widget->window coordinates for widgets that return %TRUE for
+ * gtk_widget_get_has_window(), and are relative to @widget->allocation.x,
+ * @widget->allocation.y otherwise.
+ *
+ * @width or @height may be 0, in this case this function does
+ * nothing. Negative values for @width and @height are not allowed.
  */
 void
 gtk_widget_queue_draw_area (GtkWidget *widget,
@@ -5657,6 +5673,11 @@ gtk_widget_queue_draw_area (GtkWidget *widget,
   cairo_region_t *region;
 
   g_return_if_fail (GTK_IS_WIDGET (widget));
+  g_return_if_fail (width >= 0);
+  g_return_if_fail (height >= 0);
+
+  if (width == 0 || height == 0)
+    return;
 
   rect.x = x;
   rect.y = y;
@@ -6068,26 +6089,16 @@ gtk_widget_size_allocate_with_baseline (GtkWidget     *widget,
   if (!alloc_needed && !size_changed && !position_changed && !baseline_changed)
     goto out;
 
-  memset (&priv->clip, 0, sizeof (priv->clip));
-  priv->supports_clip = FALSE;
-
   priv->allocated_baseline = baseline;
   g_signal_emit (widget, widget_signals[SIZE_ALLOCATE], 0, &real_allocation);
 
   /* Size allocation is god... after consulting god, no further requests or allocations are needed */
   priv->alloc_needed = FALSE;
 
-  if (priv->supports_clip)
-    {
-      size_changed |= (old_clip.width != priv->clip.width ||
-                       old_clip.height != priv->clip.height);
-      position_changed |= (old_clip.x != priv->clip.x ||
-                          old_clip.y != priv->clip.y);
-    }
-  else
-    {
-      priv->clip = priv->allocation;
-    }
+  size_changed |= (old_clip.width != priv->clip.width ||
+                   old_clip.height != priv->clip.height);
+  position_changed |= (old_clip.x != priv->clip.x ||
+                      old_clip.y != priv->clip.y);
 
   if (gtk_widget_get_mapped (widget) && priv->redraw_on_alloc)
     {
@@ -6337,7 +6348,7 @@ gtk_widget_real_size_allocate (GtkWidget     *widget,
 {
   GtkWidgetPrivate *priv = widget->priv;
 
-  priv->allocation = *allocation;
+  gtk_widget_set_allocation (widget, allocation);
 
   if (gtk_widget_get_realized (widget) &&
       gtk_widget_get_has_window (widget))
@@ -6948,6 +6959,8 @@ _gtk_widget_draw_internal (GtkWidget *widget,
     {
       gboolean result;
 
+      gdk_window_mark_paint_from_clip (window, cr);
+
       g_signal_emit (widget, widget_signals[DRAW],
                      0, cr,
                      &result);
@@ -7108,8 +7121,9 @@ _gtk_widget_draw (GtkWidget *widget,
   cairo_save (cr);
 
   push_group =
-    (widget->priv->alpha != 255 &&
-     !gtk_widget_is_toplevel (widget));
+    widget->priv->alpha != 255 &&
+    (!gtk_widget_is_toplevel (widget) ||
+     gtk_widget_get_visual (widget) == gdk_screen_get_rgba_visual (gtk_widget_get_screen (widget)));
 
   if (push_group)
     cairo_push_group (cr);
@@ -7566,8 +7580,8 @@ gtk_cairo_transform_to_window (cairo_t   *cr,
  * Very rarely-used function. This function is used to emit
  * an expose event on a widget. This function is not normally used
  * directly. The only time it is used is when propagating an expose
- * event to a child %NO_WINDOW widget, and that is normally done
- * using gtk_container_propagate_draw().
+ * event to a windowless child widget (gtk_widget_get_has_window() is %FALSE),
+ * and that is normally done using gtk_container_propagate_draw().
  *
  * If you want to force an area of a window to be redrawn,
  * use gdk_window_invalidate_rect() or gdk_window_invalidate_region().
@@ -7986,17 +8000,15 @@ gtk_widget_intersect (GtkWidget	         *widget,
  * @widget: a #GtkWidget
  * @region: a #cairo_region_t, in the same coordinate system as
  *          @widget->allocation. That is, relative to @widget->window
- *          for %NO_WINDOW widgets; relative to the parent window
- *          of @widget->window for widgets with their own window.
+ *          for widgets which return %FALSE from gtk_widget_get_has_window();
+ *          relative to the parent window of @widget->window otherwise.
  *
  * Computes the intersection of a @widget’s area and @region, returning
  * the intersection. The result may be empty, use cairo_region_is_empty() to
  * check.
  *
  * Returns: A newly allocated region holding the intersection of @widget
- *     and @region. The coordinates of the return value are relative to
- *     @widget->window for %NO_WINDOW widgets, and relative to the parent
- *     window of @widget->window for widgets with their own window.
+ *     and @region.
  *
  * Deprecated: 3.14: Use gtk_widget_get_allocation() and
  *     cairo_region_intersect_rectangle() to get the same behavior.
@@ -8215,7 +8227,12 @@ gtk_widget_real_style_updated (GtkWidget *widget)
 
       if (widget->priv->anchored)
         {
-          if (changes == NULL || _gtk_css_style_property_changes_affect_size (changes))
+          static GtkBitmask *affects_size = NULL;
+
+          if (G_UNLIKELY (affects_size == NULL))
+            affects_size = _gtk_css_style_property_get_mask_affecting (GTK_CSS_AFFECTS_SIZE | GTK_CSS_AFFECTS_CLIP);
+
+          if (changes == NULL || _gtk_bitmask_intersects (changes, affects_size))
             gtk_widget_queue_resize (widget);
           else
             gtk_widget_queue_draw (widget);
@@ -8698,7 +8715,8 @@ gtk_widget_set_name (GtkWidget	 *widget,
   g_free (priv->name);
   priv->name = new_name;
 
-  _gtk_widget_invalidate_style_context (widget, GTK_CSS_CHANGE_NAME);
+  if (priv->context)
+    gtk_style_context_set_id (priv->context, priv->name);
 
   g_object_notify (G_OBJECT (widget), "name");
 }
@@ -8842,16 +8860,9 @@ gtk_widget_unset_state_flags (GtkWidget     *widget,
 GtkStateFlags
 gtk_widget_get_state_flags (GtkWidget *widget)
 {
-  GtkStateFlags flags;
-
   g_return_val_if_fail (GTK_IS_WIDGET (widget), 0);
 
-  flags = widget->priv->state_flags;
-
-  if (gtk_widget_has_focus (widget))
-    flags |= GTK_STATE_FLAG_FOCUSED;
-
-  return flags;
+  return widget->priv->state_flags;
 }
 
 /**
@@ -9644,6 +9655,8 @@ _gtk_widget_get_modifier_properties (GtkWidget *widget)
  * priority.
  *
  * Since: 3.0
+ *
+ * Deprecated:3.16: Use a custom style provider and style classes instead
  */
 void
 gtk_widget_override_color (GtkWidget     *widget,
@@ -9671,6 +9684,13 @@ gtk_widget_override_color (GtkWidget     *widget,
  * See gtk_widget_override_color().
  *
  * Since: 3.0
+ *
+ * Deprecated: 3.16: This function is not useful in the context of CSS-based
+ *   rendering. If you wish to change the way a widget renders its background
+ *   you should use a custom CSS style, through an application-specific
+ *   #GtkStyleProvider and a CSS style class. You can also override the default
+ *   drawing of a widget through the #GtkWidget::draw signal, and use Cairo to
+ *   draw a specific color, regardless of the CSS style.
  */
 void
 gtk_widget_override_background_color (GtkWidget     *widget,
@@ -9695,6 +9715,11 @@ gtk_widget_override_background_color (GtkWidget     *widget,
  * left untouched. See gtk_widget_override_color().
  *
  * Since: 3.0
+ *
+ * Deprecated: 3.16: This function is not useful in the context of CSS-based
+ *   rendering. If you wish to change the font a widget uses to render its text
+ *   you should use a custom CSS style, through an application-specific
+ *   #GtkStyleProvider and a CSS style class.
  */
 void
 gtk_widget_override_font (GtkWidget                  *widget,
@@ -9723,6 +9748,11 @@ gtk_widget_override_font (GtkWidget                  *widget,
  * or background color.
  *
  * Since: 3.0
+ *
+ * Deprecated: 3.16: This function is not useful in the context of CSS-based
+ *   rendering. If you wish to change the color used to render symbolic icons
+ *   you should use a custom CSS style, through an application-specific
+ *   #GtkStyleProvider and a CSS style class.
  */
 void
 gtk_widget_override_symbolic_color (GtkWidget     *widget,
@@ -9756,6 +9786,11 @@ gtk_widget_override_symbolic_color (GtkWidget     *widget,
  * so the alpha value in @primary and @secondary will be ignored.
  *
  * Since: 3.0
+ *
+ * Deprecated: 3.16: This function is not useful in the context of CSS-based
+ *   rendering. If you wish to change the color used to render the primary
+ *   and seconday cursors you should use a custom CSS style, through an
+ *   application-specific #GtkStyleProvider and a CSS style class.
  */
 void
 gtk_widget_override_cursor (GtkWidget     *widget,
@@ -11125,7 +11160,8 @@ gtk_widget_set_events (GtkWidget *widget,
  * so be careful. This function must be called while a widget is
  * unrealized. Consider gtk_widget_add_device_events() for widgets that are
  * already realized, or if you want to preserve the existing event
- * mask. This function can’t be used with #GTK_NO_WINDOW widgets;
+ * mask. This function can’t be used with windowless widgets (which return
+ * %FALSE from gtk_widget_get_has_window());
  * to get events on those widgets, place them inside a #GtkEventBox
  * and receive events on the event box.
  *
@@ -11279,7 +11315,8 @@ gtk_widget_add_events_internal (GtkWidget *widget,
  * @events: an event mask, see #GdkEventMask
  *
  * Adds the events in the bitfield @events to the event mask for
- * @widget. See gtk_widget_set_events() for details.
+ * @widget. See gtk_widget_set_events() and the
+ * [input handling overview][event-masks] for details.
  **/
 void
 gtk_widget_add_events (GtkWidget *widget,
@@ -11422,7 +11459,7 @@ gtk_widget_get_ancestor (GtkWidget *widget,
 /**
  * gtk_widget_set_visual:
  * @widget: a #GtkWidget
- * @visual: visual to be used or %NULL to unset a previous one
+ * @visual: (allow-none): visual to be used or %NULL to unset a previous one
  *
  * Sets the visual that should be used for by widget and its children for
  * creating #GdkWindows. The visual must be on the same #GdkScreen as
@@ -11438,14 +11475,13 @@ gtk_widget_set_visual (GtkWidget *widget,
 {
   g_return_if_fail (GTK_IS_WIDGET (widget));
   g_return_if_fail (visual == NULL || GDK_IS_VISUAL (visual));
+
   if (visual)
-    {
-      g_return_if_fail (gtk_widget_get_screen (widget) == gdk_visual_get_screen (visual));
-    }
+    g_return_if_fail (gtk_widget_get_screen (widget) == gdk_visual_get_screen (visual));
 
   g_object_set_qdata_full (G_OBJECT (widget),
                            quark_visual,
-                           g_object_ref (visual),
+                           visual ? g_object_ref (visual) : NULL,
                            g_object_unref);
 }
 
@@ -11512,9 +11548,8 @@ gtk_widget_get_settings (GtkWidget *widget)
  * gtk_widget_get_events:
  * @widget: a #GtkWidget
  *
- * Returns the event mask for the widget (a bitfield containing flags
- * from the #GdkEventMask enumeration). These are the events that the widget
- * will receive.
+ * Returns the event mask (see #GdkEventMask) for the widget. These are the
+ * events that the widget will receive.
  *
  * Note: Internally, the widget event mask will be the logical OR of the event
  * mask set through gtk_widget_set_events() or gtk_widget_add_events(), and the
@@ -11569,9 +11604,9 @@ gtk_widget_get_device_events (GtkWidget *widget,
  *
  * Obtains the location of the mouse pointer in widget coordinates.
  * Widget coordinates are a bit odd; for historical reasons, they are
- * defined as @widget->window coordinates for widgets that are not
- * #GTK_NO_WINDOW widgets, and are relative to @widget->allocation.x,
- * @widget->allocation.y for widgets that are #GTK_NO_WINDOW widgets.
+ * defined as @widget->window coordinates for widgets that return %TRUE for
+ * gtk_widget_get_has_window(); and are relative to @widget->allocation.x,
+ * @widget->allocation.y otherwise.
  *
  * Deprecated: 3.4: Use gdk_window_get_device_position() instead.
  **/
@@ -12905,6 +12940,59 @@ gtk_widget_shape_combine_region (GtkWidget *widget,
     }
 }
 
+static void
+gtk_widget_update_input_shape (GtkWidget *widget)
+{
+  GtkWidgetPrivate *priv = widget->priv;
+
+  /* set shape if widget has a gdk window already.
+   * otherwise the shape is scheduled to be set by gtk_widget_realize().
+   */
+  if (priv->window)
+    {
+      cairo_region_t *region;
+      cairo_region_t *csd_region;
+      cairo_region_t *app_region;
+      gboolean free_region;
+
+      app_region = g_object_get_qdata (G_OBJECT (widget), quark_input_shape_info);
+      csd_region = g_object_get_data (G_OBJECT (widget), "csd-region");
+
+      free_region = FALSE;
+
+      if (app_region && csd_region)
+        {
+          free_region = TRUE;
+          region = cairo_region_copy (app_region);
+          cairo_region_intersect (region, csd_region);
+        }
+      else if (app_region)
+        region = app_region;
+      else if (csd_region)
+        region = csd_region;
+      else
+        region = NULL;
+
+      gdk_window_input_shape_combine_region (priv->window, region, 0, 0);
+
+      if (free_region)
+        cairo_region_destroy (region);
+    }
+}
+
+void
+gtk_widget_set_csd_input_shape (GtkWidget            *widget,
+                                const cairo_region_t *region)
+{
+  if (region == NULL)
+    g_object_set_data (G_OBJECT (widget), "csd-region", NULL);
+  else
+    g_object_set_data_full (G_OBJECT (widget), "csd-region",
+                            cairo_region_copy (region),
+                            (GDestroyNotify) cairo_region_destroy);
+  gtk_widget_update_input_shape (widget);
+}
+
 /**
  * gtk_widget_input_shape_combine_region:
  * @widget: a #GtkWidget
@@ -12917,36 +13005,20 @@ gtk_widget_shape_combine_region (GtkWidget *widget,
  * Since: 3.0
  **/
 void
-gtk_widget_input_shape_combine_region (GtkWidget *widget,
+gtk_widget_input_shape_combine_region (GtkWidget      *widget,
                                        cairo_region_t *region)
 {
-  GtkWidgetPrivate *priv;
-
   g_return_if_fail (GTK_IS_WIDGET (widget));
   /*  set_shape doesn't work on widgets without gdk window */
   g_return_if_fail (gtk_widget_get_has_window (widget));
 
-  priv = widget->priv;
-
   if (region == NULL)
-    {
-      if (priv->window)
-	gdk_window_input_shape_combine_region (priv->window, NULL, 0, 0);
-
-      g_object_set_qdata (G_OBJECT (widget), quark_input_shape_info, NULL);
-    }
+    g_object_set_qdata (G_OBJECT (widget), quark_input_shape_info, NULL);
   else
-    {
-      g_object_set_qdata_full (G_OBJECT (widget), quark_input_shape_info,
-			       cairo_region_copy (region),
-			       (GDestroyNotify) cairo_region_destroy);
-
-      /* set shape if widget has a gdk window already.
-       * otherwise the shape is scheduled to be set by gtk_widget_realize().
-       */
-      if (priv->window)
-	gdk_window_input_shape_combine_region (priv->window, region, 0, 0);
-    }
+    g_object_set_qdata_full (G_OBJECT (widget), quark_input_shape_info,
+                             cairo_region_copy (region),
+                             (GDestroyNotify) cairo_region_destroy);
+  gtk_widget_update_input_shape (widget);
 }
 
 
@@ -15468,23 +15540,16 @@ gtk_widget_get_clip (GtkWidget     *widget,
  * @widget: a #GtkWidget
  * @clip: a pointer to a #GtkAllocation to copy from
  *
- * Sets the widget’s clip.  This must not be used
- * directly, but from within a widget’s size_allocate method.
+ * Sets the widget’s clip.  This must not be used directly,
+ * but from within a widget’s size_allocate method.
+ * It must be called after gtk_widget_set_allocation() (or after chaning up
+ * to the parent class), because that function resets the clip.
  *
  * The clip set should be the area that @widget draws on. If @widget is a
  * #GtkContainer, the area must contain all children's clips.
  *
  * If this function is not called by @widget during a ::size-allocate handler,
- * it is assumed to be equal to the allocation. However, if the function is
- * not called, certain features that might extend a widget's allocation will
- * not be available:
- *
- *  * The #GtkWidget::draw signal will be clipped to the widget's allocation
- *    to avoid overdraw.
- *  * Calling gtk_render_background() will not draw outset shadows.
- *
- * It is therefore suggested that you always call gtk_widget_set_clip() during
- * a ::size-allocate handler.
+ * the clip will be set to @widget's allocation.
  *
  * Since: 3.14
  */
@@ -15500,25 +15565,30 @@ gtk_widget_set_clip (GtkWidget           *widget,
 
   priv = widget->priv;
 
+#ifdef G_ENABLE_DEBUG
+  if (gtk_get_debug_flags () & GTK_DEBUG_GEOMETRY)
+    {
+      gint depth;
+      GtkWidget *parent;
+      const gchar *name;
+
+      depth = 0;
+      parent = widget;
+      while (parent)
+	{
+	  depth++;
+	  parent = gtk_widget_get_parent (parent);
+	}
+
+      name = g_type_name (G_OBJECT_TYPE (G_OBJECT (widget)));
+      g_print ("gtk_widget_set_clip:      %*s%s %d %d %d %d\n",
+	       2 * depth, " ", name,
+	       clip->x, clip->y,
+	       clip->width, clip->height);
+    }
+#endif /* G_ENABLE_DEBUG */
+
   priv->clip = *clip;
-  priv->supports_clip = TRUE;
-}
-
-/**
- * _gtk_widget_supports_clip:
- * @widget: The #GtkWidget to check
- *
- * Returns %TRUE if the widget called gtk_widget_set_clip() during
- * size allocation. See that function for details.
- *
- * Returns: %TRUE if the widget handles a clip separate from its allocation.
- **/
-gboolean
-_gtk_widget_supports_clip (GtkWidget *widget)
-{
-  g_return_val_if_fail (GTK_IS_WIDGET (widget), TRUE);
-
-  return widget->priv->supports_clip;
 }
 
 static void
@@ -15527,7 +15597,8 @@ union_with_clip (GtkWidget *widget,
 {
   GtkAllocation widget_clip;
 
-  if (!gtk_widget_is_drawable (widget))
+  if (!gtk_widget_is_visible (widget) ||
+      !gtk_widget_get_child_visible (widget))
     return;
 
   gtk_widget_get_clip (widget, &widget_clip);
@@ -15558,26 +15629,42 @@ _gtk_widget_set_simple_clip (GtkWidget     *widget,
                              GtkAllocation *content_clip)
 {
   GtkStyleContext *context;
-  GtkAllocation clip;
+  GtkAllocation clip, allocation;
   GtkBorder extents;
 
   context = gtk_widget_get_style_context (widget);
 
-  gtk_widget_get_allocation (widget, &clip);
+  gtk_widget_get_allocation (widget, &allocation);
 
   _gtk_css_shadows_value_get_extents (_gtk_style_context_peek_property (context,
                                                                         GTK_CSS_PROPERTY_BOX_SHADOW),
                                       &extents);
+
+  clip = allocation;
   clip.x -= extents.left;
   clip.y -= extents.top;
   clip.width += extents.left + extents.right;
   clip.height += extents.top + extents.bottom;
 
   if (content_clip)
-  gdk_rectangle_union (content_clip, &clip, &clip);
+    gdk_rectangle_union (content_clip, &clip, &clip);
 
   if (GTK_IS_CONTAINER (widget))
-    gtk_container_forall (GTK_CONTAINER (widget), union_with_clip, &clip);
+    {
+      if (gtk_widget_get_has_window (widget))
+        {
+          clip.x -= allocation.x;
+          clip.y -= allocation.y;
+        }
+
+      gtk_container_forall (GTK_CONTAINER (widget), union_with_clip, &clip);
+
+      if (gtk_widget_get_has_window (widget))
+        {
+          clip.x += allocation.x;
+          clip.y += allocation.y;
+        }
+    }
 
   gtk_widget_set_clip (widget, &clip);
 }
@@ -15650,6 +15737,7 @@ gtk_widget_set_allocation (GtkWidget           *widget,
   priv = widget->priv;
 
   priv->allocation = *allocation;
+  priv->clip = *allocation;
 }
 
 /**
@@ -15936,7 +16024,8 @@ gtk_widget_update_alpha (GtkWidget *widget)
 
   if (gtk_widget_get_realized (widget))
     {
-      if (gtk_widget_is_toplevel (widget))
+      if (gtk_widget_is_toplevel (widget) &&
+          gtk_widget_get_visual (widget) != gdk_screen_get_rgba_visual (gtk_widget_get_screen (widget)))
 	gdk_window_set_opacity (priv->window, priv->alpha / 255.0);
 
       gtk_widget_queue_draw (widget);
@@ -16341,6 +16430,7 @@ gtk_widget_get_style_context (GtkWidget *widget)
 
       priv->context = gtk_style_context_new ();
 
+      gtk_style_context_set_id (priv->context, priv->name);
       gtk_style_context_set_state (priv->context, priv->state_flags);
       gtk_style_context_set_scale (priv->context, gtk_widget_get_scale_factor (widget));
 
@@ -16417,45 +16507,54 @@ _gtk_widget_set_style (GtkWidget *widget,
   widget->priv->style = style;
 }
 
+GtkActionMuxer *
+_gtk_widget_get_parent_muxer (GtkWidget *widget,
+                              gboolean   create)
+{
+  GtkWidget *parent;
+
+  if (GTK_IS_WINDOW (widget))
+    return gtk_application_get_parent_muxer_for_window (GTK_WINDOW (widget));
+
+  if (GTK_IS_MENU (widget))
+    parent = gtk_menu_get_attach_widget (GTK_MENU (widget));
+  else if (GTK_IS_POPOVER (widget))
+    parent = gtk_popover_get_relative_to (GTK_POPOVER (widget));
+  else
+    parent = gtk_widget_get_parent (widget);
+
+  if (parent)
+    return _gtk_widget_get_action_muxer (parent, create);
+
+  return NULL;
+}
+
 void
 _gtk_widget_update_parent_muxer (GtkWidget *widget)
 {
-  GtkActionMuxer *parent_muxer;
-
   if (widget->priv->muxer == NULL)
     return;
 
-  if (GTK_IS_WINDOW (widget))
-    {
-      parent_muxer = gtk_application_get_parent_muxer_for_window (GTK_WINDOW (widget));
-    }
-  else
-    {
-      GtkWidget *parent;
-
-      if (GTK_IS_MENU (widget))
-        parent = gtk_menu_get_attach_widget (GTK_MENU (widget));
-      else if (GTK_IS_POPOVER (widget))
-        parent = gtk_popover_get_relative_to (GTK_POPOVER (widget));
-      else
-        parent = gtk_widget_get_parent (widget);
-
-      parent_muxer = parent ? _gtk_widget_get_action_muxer (parent) : NULL;
-    }
-
-  gtk_action_muxer_set_parent (widget->priv->muxer, parent_muxer);
+  gtk_action_muxer_set_parent (widget->priv->muxer,
+                               _gtk_widget_get_parent_muxer (widget, TRUE));
 }
 
 GtkActionMuxer *
-_gtk_widget_get_action_muxer (GtkWidget *widget)
+_gtk_widget_get_action_muxer (GtkWidget *widget,
+                              gboolean   create)
 {
-  if (widget->priv->muxer == NULL)
+  if (widget->priv->muxer)
+    return widget->priv->muxer;
+
+  if (create)
     {
       widget->priv->muxer = gtk_action_muxer_new ();
       _gtk_widget_update_parent_muxer (widget);
-    }
 
-  return widget->priv->muxer;
+      return widget->priv->muxer;
+    }
+  else
+    return _gtk_widget_get_parent_muxer (widget, FALSE);
 }
 
 /**
@@ -16484,7 +16583,7 @@ gtk_widget_insert_action_group (GtkWidget    *widget,
   g_return_if_fail (GTK_IS_WIDGET (widget));
   g_return_if_fail (name != NULL);
 
-  muxer = _gtk_widget_get_action_muxer (widget);
+  muxer = _gtk_widget_get_action_muxer (widget, TRUE);
 
   if (group)
     gtk_action_muxer_insert (muxer, name, group);
@@ -16559,9 +16658,9 @@ template_data_free (GtkWidgetTemplate *template_data)
 }
 
 static GHashTable *
-get_auto_child_hash (GtkWidget        *widget,
-		     GType                type,
-		     gboolean             create)
+get_auto_child_hash (GtkWidget *widget,
+		     GType      type,
+		     gboolean   create)
 {
   GHashTable *auto_child_hash;
 
@@ -16596,11 +16695,11 @@ get_auto_child_hash (GtkWidget        *widget,
 }
 
 static gboolean
-setup_template_child (GtkWidgetTemplate *template_data,
-		       GType                 class_type,
-		       AutomaticChildClass  *child_class,
-		       GtkWidget         *widget,
-		       GtkBuilder           *builder)
+setup_template_child (GtkWidgetTemplate   *template_data,
+                      GType                class_type,
+                      AutomaticChildClass *child_class,
+                      GtkWidget           *widget,
+                      GtkBuilder          *builder)
 {
   GHashTable *auto_child_hash;
   GObject    *object;
@@ -16685,7 +16784,7 @@ gtk_widget_init_template (GtkWidget *widget)
 
   /* This will build the template XML as children to the widget instance, also it
    * will validate that the template is created for the correct GType and assert that
-   * there is no infinate recursion.
+   * there is no infinite recursion.
    */
   if (!_gtk_builder_extend_with_template (builder, widget, class_type,
 					  (const gchar *)g_bytes_get_data (template->data, NULL),
@@ -16964,18 +17063,49 @@ gtk_widget_get_template_child (GtkWidget   *widget,
   return ret;
 }
 
-gchar **
-_gtk_widget_list_action_prefixes (GtkWidget *widget)
+/**
+ * gtk_widget_list_action_prefixes:
+ * @widget: A #GtkWidget
+ *
+ * Retrieves a %NULL-terminated array of strings containing the prefixes of
+ * #GActionGroup's available to @widget.
+ *
+ * Returns: (transfer container): a %NULL-terminated array of strings.
+ *
+ * Since: 3.16
+ */
+const gchar **
+gtk_widget_list_action_prefixes (GtkWidget *widget)
 {
+  g_return_val_if_fail (GTK_IS_WIDGET (widget), NULL);
+
   if (widget->priv->muxer)
-    return gtk_action_muxer_list_prefixes (widget->priv->muxer);
-  return NULL;
+      return gtk_action_muxer_list_prefixes (widget->priv->muxer);
+  return g_new0 (const gchar *, 0 + 1);
 }
 
+/**
+ * gtk_widget_get_action_group:
+ * @widget: A #GtkWidget
+ * @prefix: The “prefix” of the action group.
+ *
+ * Retrieves the #GActionGroup that was registered using @prefix. The resulting
+ * #GActionGroup may have been registered to @widget or any #GtkWidget in its
+ * ancestry.
+ *
+ * If no action group was found matching @prefix, then %NULL is returned.
+ *
+ * Returns: (transfer none) (nullable): A #GActionGroup or %NULL.
+ *
+ * Since: 3.16
+ */
 GActionGroup *
-_gtk_widget_get_action_group (GtkWidget   *widget,
-                              const gchar *prefix)
+gtk_widget_get_action_group (GtkWidget   *widget,
+                             const gchar *prefix)
 {
+  g_return_val_if_fail (GTK_IS_WIDGET (widget), NULL);
+  g_return_val_if_fail (prefix, NULL);
+
   if (widget->priv->muxer)
     return gtk_action_muxer_lookup (widget->priv->muxer, prefix);
   return NULL;
@@ -17162,4 +17292,34 @@ _gtk_widget_list_controllers (GtkWidget           *widget,
     }
 
   return retval;
+}
+
+gboolean
+_gtk_widget_consumes_motion (GtkWidget        *widget,
+                             GdkEventSequence *sequence)
+{
+  EventControllerData *data;
+  GtkWidgetPrivate *priv;
+  GList *l;
+
+  g_return_val_if_fail (GTK_IS_WIDGET (widget), FALSE);
+
+  priv = widget->priv;
+
+  for (l = priv->event_controllers; l; l = l->next)
+    {
+      data = l->data;
+
+      if (data->controller == NULL)
+        continue;
+
+      if ((!GTK_IS_GESTURE_SINGLE (data->controller) ||
+           GTK_IS_GESTURE_DRAG (data->controller) ||
+           GTK_IS_GESTURE_SWIPE (data->controller)) &&
+          gtk_gesture_get_sequence_state (GTK_GESTURE (data->controller),
+                                          sequence) != GTK_EVENT_SEQUENCE_DENIED)
+        return TRUE;
+    }
+
+  return FALSE;
 }

@@ -470,6 +470,26 @@ resize_by_scroll_cb (GtkWidget      *scrolled_window,
 }
 
 static void
+gtk_font_chooser_widget_update_preview_attributes (GtkFontChooserWidget *fontchooser)
+{
+  GtkFontChooserWidgetPrivate *priv;
+  PangoAttrList *attrs;
+
+  priv = fontchooser->priv;
+
+  attrs = pango_attr_list_new ();
+
+  /* Prevent font fallback */
+  pango_attr_list_insert (attrs, pango_attr_fallback_new (FALSE));
+
+  /* Force current font */
+  pango_attr_list_insert (attrs, pango_attr_font_desc_new (priv->font_desc));
+
+  gtk_entry_set_attributes (GTK_ENTRY (priv->preview), attrs);
+  pango_attr_list_unref (attrs);
+}
+
+static void
 row_inserted_cb (GtkTreeModel *model,
                  GtkTreePath  *path,
                  GtkTreeIter  *iter,
@@ -540,7 +560,6 @@ static void
 gtk_font_chooser_widget_init (GtkFontChooserWidget *fontchooser)
 {
   GtkFontChooserWidgetPrivate *priv;
-  PangoAttrList *attrs;
 
   fontchooser->priv = gtk_font_chooser_widget_get_instance_private (fontchooser);
   priv = fontchooser->priv;
@@ -555,11 +574,7 @@ gtk_font_chooser_widget_init (GtkFontChooserWidget *fontchooser)
   /* Set default preview text */
   gtk_entry_set_text (GTK_ENTRY (priv->preview), priv->preview_text);
 
-  /* Prevent font fallback */
-  attrs = pango_attr_list_new ();
-  pango_attr_list_insert (attrs, pango_attr_fallback_new (FALSE));
-  gtk_entry_set_attributes (GTK_ENTRY (priv->preview), attrs);
-  pango_attr_list_unref (attrs);
+  gtk_font_chooser_widget_update_preview_attributes (fontchooser);
 
   gtk_widget_add_events (priv->preview, GDK_SCROLL_MASK);
 
@@ -579,7 +594,7 @@ gtk_font_chooser_widget_init (GtkFontChooserWidget *fontchooser)
                                            fontchooser,
                                            NULL);
 
-  /* Load data and set initial style dependant parameters */
+  /* Load data and set initial style-dependent parameters */
   gtk_font_chooser_widget_load_fonts (fontchooser);
   gtk_font_chooser_widget_set_cell_size (fontchooser);
   gtk_font_chooser_widget_take_font_desc (fontchooser, NULL);
@@ -1085,7 +1100,7 @@ gtk_font_chooser_widget_merge_font_desc (GtkFontChooserWidget *fontchooser,
       gtk_font_chooser_widget_update_marks (fontchooser);
     }
 
-  gtk_widget_override_font (priv->preview, priv->font_desc);
+  gtk_font_chooser_widget_update_preview_attributes (fontchooser);
 
   pango_font_description_free (font_desc); /* adopted */
 
@@ -1109,26 +1124,14 @@ gtk_font_chooser_widget_take_font_desc (GtkFontChooserWidget *fontchooser,
     {
       GtkTreeIter iter;
 
-      if (gtk_font_chooser_widget_find_font (fontchooser,
-                                             font_desc,
-                                             &iter))
-        {
-          gtk_font_chooser_widget_merge_font_desc (fontchooser,
-                                                   font_desc,
-                                                   &iter);
-        }
+      if (gtk_font_chooser_widget_find_font (fontchooser, font_desc, &iter))
+        gtk_font_chooser_widget_merge_font_desc (fontchooser, font_desc, &iter);
       else
-        {
-          gtk_font_chooser_widget_merge_font_desc (fontchooser,
-                                                   font_desc,
-                                                   NULL);
-        }
+        gtk_font_chooser_widget_merge_font_desc (fontchooser, font_desc, NULL);
     }
   else
     {
-      gtk_font_chooser_widget_merge_font_desc (fontchooser,
-                                               font_desc,
-                                               &priv->font_iter);
+      gtk_font_chooser_widget_merge_font_desc (fontchooser, font_desc, &priv->font_iter);
                                                           
     }
 }

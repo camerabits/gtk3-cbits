@@ -30,6 +30,8 @@
 #include "gdkinternals.h"
 #include "gdkintl.h"
 
+#include "gdk-private.h"
+
 #ifndef HAVE_XCONVERTCASE
 #include "gdkkeysyms.h"
 #endif
@@ -134,6 +136,15 @@ static GMutex gdk_threads_mutex;
 static GCallback gdk_threads_lock = NULL;
 static GCallback gdk_threads_unlock = NULL;
 
+static const GDebugKey gdk_gl_keys[] = {
+  {"disable",               GDK_GL_DISABLE},
+  {"always",                GDK_GL_ALWAYS},
+  {"software-draw",         GDK_GL_SOFTWARE_DRAW_GL | GDK_GL_SOFTWARE_DRAW_SURFACE},
+  {"software-draw-gl",      GDK_GL_SOFTWARE_DRAW_GL},
+  {"software-draw-surface", GDK_GL_SOFTWARE_DRAW_SURFACE},
+  {"texture-rectangle",     GDK_GL_TEXTURE_RECTANGLE},
+};
+
 #ifdef G_ENABLE_DEBUG
 static const GDebugKey gdk_debug_keys[] = {
   {"events",        GDK_DEBUG_EVENTS},
@@ -148,7 +159,8 @@ static const GDebugKey gdk_debug_keys[] = {
   {"draw",          GDK_DEBUG_DRAW},
   {"eventloop",     GDK_DEBUG_EVENTLOOP},
   {"frames",        GDK_DEBUG_FRAMES},
-  {"settings",      GDK_DEBUG_SETTINGS}
+  {"settings",      GDK_DEBUG_SETTINGS},
+  {"opengl",        GDK_DEBUG_OPENGL},
 };
 
 static gboolean
@@ -229,23 +241,33 @@ static const GOptionEntry gdk_args[] = {
   { NULL }
 };
 
+void
+gdk_add_option_entries (GOptionGroup *group)
+{
+  g_option_group_add_entries (group, gdk_args);
+}
+
 /**
  * gdk_add_option_entries_libgtk_only:
  * @group: An option group.
  *
  * Appends gdk option entries to the passed in option group. This is
  * not public API and must not be used by applications.
+ *
+ * Deprecated: 3.16: This symbol was never meant to be used outside
+ *   of GTK+
  */
 void
 gdk_add_option_entries_libgtk_only (GOptionGroup *group)
 {
-  g_option_group_add_entries (group, gdk_args);
+  gdk_add_option_entries (group);
 }
 
 void
-gdk_pre_parse_libgtk_only (void)
+gdk_pre_parse (void)
 {
   const char *rendering_mode;
+  const gchar *gl_string;
 
   gdk_initialized = TRUE;
 
@@ -266,6 +288,12 @@ gdk_pre_parse_libgtk_only (void)
   }
 #endif  /* G_ENABLE_DEBUG */
 
+  gl_string = getenv("GDK_GL");
+  if (gl_string != NULL)
+    _gdk_gl_flags = g_parse_debug_string (gl_string,
+                                          (GDebugKey *) gdk_gl_keys,
+                                          G_N_ELEMENTS (gdk_gl_keys));
+
   if (getenv ("GDK_NATIVE_WINDOWS"))
     {
       g_warning ("The GDK_NATIVE_WINDOWS environment variable is not supported in GTK3.\n"
@@ -285,6 +313,20 @@ gdk_pre_parse_libgtk_only (void)
     }
 }
 
+/**
+ * gdk_pre_parse_libgtk_only:
+ *
+ * Prepare for parsing command line arguments for GDK. This is not
+ * public API and should not be used in application code.
+ *
+ * Deprecated: 3.16: This symbol was never meant to be used outside
+ *   of GTK+
+ */
+void
+gdk_pre_parse_libgtk_only (void)
+{
+  gdk_pre_parse ();
+}
   
 /**
  * gdk_parse_args:
@@ -313,7 +355,7 @@ gdk_parse_args (int    *argc,
   if (gdk_initialized)
     return;
 
-  gdk_pre_parse_libgtk_only ();
+  gdk_pre_parse ();
 
   option_context = g_option_context_new (NULL);
   g_option_context_set_ignore_unknown_options (option_context, TRUE);
@@ -372,8 +414,8 @@ gdk_get_display_arg_name (void)
    return _gdk_display_arg_name;
 }
 
-/**
- * gdk_display_open_default_libgtk_only:
+/*< private >
+ * gdk_display_open_default:
  *
  * Opens the default display specified by command line arguments or
  * environment variables, sets it as the default display, and returns
@@ -383,9 +425,9 @@ gdk_get_display_arg_name (void)
  *
  * Returns: (nullable) (transfer none): the default display, if it
  *   could be opened, otherwise %NULL.
- **/
+ */
 GdkDisplay *
-gdk_display_open_default_libgtk_only (void)
+gdk_display_open_default (void)
 {
   GdkDisplay *display;
 
@@ -398,6 +440,27 @@ gdk_display_open_default_libgtk_only (void)
   display = gdk_display_open (gdk_get_display_arg_name ());
 
   return display;
+}
+
+/**
+ * gdk_display_open_default_libgtk_only:
+ *
+ * Opens the default display specified by command line arguments or
+ * environment variables, sets it as the default display, and returns
+ * it. gdk_parse_args() must have been called first. If the default
+ * display has previously been set, simply returns that. An internal
+ * function that should not be used by applications.
+ *
+ * Returns: (nullable) (transfer none): the default display, if it
+ *   could be opened, otherwise %NULL.
+ *
+ * Deprecated: 3.16: This symbol was never meant to be used outside
+ *   of GTK+
+ */
+GdkDisplay *
+gdk_display_open_default_libgtk_only (void)
+{
+  return gdk_display_open_default ();
 }
 
 /**
@@ -422,7 +485,7 @@ gdk_init_check (int    *argc,
 {
   gdk_parse_args (argc, argv);
 
-  return gdk_display_open_default_libgtk_only () != NULL;
+  return gdk_display_open_default () != NULL;
 }
 
 

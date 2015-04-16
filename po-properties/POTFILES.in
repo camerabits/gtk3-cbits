@@ -7,14 +7,20 @@ gdk/gdkcursor.c
 gdk/gdkdevice.c
 gdk/gdkdevicemanager.c
 gdk/gdkdisplaymanager.c
+gdk/gdkglcontext.c
 gdk/gdkpango.c
 gdk/gdkscreen.c
 gdk/gdkwindow.c
 gdk/keyname-table.h
+gdk/mir/gdkmirglcontext.c
+gdk/mir/gdkmirwindowimpl.c
+gdk/wayland/gdkglcontext-wayland.c
+gdk/win32/gdkglcontext-win32.c
 gdk/win32/gdkmain-win32.c
 gdk/x11/gdkapplaunchcontext-x11.c
 gdk/x11/gdkdevicemanager-xi2.c
 gdk/x11/gdkdevice-xi2.c
+gdk/x11/gdkglcontext-x11.c
 gdk/x11/gdkmain-x11.c
 gtk/a11y/gtkbooleancellaccessible.c
 gtk/a11y/gtkbuttonaccessible.c
@@ -24,6 +30,7 @@ gtk/a11y/gtkcomboboxaccessible.c
 gtk/a11y/gtkentryaccessible.c
 gtk/a11y/gtkexpanderaccessible.c
 gtk/a11y/gtkimageaccessible.c
+gtk/a11y/gtkmenubuttonaccessible.c
 gtk/a11y/gtkmenuitemaccessible.c
 gtk/a11y/gtkrenderercellaccessible.c
 gtk/a11y/gtkscalebuttonaccessible.c
@@ -147,6 +154,7 @@ gtk/gtkgesture.c
 gtk/gtkgesturelongpress.c
 gtk/gtkgesturepan.c
 gtk/gtkgesturesingle.c
+gtk/gtkglarea.c
 gtk/gtkgrid.c
 gtk/gtkheaderbar.c
 gtk/gtkicontheme.c
@@ -175,6 +183,7 @@ gtk/gtkmenuitem.c
 gtk/gtkmenushell.c
 gtk/gtkmenutoolbutton.c
 gtk/gtkmessagedialog.c
+gtk/gtkmodelbutton.c
 gtk/gtkmodifierstyle.c
 gtk/gtkmodules.c
 gtk/gtkmountoperation.c
@@ -191,6 +200,7 @@ gtk/gtkpathbar.c
 gtk/gtkplacessidebar.c
 gtk/gtkplug.c
 gtk/gtkpopover.c
+gtk/gtkpopovermenu.c
 gtk/gtkprintbackend.c
 gtk/gtkprinter.c
 gtk/gtkprinteroption.c
@@ -227,6 +237,7 @@ gtk/gtksocket.c
 gtk/gtkspinbutton.c
 gtk/gtkspinner.c
 gtk/gtkstack.c
+gtk/gtkstacksidebar.c
 gtk/gtkstackswitcher.c
 gtk/gtkstatusbar.c
 gtk/gtkstylecontext.c
@@ -287,11 +298,14 @@ gtk/paper_names_offsets.c
 gtk/updateiconcache.c
 modules/input/gtkimcontextxim.c
 modules/input/imam-et.c
+modules/input/imbroadway.c
 modules/input/imcedilla.c
 modules/input/imcyrillic-translit.c
+modules/input/imime.c
 modules/input/iminuktitut.c
 modules/input/imipa.c
 modules/input/immultipress.c
+modules/input/imquartz.c
 modules/input/imthai.c
 modules/input/imti-er.c
 modules/input/imti-et.c

@@ -55,7 +55,7 @@ static GObjectClass *parent_class;
 static const GtkIMContextInfo imquartz_info =
 {
   "quartz",
-  "Mac OS X Quartz",
+  NC_("input method menu", "Mac OS X Quartz"),
   GETTEXT_PACKAGE,
   GTK_LOCALEDIR,
   "ja:ko:zh:*",
@@ -171,9 +171,6 @@ output_result (GtkIMContext *context,
       if (qc->preedit_str && strlen (qc->preedit_str) > 0)
         retval = TRUE;
     }
-
-  g_free (fixed_str);
-  g_free (marked_str);
 
   return retval;
 }

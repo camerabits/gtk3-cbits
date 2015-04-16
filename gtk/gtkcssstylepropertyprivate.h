@@ -47,10 +47,9 @@ struct _GtkCssStyleProperty
 
   GtkCssValue *initial_value;
   guint id;
+  GtkCssAffects affects;
   guint inherit :1;
   guint animated :1;
-  guint affects_size :1;
-  guint affects_font :1;
 
   GtkCssStylePropertyParseFunc parse_value;
   GtkCssStylePropertyQueryFunc query_value;
@@ -73,6 +72,7 @@ GtkCssStyleProperty *   _gtk_css_style_property_lookup_by_id    (guint          
 
 gboolean                _gtk_css_style_property_is_inherit      (GtkCssStyleProperty    *property);
 gboolean                _gtk_css_style_property_is_animated     (GtkCssStyleProperty    *property);
+GtkCssAffects           _gtk_css_style_property_get_affects     (GtkCssStyleProperty    *property);
 gboolean                _gtk_css_style_property_affects_size    (GtkCssStyleProperty    *property);
 gboolean                _gtk_css_style_property_affects_font    (GtkCssStyleProperty    *property);
 guint                   _gtk_css_style_property_get_id          (GtkCssStyleProperty    *property);
@@ -83,10 +83,8 @@ void                    _gtk_css_style_property_print_value     (GtkCssStyleProp
                                                                  GtkCssValue            *value,
                                                                  GString                *string);
 
-gboolean                _gtk_css_style_property_changes_affect_size
-                                                                (const GtkBitmask       *changes);
-gboolean                _gtk_css_style_property_changes_affect_font
-                                                                (const GtkBitmask       *changes);
+GtkBitmask *            _gtk_css_style_property_get_mask_affecting
+                                                                (GtkCssAffects           affects);
 
 G_END_DECLS
 

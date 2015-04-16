@@ -315,8 +315,9 @@ typedef struct
 typedef struct 
 {
   gchar *dir;
-  time_t mtime; /* 0 == not existing or not a dir */
+  time_t mtime;
   GtkIconCache *cache;
+  gboolean exists;
 } IconThemeDirMtime;
 
 static void         gtk_icon_theme_finalize   (GObject          *object);
@@ -1133,10 +1134,13 @@ insert_theme (GtkIconTheme *icon_theme,
       dir_mtime = g_slice_new (IconThemeDirMtime);
       dir_mtime->cache = NULL;
       dir_mtime->dir = path;
-      if (g_stat (path, &stat_buf) == 0 && S_ISDIR (stat_buf.st_mode))
+      if (g_stat (path, &stat_buf) == 0 && S_ISDIR (stat_buf.st_mode)) {
         dir_mtime->mtime = stat_buf.st_mtime;
-      else
+        dir_mtime->exists = TRUE;
+      } else {
         dir_mtime->mtime = 0;
+        dir_mtime->exists = FALSE;
+      }
 
       priv->dir_mtimes = g_list_prepend (priv->dir_mtimes, dir_mtime);
     }
@@ -1370,11 +1374,13 @@ load_themes (GtkIconTheme *icon_theme)
       
       dir_mtime->dir = g_strdup (dir);
       dir_mtime->mtime = 0;
+      dir_mtime->exists = FALSE;
       dir_mtime->cache = NULL;
 
       if (g_stat (dir, &stat_buf) != 0 || !S_ISDIR (stat_buf.st_mode))
         continue;
       dir_mtime->mtime = stat_buf.st_mtime;
+      dir_mtime->exists = TRUE;
 
       dir_mtime->cache = _gtk_icon_cache_new_for_path (dir);
       if (dir_mtime->cache != NULL)
@@ -2305,7 +2311,7 @@ gtk_icon_theme_load_icon_for_scale (GtkIconTheme        *icon_theme,
   if (!icon_info)
     {
       g_set_error (error, GTK_ICON_THEME_ERROR,  GTK_ICON_THEME_NOT_FOUND,
-                   _("Icon '%s' not present in theme"), icon_name);
+                   _("Icon '%s' not present in theme %s"), icon_name, icon_theme->priv->current_theme);
       return NULL;
     }
 
@@ -2369,7 +2375,7 @@ gtk_icon_theme_load_surface (GtkIconTheme        *icon_theme,
   if (!icon_info)
     {
       g_set_error (error, GTK_ICON_THEME_ERROR,  GTK_ICON_THEME_NOT_FOUND,
-                   _("Icon '%s' not present in theme"), icon_name);
+                   _("Icon '%s' not present in theme %s"), icon_name, icon_theme->priv->current_theme);
       return NULL;
     }
 
@@ -2714,12 +2720,12 @@ rescan_themes (GtkIconTheme *icon_theme)
       stat_res = g_stat (dir_mtime->dir, &stat_buf);
 
       /* dir mtime didn't change */
-      if (stat_res == 0 &&
+      if (stat_res == 0 && dir_mtime->exists &&
           S_ISDIR (stat_buf.st_mode) &&
           dir_mtime->mtime == stat_buf.st_mtime)
         continue;
       /* didn't exist before, and still doesn't */
-      if (dir_mtime->mtime == 0 &&
+      if (!dir_mtime->exists &&
           (stat_res != 0 || !S_ISDIR (stat_buf.st_mode)))
         continue;
 
@@ -3314,7 +3320,7 @@ theme_subdir_load (GtkIconTheme *icon_theme,
     {
       dir_mtime = (IconThemeDirMtime *)d->data;
 
-      if (dir_mtime->mtime == 0)
+      if (!dir_mtime->exists)
         continue; /* directory doesn't exist */
 
       full_dir = g_build_filename (dir_mtime->dir, subdir, NULL);
@@ -3859,7 +3865,7 @@ icon_info_ensure_scale_and_pixbuf (GtkIconInfo *icon_info)
         {
           gint size;
 
-          if (icon_info->forced_size)
+          if (icon_info->forced_size || icon_info->dir_type == ICON_THEME_DIR_UNTHEMED)
             size = scaled_desired_size;
           else
             size = icon_info->dir_size * dir_scale * icon_info->scale;
@@ -3889,7 +3895,7 @@ icon_info_ensure_scale_and_pixbuf (GtkIconInfo *icon_info)
             {
               gint size;
 
-              if (icon_info->forced_size)
+              if (icon_info->forced_size || icon_info->dir_type == ICON_THEME_DIR_UNTHEMED)
                 size = scaled_desired_size;
               else
                 size = icon_info->dir_size * dir_scale * icon_info->scale;
@@ -5451,7 +5457,21 @@ gtk_icon_theme_lookup_by_gicon_for_scale (GtkIconTheme       *icon_theme,
           if (file != NULL)
             {
               info->icon_file = g_object_ref (file);
-              info->filename = g_file_get_path (file);
+              info->is_resource = g_file_has_uri_scheme (file, "resource");
+
+              if (info->is_resource)
+                {
+                  gchar *uri;
+
+                  uri = g_file_get_uri (file);
+                  info->filename = g_strdup (uri + 11); /* resource:// */
+                  g_free (uri);
+                }
+              else
+                {
+                  info->filename = g_file_get_path (file);
+                }
+
               info->is_svg = suffix_from_name (info->filename) == ICON_SUFFIX_SVG;
             }
         }

@@ -1,7 +1,7 @@
 /*
  * gdkdisplay-wayland.h
- * 
- * Copyright 2001 Sun Microsystems Inc. 
+ *
+ * Copyright 2001 Sun Microsystems Inc.
  *
  * Erwann Chenede <erwann.chenede@sun.com>
  *
@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <wayland-client.h>
 #include <wayland-cursor.h>
+#include <wayland-egl.h>
 #include <gdk/wayland/gtk-shell-client-protocol.h>
 #include <gdk/wayland/xdg-shell-client-protocol.h>
 
@@ -37,7 +38,12 @@
 
 #include "gdkdisplayprivate.h"
 
+#include <epoxy/egl.h>
+
 G_BEGIN_DECLS
+
+#define GDK_WAYLAND_MAX_THEME_SCALE 2
+#define GDK_WAYLAND_THEME_SCALES_COUNT GDK_WAYLAND_MAX_THEME_SCALE
 
 typedef struct _GdkWaylandSelection GdkWaylandSelection;
 
@@ -66,7 +72,9 @@ struct _GdkWaylandDisplay
   struct wl_data_device_manager *data_device_manager;
   struct wl_subcompositor *subcompositor;
 
-  struct wl_cursor_theme *cursor_theme;
+  struct wl_cursor_theme *scaled_cursor_themes[GDK_WAYLAND_THEME_SCALES_COUNT];
+  gchar *cursor_theme_name;
+  int cursor_theme_size;
   GHashTable *cursor_cache;
 
   GSource *event_source;
@@ -76,6 +84,17 @@ struct _GdkWaylandDisplay
   struct xkb_context *xkb_context;
 
   GdkWaylandSelection *selection;
+
+  /* egl info */
+  EGLDisplay egl_display;
+  int egl_major_version;
+  int egl_minor_version;
+
+  guint have_egl : 1;
+  guint have_egl_khr_create_context : 1;
+  guint have_egl_buffer_age : 1;
+  guint have_egl_swap_buffers_with_damage : 1;
+  guint have_egl_surfaceless_context : 1;
 };
 
 struct _GdkWaylandDisplayClass
@@ -85,4 +104,4 @@ struct _GdkWaylandDisplayClass
 
 G_END_DECLS
 
-#endif				/* __GDK_WAYLAND_DISPLAY__ */
+#endif  /* __GDK_WAYLAND_DISPLAY__ */

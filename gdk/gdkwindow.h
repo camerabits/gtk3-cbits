@@ -627,9 +627,9 @@ void gdk_window_shape_combine_region (GdkWindow	      *window,
 GDK_AVAILABLE_IN_ALL
 void gdk_window_set_child_shapes (GdkWindow *window);
 
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 gboolean gdk_window_get_composited (GdkWindow *window);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void gdk_window_set_composited   (GdkWindow *window,
                                   gboolean   composited);
 
@@ -675,7 +675,7 @@ GdkWindowState gdk_window_get_state (GdkWindow *window);
 /* Set static bit gravity on the parent, and static
  * window gravity on all children.
  */
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 gboolean gdk_window_set_static_gravities (GdkWindow *window,
                                           gboolean   use_static);
 
@@ -739,6 +739,9 @@ cairo_region_t *gdk_window_get_visible_region(GdkWindow         *window);
 GDK_AVAILABLE_IN_ALL
 void	      gdk_window_begin_paint_rect   (GdkWindow          *window,
 					     const GdkRectangle *rectangle);
+GDK_AVAILABLE_IN_3_16
+void	      gdk_window_mark_paint_from_clip (GdkWindow          *window,
+					       cairo_t            *cr);
 GDK_AVAILABLE_IN_ALL
 void	      gdk_window_begin_paint_region (GdkWindow          *window,
 					     const cairo_region_t    *region);
@@ -1034,9 +1037,9 @@ void       gdk_window_freeze_updates      (GdkWindow    *window);
 GDK_AVAILABLE_IN_ALL
 void       gdk_window_thaw_updates        (GdkWindow    *window);
 
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void       gdk_window_freeze_toplevel_updates_libgtk_only (GdkWindow *window);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16
 void       gdk_window_thaw_toplevel_updates_libgtk_only   (GdkWindow *window);
 
 GDK_AVAILABLE_IN_ALL
@@ -1107,6 +1110,10 @@ void       gdk_window_set_shadow_width         (GdkWindow      *window,
 GDK_AVAILABLE_IN_3_14
 gboolean  gdk_window_show_window_menu          (GdkWindow      *window,
                                                 GdkEvent       *event);
+
+GDK_AVAILABLE_IN_3_16
+GdkGLContext * gdk_window_create_gl_context    (GdkWindow      *window,
+                                                GError        **error);
 
 G_END_DECLS
 

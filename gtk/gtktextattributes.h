@@ -1,4 +1,4 @@
-/* gtktexttag.c - text tag object
+/* gtktextattributes.h - text attributes
  *
  * Copyright (c) 1992-1994 The Regents of the University of California.
  * Copyright (c) 1994-1997 Sun Microsystems, Inc.
@@ -89,8 +89,8 @@ typedef struct _GtkTextAppearance GtkTextAppearance;
 struct _GtkTextAppearance
 {
   /*< public >*/
-  GdkColor bg_color;
-  GdkColor fg_color;
+  GdkColor bg_color; /* pixel is taken for underline color */
+  GdkColor fg_color; /* pixel is taken for strikethrough color */
 
   /* super/subscript rise, can be negative */
   gint rise;
@@ -155,6 +155,8 @@ struct _GtkTextAppearance
  * @bg_full_height: Background is fit to full line height rather than
  *    baseline +/- ascent/descent (font height).
  * @editable: Can edit this text.
+ * @no_fallback: Whether to disable font fallback.
+ * @letter_spacing: Extra space to insert between graphemes, in Pango units
  *
  * Using #GtkTextAttributes directly should rarely be necessary.
  * It’s primarily useful with gtk_text_iter_get_attributes().
@@ -172,7 +174,6 @@ struct _GtkTextAttributes
   GtkJustification justification;
   GtkTextDirection direction;
 
-  /* Individual chunks of this can be set/unset as a group */
   PangoFontDescription *font;
 
   gdouble font_scale;
@@ -187,34 +188,27 @@ struct _GtkTextAttributes
 
   PangoTabArray *tabs;
 
-  GtkWrapMode wrap_mode;        /* How to handle wrap-around for this tag.
-                                 * Must be GTK_WRAPMODE_CHAR,
-                                 * GTK_WRAPMODE_NONE, GTK_WRAPMODE_WORD
-                                 */
+  GtkWrapMode wrap_mode;
 
   PangoLanguage *language;
 
   /*< private >*/
-  /* Paragraph background */
   GdkColor *pg_bg_color;
 
   /*< public >*/
-  /* hide the text  */
   guint invisible : 1;
-
-  /* Background is fit to full line height rather than
-   * baseline +/- ascent/descent (font height)
-   */
   guint bg_full_height : 1;
-
-  /* can edit this text */
   guint editable : 1;
+  guint no_fallback: 1;
 
   /*< private >*/
-  /* Paragraph background */
   GdkRGBA *pg_bg_rgba;
 
-  guint padding[3];
+  /*< public >*/
+  gint letter_spacing;
+
+  /*< private >*/
+  guint padding[2];
 };
 
 GDK_AVAILABLE_IN_ALL

@@ -238,6 +238,8 @@ struct _GtkLabelPrivate
   gchar   *text;
 
   gdouble  angle;
+  gfloat   xalign;
+  gfloat   yalign;
 
   guint    mnemonics_visible  : 1;
   guint    jtype              : 2;
@@ -345,7 +347,9 @@ enum {
   PROP_ANGLE,
   PROP_MAX_WIDTH_CHARS,
   PROP_TRACK_VISITED_LINKS,
-  PROP_LINES
+  PROP_LINES,
+  PROP_XALIGN,
+  PROP_YALIGN
 };
 
 /* When rotating ellipsizable text we want the natural size to request 
@@ -754,10 +758,46 @@ gtk_label_class_init (GtkLabelClass *class)
 				   PROP_JUSTIFY,
                                    g_param_spec_enum ("justify",
                                                       P_("Justification"),
-                                                      P_("The alignment of the lines in the text of the label relative to each other. This does NOT affect the alignment of the label within its allocation. See GtkMisc::xalign for that"),
+                                                      P_("The alignment of the lines in the text of the label relative to each other. This does NOT affect the alignment of the label within its allocation. See GtkLabel:xalign for that"),
 						      GTK_TYPE_JUSTIFICATION,
 						      GTK_JUSTIFY_LEFT,
                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY));
+
+  /**
+   * GtkLabel:xalign:
+   *
+   * The xalign property determines the horizontal aligment of the label text
+   * inside the labels size allocation. Compare this to #GtkWidget:halign,
+   * which determines how the labels size allocation is positioned in the
+   * space available for the label.
+   *
+   * Since: 3.16
+   */
+  g_object_class_install_property (gobject_class,
+                                   PROP_XALIGN,
+                                   g_param_spec_float ("xalign",
+                                                       P_("X align"),
+                                                       P_("The horizontal alignment, from 0 (left) to 1 (right). Reversed for RTL layouts."),
+                                                       0.0, 1.0, 0.5,
+                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY));
+
+  /**
+   * GtkLabel:yalign:
+   *
+   * The yalign property determines the vertical aligment of the label text
+   * inside the labels size allocation. Compare this to #GtkWidget:valign,
+   * which determines how the labels size allocation is positioned in the
+   * space available for the label.
+   *
+   * Since: 3.16
+   */
+  g_object_class_install_property (gobject_class,
+                                   PROP_YALIGN,
+                                   g_param_spec_float ("yalign",
+                                                       P_("Y align"),
+                                                       P_("The vertical alignment, from 0 (top) to 1 (bottom)"),
+                                                       0.0, 1.0, 0.5,
+                                                       GTK_PARAM_READWRITE|G_PARAM_EXPLICIT_NOTIFY));
 
   g_object_class_install_property (gobject_class,
                                    PROP_PATTERN,
@@ -1162,6 +1202,12 @@ gtk_label_set_property (GObject      *object,
     case PROP_LINES:
       gtk_label_set_lines (label, g_value_get_int (value));
       break;
+    case PROP_XALIGN:
+      gtk_label_set_xalign (label, g_value_get_float (value));
+      break;
+    case PROP_YALIGN:
+      gtk_label_set_yalign (label, g_value_get_float (value));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -1236,6 +1282,12 @@ gtk_label_get_property (GObject     *object,
     case PROP_LINES:
       g_value_set_int (value, gtk_label_get_lines (label));
       break;
+    case PROP_XALIGN:
+      g_value_set_float (value, gtk_label_get_xalign (label));
+      break;
+    case PROP_YALIGN:
+      g_value_set_float (value, gtk_label_get_yalign (label));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -1246,6 +1298,7 @@ static void
 gtk_label_init (GtkLabel *label)
 {
   GtkLabelPrivate *priv;
+  GtkStyleContext *context;
 
   label->priv = gtk_label_get_instance_private (label);
   priv = label->priv;
@@ -1256,6 +1309,9 @@ gtk_label_init (GtkLabel *label)
   priv->max_width_chars = -1;
   priv->label = NULL;
   priv->lines = -1;
+
+  priv->xalign = 0.5;
+  priv->yalign = 0.5;
 
   priv->jtype = GTK_JUSTIFY_LEFT;
   priv->wrap = FALSE;
@@ -1278,6 +1334,9 @@ gtk_label_init (GtkLabel *label)
   priv->mnemonics_visible = TRUE;
 
   gtk_label_set_text (label, "");
+
+  context = gtk_widget_get_style_context (GTK_WIDGET (label));
+  gtk_style_context_add_class (context, GTK_STYLE_CLASS_LABEL);
 
   priv->drag_gesture = gtk_gesture_drag_new (GTK_WIDGET (label));
   g_signal_connect (priv->drag_gesture, "drag-begin",
@@ -2173,10 +2232,10 @@ gtk_label_set_text (GtkLabel    *label,
 /**
  * gtk_label_set_attributes:
  * @label: a #GtkLabel
- * @attrs: a #PangoAttrList
- * 
+ * @attrs: (allow-none): a #PangoAttrList, or %NULL
+ *
  * Sets a #PangoAttrList; the attributes in the list are applied to the
- * label text. 
+ * label text.
  *
  * The attributes set with this function will be applied
  * and merged with any other attributes previously effected by way
@@ -3367,6 +3426,8 @@ gtk_label_update_layout_attributes (GtkLabel *label)
 
       attrs = pango_attr_list_new ();
 
+      gtk_style_context_save (context);
+
       for (list = priv->select_info->links; list; list = list->next)
         {
           GtkLabelLink *link = list->data;
@@ -3383,6 +3444,7 @@ gtk_label_update_layout_attributes (GtkLabel *label)
           else
             state |= GTK_STATE_FLAG_LINK;
 
+          gtk_style_context_set_state (context, state);
           gtk_style_context_get_color (context, state, &link_color);
 
           attribute = pango_attr_foreground_new (link_color.red * 65535,
@@ -3392,6 +3454,8 @@ gtk_label_update_layout_attributes (GtkLabel *label)
           attribute->end_index = link->end;
           pango_attr_list_insert (attrs, attribute);
         }
+
+      gtk_style_context_restore (context);
     }
   else if (priv->markup_attrs && priv->attrs)
     attrs = pango_attr_list_new ();
@@ -3888,8 +3952,10 @@ get_layout_location (GtkLabel  *label,
   widget = GTK_WIDGET (label);
   priv   = label->priv;
 
+  xalign = priv->xalign;
+  yalign = priv->yalign;
+
 G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-  gtk_misc_get_alignment (GTK_MISC (label), &xalign, &yalign);
   _gtk_misc_get_padding_and_border (GTK_MISC (label), &border);
 G_GNUC_END_IGNORE_DEPRECATIONS
 
@@ -3996,7 +4062,6 @@ gtk_label_size_allocate (GtkWidget     *widget,
     }
 
   gtk_label_get_ink_rect (label, &clip_rect);
-  gdk_rectangle_union (&clip_rect, allocation, &clip_rect);
   _gtk_widget_set_simple_clip (widget, &clip_rect);
 }
 
@@ -4161,7 +4226,6 @@ gtk_label_draw (GtkWidget *widget,
         {
           gint range[2];
           cairo_region_t *clip;
-          GdkRGBA bg_color, fg_color;
 
           range[0] = info->selection_anchor;
           range[1] = info->selection_end;
@@ -4178,24 +4242,23 @@ gtk_label_draw (GtkWidget *widget,
                                                    range,
                                                    1);
 
-         /* FIXME should use gtk_paint, but it can't use a clip region */
           cairo_save (cr);
+          gtk_style_context_save (context);
 
           gdk_cairo_region (cr, clip);
           cairo_clip (cr);
 
-          state |= GTK_STATE_FLAG_SELECTED;
+          gtk_style_context_set_state (context, state | GTK_STATE_FLAG_SELECTED);
 
-          gtk_style_context_get_color (context, state, &fg_color);
-          gtk_style_context_get_background_color (context, state, &bg_color);
+          gtk_render_background (context, cr,
+                                 allocation.x, allocation.y,
+                                 allocation.width, allocation.height);
 
-          gdk_cairo_set_source_rgba (cr, &bg_color);
-          cairo_paint (cr);
+          gtk_render_layout (context, cr,
+                             x, y,
+                             priv->layout);
 
-          gdk_cairo_set_source_rgba (cr, &fg_color);
-          cairo_move_to (cr, x, y);
-          _gtk_pango_fill_layout (cr, priv->layout);
-
+          gtk_style_context_restore (context);
           cairo_restore (cr);
           cairo_region_destroy (clip);
         }
@@ -4206,7 +4269,6 @@ gtk_label_draw (GtkWidget *widget,
           gint range[2];
           cairo_region_t *clip;
           GdkRectangle rect;
-          GdkRGBA link_color;
 
           if (info->selectable &&
               gtk_widget_has_focus (widget) &&
@@ -4226,12 +4288,11 @@ gtk_label_draw (GtkWidget *widget,
 
           if (active_link)
             {
-              GdkRGBA bg_color;
-
               range[0] = active_link->start;
               range[1] = active_link->end;
 
               cairo_save (cr);
+              gtk_style_context_save (context);
 
               clip = gdk_pango_layout_get_clip_region (priv->layout,
                                                        x, y,
@@ -4246,22 +4307,22 @@ gtk_label_draw (GtkWidget *widget,
               else
                 state |= GTK_STATE_FLAG_PRELIGHT;
 
-              gtk_style_context_get_background_color (context, state, &bg_color);
-
-              gdk_cairo_set_source_rgba (cr, &bg_color);
-              cairo_paint (cr);
-
               if (active_link->visited)
                 state |= GTK_STATE_FLAG_VISITED;
               else
                 state |= GTK_STATE_FLAG_LINK;
 
-              gtk_style_context_get_color (context, state, &link_color);
-              gdk_cairo_set_source_rgba (cr, &link_color);
+              gtk_style_context_set_state (context, state);
 
-              cairo_move_to (cr, x, y);
-              _gtk_pango_fill_layout (cr, priv->layout);
+              gtk_render_background (context, cr,
+                                     allocation.x, allocation.y,
+                                     allocation.width, allocation.height);
 
+              gtk_render_layout (context, cr,
+                                 x, y,
+                                 priv->layout);
+
+              gtk_style_context_restore (context);
               cairo_restore (cr);
             }
 
@@ -5836,7 +5897,8 @@ gtk_label_get_layout (GtkLabel *label)
  * into coordinates inside the #PangoLayout, e.g. to take some action
  * if some part of the label is clicked. Of course you will need to
  * create a #GtkEventBox to receive the events, and pack the label
- * inside it, since labels are a #GTK_NO_WINDOW widget. Remember
+ * inside it, since labels are windowless (they return %FALSE from
+ * gtk_widget_get_has_window()). Remember
  * when using the #PangoLayout functions you need to convert to
  * and from pixels using PANGO_PIXELS() or #PANGO_SCALE.
  **/
@@ -7026,4 +7088,92 @@ _gtk_label_get_link_focused (GtkLabel *label,
     }
 
   return FALSE;
+}
+
+/**
+ * gtk_label_set_xalign:
+ * @label: a #GtkLabel
+ * @xalign: the new xalign value, between 0 and 1
+ *
+ * Sets the #GtkLabel:xalign property for @label.
+ *
+ * Since: 3.16
+ */
+void
+gtk_label_set_xalign (GtkLabel *label,
+                      gfloat    xalign)
+{
+  g_return_if_fail (GTK_IS_LABEL (label));
+
+  xalign = CLAMP (xalign, 0.0, 1.0); 
+
+  if (label->priv->xalign == xalign)
+    return;
+
+  label->priv->xalign = xalign;
+
+  gtk_widget_queue_draw (GTK_WIDGET (label));
+  g_object_notify (G_OBJECT (label), "xalign");
+}
+
+/**
+ * gtk_label_get_xalign:
+ * @label: a #GtkLabel
+ *
+ * Gets the #GtkLabel:xalign property for @label.
+ *
+ * Returns: the xalign property
+ *
+ * Since: 3.16
+ */
+gfloat
+gtk_label_get_xalign (GtkLabel *label)
+{
+  g_return_val_if_fail (GTK_IS_LABEL (label), 0.5);
+
+  return label->priv->xalign;
+}
+
+/**
+ * gtk_label_set_yalign:
+ * @label: a #GtkLabel
+ * @yalign: the new yalign value, between 0 and 1
+ *
+ * Sets the #GtkLabel:yalign property for @label.
+ *
+ * Since: 3.16
+ */
+void
+gtk_label_set_yalign (GtkLabel *label,
+                      gfloat    yalign)
+{
+  g_return_if_fail (GTK_IS_LABEL (label));
+
+  yalign = CLAMP (yalign, 0.0, 1.0); 
+
+  if (label->priv->yalign == yalign)
+    return;
+
+  label->priv->yalign = yalign;
+
+  gtk_widget_queue_draw (GTK_WIDGET (label));
+  g_object_notify (G_OBJECT (label), "yalign");
+}
+
+/**
+ * gtk_label_get_yalign:
+ * @label: a #GtkLabel
+ *
+ * Gets the #GtkLabel:yalign property for @label.
+ *
+ * Returns: the yalign property
+ *
+ * Since: 3.16
+ */
+gfloat
+gtk_label_get_yalign (GtkLabel *label)
+{
+  g_return_val_if_fail (GTK_IS_LABEL (label), 0.5);
+
+  return label->priv->yalign;
 }

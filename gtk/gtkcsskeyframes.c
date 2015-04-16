@@ -437,17 +437,16 @@ _gtk_css_keyframes_print (GtkCssKeyframes *keyframes,
 GtkCssKeyframes *
 _gtk_css_keyframes_compute (GtkCssKeyframes         *keyframes,
                             GtkStyleProviderPrivate *provider,
-			    int                      scale,
-                            GtkCssComputedValues    *values,
-                            GtkCssComputedValues    *parent_values)
+                            GtkCssStyle             *style,
+                            GtkCssStyle             *parent_style)
 {
   GtkCssKeyframes *resolved;
   guint k, p;
 
   g_return_val_if_fail (keyframes != NULL, NULL);
   g_return_val_if_fail (GTK_IS_STYLE_PROVIDER_PRIVATE (provider), NULL);
-  g_return_val_if_fail (GTK_IS_CSS_COMPUTED_VALUES (values), NULL);
-  g_return_val_if_fail (parent_values == NULL || GTK_IS_CSS_COMPUTED_VALUES (parent_values), NULL);
+  g_return_val_if_fail (GTK_IS_CSS_STYLE (style), NULL);
+  g_return_val_if_fail (parent_style == NULL || GTK_IS_CSS_STYLE (parent_style), NULL);
 
   resolved = gtk_css_keyframes_alloc ();
   resolved->n_keyframes = keyframes->n_keyframes;
@@ -466,9 +465,8 @@ _gtk_css_keyframes_compute (GtkCssKeyframes         *keyframes,
           KEYFRAMES_VALUE (resolved, k, p) =  _gtk_css_value_compute (KEYFRAMES_VALUE (keyframes, k, p),
                                                                       resolved->property_ids[p],
                                                                       provider,
-								      scale,
-                                                                      values,
-                                                                      parent_values,
+                                                                      style,
+                                                                      parent_style,
                                                                       NULL);
         }
     }

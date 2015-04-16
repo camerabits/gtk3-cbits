@@ -186,26 +186,34 @@ flip_buffer (guchar *dst_buffer,
 }
 
 static void
-_boxblur (guchar  *buffer,
-          int      width,
-          int      height,
-          int      radius)
+_boxblur (guchar      *buffer,
+          int          width,
+          int          height,
+          int          radius,
+          GtkBlurFlags flags)
 {
   guchar *flipped_buffer;
+  int d = get_box_filter_size (radius);
 
   flipped_buffer = g_malloc (width * height);
 
-  /* Step 1: swap rows and columns */
-  flip_buffer (flipped_buffer, buffer, width, height);
+  if (flags & GTK_BLUR_Y)
+    {
+      /* Step 1: swap rows and columns */
+      flip_buffer (flipped_buffer, buffer, width, height);
 
-  /* Step 2: blur rows (really columns) */
-  blur_rows (flipped_buffer, buffer, height, width, radius);
+      /* Step 2: blur rows (really columns) */
+      blur_rows (flipped_buffer, buffer, height, width, d);
 
-  /* Step 3: swap rows and columns */
-  flip_buffer (buffer, flipped_buffer, height, width);
+      /* Step 3: swap rows and columns */
+      flip_buffer (buffer, flipped_buffer, height, width);
+    }
 
-  /* Step 4: blur rows */
-  blur_rows (buffer, flipped_buffer, width, height, radius);
+  if (flags & GTK_BLUR_X)
+    {
+      /* Step 4: blur rows */
+      blur_rows (buffer, flipped_buffer, width, height, d);
+    }
 
   g_free (flipped_buffer);
 }
@@ -219,18 +227,21 @@ _boxblur (guchar  *buffer,
  */
 void
 _gtk_cairo_blur_surface (cairo_surface_t* surface,
-                         double           radius_d)
+                         double           radius_d,
+                         GtkBlurFlags     flags)
 {
-  cairo_format_t format;
   int radius = radius_d;
 
   g_return_if_fail (surface != NULL);
   g_return_if_fail (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_IMAGE);
+  g_return_if_fail (cairo_image_surface_get_format (surface) == CAIRO_FORMAT_A8);
 
-  format = cairo_image_surface_get_format (surface);
-  g_return_if_fail (format == CAIRO_FORMAT_A8);
+  /* The code doesn't actually do any blurring for radius 1, as it
+   * ends up with box filter size 1 */
+  if (radius <= 1)
+    return;
 
-  if (radius == 0)
+  if ((flags & (GTK_BLUR_X|GTK_BLUR_Y)) == 0)
     return;
 
   /* Before we mess with the surface, execute any pending drawing. */
@@ -239,7 +250,7 @@ _gtk_cairo_blur_surface (cairo_surface_t* surface,
   _boxblur (cairo_image_surface_get_data (surface),
             cairo_image_surface_get_stride (surface),
             cairo_image_surface_get_height (surface),
-            radius);
+            radius, flags);
 
   /* Inform cairo we altered the surface contents. */
   cairo_surface_mark_dirty (surface);
@@ -254,7 +265,7 @@ _gtk_cairo_blur_surface (cairo_surface_t* surface,
  *
  * This is just the number of pixels added by the blur radius, shadow
  * offset and spread are not included.
- * 
+ *
  * Much of this, the 3 * sqrt(2 * pi) / 4, is the known value for
  * approximating a Gaussian using box blurs.  This yields quite a good
  * approximation for a Gaussian.  Then we multiply this by 1.5 since our
@@ -266,5 +277,5 @@ _gtk_cairo_blur_surface (cairo_surface_t* surface,
 int
 _gtk_cairo_blur_compute_pixels (double radius)
 {
-  return floor (radius * GAUSSIAN_SCALE_FACTOR + 0.5);
+  return floor (radius * GAUSSIAN_SCALE_FACTOR * 1.5 + 0.5);
 }

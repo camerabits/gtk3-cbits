@@ -2842,13 +2842,15 @@ get_icon_width (GtkEntry             *entry,
   GtkStyleContext *context;
   GtkBorder padding;
   gint width;
+  GtkStateFlags state;
 
   if (!icon_info)
     return 0;
 
   context = gtk_widget_get_style_context (GTK_WIDGET (entry));
   gtk_entry_prepare_context_for_icon (entry, context, icon_pos);
-  gtk_style_context_get_padding (context, 0, &padding);
+  state = gtk_style_context_get_state (context);
+  gtk_style_context_get_padding (context, state, &padding);
 
   _gtk_icon_helper_get_size (icon_info->icon_helper, context,
                              &width, NULL);
@@ -3412,19 +3414,17 @@ _gtk_entry_get_borders (GtkEntry *entry,
   GtkWidget *widget = GTK_WIDGET (entry);
   GtkBorder padding, border;
   GtkStyleContext *context;
+  GtkStateFlags state;
 
   context = gtk_widget_get_style_context (widget);
+  state = gtk_style_context_get_state (context);
+  gtk_style_context_get_padding (context, state, &padding);
+  gtk_style_context_get_border (context, state, &border);
 
-  gtk_style_context_get_padding (context, 0, &padding);
-  gtk_style_context_get_border (context, 0, &border);
-
-  if (border_out != NULL)
-    {
-      border_out->top = padding.top + border.top;
-      border_out->bottom = padding.bottom + border.bottom;
-      border_out->left = padding.left + border.left;
-      border_out->right = padding.right + border.right;
-    }
+  border_out->top = padding.top + border.top;
+  border_out->bottom = padding.bottom + border.bottom;
+  border_out->left = padding.left + border.left;
+  border_out->right = padding.right + border.right;
 }
 
 static void
@@ -3583,13 +3583,11 @@ gtk_entry_get_text_area_size (GtkEntry *entry,
 {
   GtkWidget *widget = GTK_WIDGET (entry);
   GtkAllocation allocation;
-  GtkRequisition requisition;
-  gint req_height;
+  gint req_height, unused;
   gint frame_height;
   GtkBorder borders;
 
-  gtk_widget_get_preferred_size (widget, &requisition, NULL);
-  req_height = requisition.height - gtk_widget_get_margin_top (widget) - gtk_widget_get_margin_bottom (widget);
+  gtk_entry_get_preferred_height_and_baseline_for_width (widget, -1, &req_height, &unused, NULL, NULL);
 
   gtk_widget_get_allocation (widget, &allocation);
   _gtk_entry_get_borders (entry, &borders);
@@ -3625,8 +3623,8 @@ get_text_area_size (GtkEntry *entry,
 
   class = GTK_ENTRY_GET_CLASS (entry);
 
-  if (class->get_text_area_size)
-    class->get_text_area_size (entry, x, y, width, height);
+  g_assert (class->get_text_area_size != NULL);
+  class->get_text_area_size (entry, x, y, width, height);
 }
 
 
@@ -3639,16 +3637,11 @@ gtk_entry_get_frame_size (GtkEntry *entry,
 {
   GtkEntryPrivate *priv = entry->priv;
   GtkAllocation allocation;
-  GtkRequisition requisition;
   GtkWidget *widget = GTK_WIDGET (entry);
-  gint area_height, y_pos;
   gint baseline;
-  gint req_height;
-  GtkBorder borders;
+  gint req_height, req_baseline, unused;
 
-  gtk_widget_get_preferred_size (widget, &requisition, NULL);
-
-  req_height = requisition.height - gtk_widget_get_margin_top (widget) - gtk_widget_get_margin_bottom (widget);
+  gtk_entry_get_preferred_height_and_baseline_for_width (widget, -1, &req_height, &unused, &req_baseline, &unused);
 
   gtk_widget_get_allocation (widget, &allocation);
   baseline = gtk_widget_get_allocated_baseline (widget);
@@ -3665,12 +3658,7 @@ gtk_entry_get_frame_size (GtkEntry *entry,
           if (baseline == -1)
             *y = (allocation.height - req_height) / 2;
           else
-            {
-              _gtk_entry_get_borders (entry, &borders);
-              area_height = req_height - borders.top - borders.bottom;
-              y_pos = ((area_height * PANGO_SCALE - priv->ascent - priv->descent) / 2 + priv->ascent) / PANGO_SCALE;
-              *y = baseline - y_pos - borders.top;
-            }
+            *y = baseline - req_baseline;
         }
 
       *y += allocation.y;
@@ -3703,8 +3691,8 @@ get_frame_size (GtkEntry *entry,
 
   class = GTK_ENTRY_GET_CLASS (entry);
 
-  if (class->get_frame_size)
-    class->get_frame_size (entry, x, y, width, height);
+  g_assert (class->get_frame_size != NULL);
+  class->get_frame_size (entry, x, y, width, height);
 
   if (!relative_to_window)
     {
@@ -3776,6 +3764,7 @@ draw_icon (GtkWidget            *widget,
   gint x, y, width, height, pix_width, pix_height;
   GtkStyleContext *context;
   GtkBorder padding;
+  GtkStateFlags state;
 
   if (!icon_info)
     return;
@@ -3795,7 +3784,8 @@ draw_icon (GtkWidget            *widget,
   gtk_entry_prepare_context_for_icon (entry, context, icon_pos);
   _gtk_icon_helper_get_size (icon_info->icon_helper, context,
                              &pix_width, &pix_height);
-  gtk_style_context_get_padding (context, 0, &padding);
+  state = gtk_style_context_get_state (context);
+  gtk_style_context_get_padding (context, state, &padding);
 
   x = MAX (0, padding.left);
   y = MAX (0, (height - pix_height) / 2);
@@ -3872,6 +3862,7 @@ get_progress_area (GtkWidget *widget,
   GtkStyleContext *context;
   GtkBorder margin, border, entry_borders;
   gint frame_width, text_area_width, text_area_height;
+  GtkStateFlags state;
 
   context = gtk_widget_get_style_context (widget);
   _gtk_entry_get_borders (entry, &entry_borders);
@@ -3887,13 +3878,15 @@ get_progress_area (GtkWidget *widget,
   *width = text_area_width + entry_borders.left + entry_borders.right;
   *height = text_area_height + entry_borders.top + entry_borders.bottom;
 
+  state = gtk_style_context_get_state (context);
+
   /* if the text area got resized by a subclass, subtract the left/right
    * border width, so that the progress bar won't extend over the resized
    * text area.
    */
   if (frame_width > *width)
     {
-      gtk_style_context_get_border (context, 0, &border);
+      gtk_style_context_get_border (context, state, &border);
       if (gtk_widget_get_direction (GTK_WIDGET (entry)) == GTK_TEXT_DIR_RTL)
         {
           *x = (frame_width - *width) + border.left;
@@ -3906,7 +3899,7 @@ get_progress_area (GtkWidget *widget,
     }
 
   gtk_entry_prepare_context_for_progress (entry, context);
-  gtk_style_context_get_margin (context, 0, &margin);
+  gtk_style_context_get_margin (context, state, &margin);
 
   gtk_style_context_restore (context);
 
@@ -5019,6 +5012,28 @@ gtk_entry_grab_focus (GtkWidget *widget)
     {
       _gtk_entry_grab_focus (entry, FALSE);
     }
+}
+
+/**
+ * gtk_entry_grab_focus_without_selecting:
+ * @entry: a #GtkEntry
+ *
+ * Causes @entry to have keyboard focus.
+ *
+ * It behaves like gtk_widget_grab_focus(),
+ * except that it doesn't select the contents of the entry.
+ * You only want to call this on some special entries
+ * which the user usually doesn't want to replace all text in,
+ * such as search-as-you-type entries.
+ *
+ * Since: 3.16
+ */
+void
+gtk_entry_grab_focus_without_selecting (GtkEntry *entry)
+{
+  g_return_if_fail (GTK_IS_ENTRY (entry));
+
+  _gtk_entry_grab_focus (entry, FALSE);
 }
 
 static void
@@ -6432,11 +6447,16 @@ draw_text_with_color (GtkEntry *entry,
       pango_layout_get_pixel_extents (layout, NULL, &logical_rect);
       gtk_entry_get_pixel_ranges (entry, &ranges, &n_ranges);
 
-      state = gtk_widget_get_state_flags (widget);
+      gtk_style_context_save (context);
+      state = gtk_style_context_get_state (context);
       state |= GTK_STATE_FLAG_SELECTED;
+      gtk_style_context_set_state (context, state);
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
       gtk_style_context_get_background_color (context, state, &selection_color);
+G_GNUC_END_IGNORE_DEPRECATIONS
       gtk_style_context_get_color (context, state, &text_color);
+      gtk_style_context_restore (context);
 
       for (i = 0; i < n_ranges; ++i)
         cairo_rectangle (cr,
@@ -6607,7 +6627,9 @@ gtk_entry_draw_cursor (GtkEntry  *entry,
           GdkRGBA color;
 
           state = gtk_widget_get_state_flags (widget);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
           gtk_style_context_get_background_color (context, state, &color);
+G_GNUC_END_IGNORE_DEPRECATIONS
 
           gdk_cairo_rectangle (cr, &rect);
           cairo_clip (cr);
@@ -7406,7 +7428,10 @@ gtk_entry_clear (GtkEntry             *entry,
   EntryIconInfo *icon_info = priv->icons[icon_pos];
   GtkImageType storage_type;
 
-  if (icon_info && _gtk_icon_helper_get_is_empty (icon_info->icon_helper))
+  if (icon_info == NULL)
+    return;
+
+  if (_gtk_icon_helper_get_is_empty (icon_info->icon_helper))
     return;
 
   g_object_freeze_notify (G_OBJECT (entry));
@@ -9293,8 +9318,7 @@ gtk_entry_set_icon_tooltip_text (GtkEntry             *entry,
   if ((icon_info = priv->icons[icon_pos]) == NULL)
     icon_info = construct_icon_info (GTK_WIDGET (entry), icon_pos);
 
-  if (icon_info->tooltip)
-    g_free (icon_info->tooltip);
+  g_free (icon_info->tooltip);
 
   /* Treat an empty string as a NULL string,
    * because an empty string would be useless for a tooltip:
@@ -9376,8 +9400,7 @@ gtk_entry_set_icon_tooltip_markup (GtkEntry             *entry,
   if ((icon_info = priv->icons[icon_pos]) == NULL)
     icon_info = construct_icon_info (GTK_WIDGET (entry), icon_pos);
 
-  if (icon_info->tooltip)
-    g_free (icon_info->tooltip);
+  g_free (icon_info->tooltip);
 
   /* Treat an empty string as a NULL string,
    * because an empty string would be useless for a tooltip:
@@ -9733,9 +9756,7 @@ bubble_targets_received (GtkClipboard     *clipboard,
 
   priv->selection_bubble = gtk_popover_new (GTK_WIDGET (entry));
   gtk_style_context_add_class (gtk_widget_get_style_context (priv->selection_bubble),
-                               GTK_STYLE_CLASS_OSD);
-  gtk_style_context_add_class (gtk_widget_get_style_context (priv->selection_bubble),
-                               "touch-selection");
+                               GTK_STYLE_CLASS_TOUCH_SELECTION);
   gtk_popover_set_position (GTK_POPOVER (priv->selection_bubble),
                             GTK_POS_TOP);
   gtk_popover_set_modal (GTK_POPOVER (priv->selection_bubble), FALSE);
@@ -9942,11 +9963,12 @@ gtk_entry_drag_motion (GtkWidget        *widget,
   gint new_position, old_position;
   gint sel1, sel2;
   GtkBorder padding;
+  GtkStateFlags state;
 
   style_context = gtk_widget_get_style_context (widget);
-  gtk_style_context_get_padding (style_context, 0, &padding);
+  state = gtk_style_context_get_state (style_context);
+  gtk_style_context_get_padding (style_context, state, &padding);
   x -= padding.left;
-  y -= padding.top;
 
   get_icon_allocations (entry, &primary, &secondary);
 
@@ -10017,13 +10039,14 @@ gtk_entry_drag_data_received (GtkWidget        *widget,
   GtkStyleContext *style_context;
   GtkBorder padding;
   gchar *str;
+  GtkStateFlags state;
 
   str = (gchar *) gtk_selection_data_get_text (selection_data);
 
   style_context = gtk_widget_get_style_context (widget);
-  gtk_style_context_get_padding (style_context, 0, &padding);
+  state = gtk_style_context_get_state (style_context);
+  gtk_style_context_get_padding (style_context, state, &padding);
   x -= padding.left;
-  y -= padding.top;
 
   get_icon_allocations (entry, &primary, &secondary);
 
@@ -10585,7 +10608,7 @@ gtk_entry_set_progress_fraction (GtkEntry *entry,
   GtkEntryPrivate *private;
   gdouble          old_fraction;
   gint x, y, width, height;
-  gint old_x, old_y, old_width, old_height;
+  gint old_x = 0, old_y = 0, old_width = 0, old_height = 0;
   gboolean was_pulse;
 
   g_return_if_fail (GTK_IS_ENTRY (entry));

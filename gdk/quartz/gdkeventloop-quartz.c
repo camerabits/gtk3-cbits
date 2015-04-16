@@ -247,8 +247,7 @@ select_thread_func (void *arg)
 	   *
 	   *  => POLLING_DESCRIPTORS: select thread picks up the file descriptors to begin polling
 	   */ 
-	  if (current_pollfds)
-	    g_free (current_pollfds);
+	  g_free (current_pollfds);
 	  
 	  current_pollfds = next_pollfds;
 	  current_n_pollfds = next_n_pollfds;

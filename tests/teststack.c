@@ -2,6 +2,7 @@
 
 GtkWidget *stack;
 GtkWidget *switcher;
+GtkWidget *sidebar;
 GtkWidget *w1;
 
 static void
@@ -17,10 +18,17 @@ set_visible_child_name (GtkWidget *button, gpointer data)
 }
 
 static void
-toggle_homogeneous (GtkWidget *button, gpointer data)
+toggle_hhomogeneous (GtkWidget *button, gpointer data)
 {
   gboolean active = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (button));
-  gtk_stack_set_homogeneous (GTK_STACK (stack), active);
+  gtk_stack_set_hhomogeneous (GTK_STACK (stack), active);
+}
+
+static void
+toggle_vhomogeneous (GtkWidget *button, gpointer data)
+{
+  gboolean active = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (button));
+  gtk_stack_set_vhomogeneous (GTK_STACK (stack), active);
 }
 
 static void
@@ -99,7 +107,7 @@ gint
 main (gint argc,
       gchar ** argv)
 {
-  GtkWidget *window, *box, *button, *hbox, *combo;
+  GtkWidget *window, *box, *button, *hbox, *combo, *layout;
   GtkWidget *w2, *w3;
   GtkListStore* store;
   GtkWidget *tree_view;
@@ -127,7 +135,15 @@ main (gint argc,
   gtk_stack_set_transition_duration (GTK_STACK (stack), 1500);
 
   gtk_widget_set_halign (stack, GTK_ALIGN_START);
-  gtk_container_add (GTK_CONTAINER (box), stack);
+
+  /* Add sidebar before stack */
+  sidebar = gtk_stack_sidebar_new ();
+  gtk_stack_sidebar_set_stack (GTK_STACK_SIDEBAR (sidebar), GTK_STACK (stack));
+  layout = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_box_pack_start (GTK_BOX (layout), sidebar, FALSE, FALSE, 0);
+  gtk_box_pack_start (GTK_BOX (layout), stack, TRUE, TRUE, 0);
+
+  gtk_container_add (GTK_CONTAINER (box), layout);
 
   gtk_stack_switcher_set_stack (GTK_STACK_SWITCHER (switcher), GTK_STACK (stack));
 
@@ -200,11 +216,17 @@ main (gint argc,
   gtk_container_add (GTK_CONTAINER (hbox), button);
   g_signal_connect (button, "clicked", (GCallback) set_visible_child_name, (gpointer) "3");
 
+  button = gtk_check_button_new ();
+  gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (button),
+				gtk_stack_get_hhomogeneous (GTK_STACK (stack)));
+  gtk_container_add (GTK_CONTAINER (hbox), button);
+  g_signal_connect (button, "clicked", (GCallback) toggle_hhomogeneous, NULL);
+
   button = gtk_check_button_new_with_label ("homogeneous");
   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (button),
-				gtk_stack_get_homogeneous (GTK_STACK (stack)));
+				gtk_stack_get_vhomogeneous (GTK_STACK (stack)));
   gtk_container_add (GTK_CONTAINER (hbox), button);
-  g_signal_connect (button, "clicked", (GCallback) toggle_homogeneous, NULL);
+  g_signal_connect (button, "clicked", (GCallback) toggle_vhomogeneous, NULL);
 
   button = gtk_toggle_button_new_with_label ("Add icon");
   g_signal_connect (button, "toggled", (GCallback) toggle_icon_name, NULL);

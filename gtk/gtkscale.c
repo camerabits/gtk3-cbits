@@ -185,15 +185,7 @@ static void
 gtk_scale_notify (GObject    *object,
                   GParamSpec *pspec)
 {
-  if (strcmp (pspec->name, "orientation") == 0)
-    {
-      GtkOrientation orientation;
-
-      orientation = gtk_orientable_get_orientation (GTK_ORIENTABLE (object));
-      gtk_range_set_flippable (GTK_RANGE (object),
-                               orientation == GTK_ORIENTATION_HORIZONTAL);
-    }
-  else if (strcmp (pspec->name, "inverted") == 0)
+  if (strcmp (pspec->name, "inverted") == 0)
     {
       GtkScale *scale = GTK_SCALE (object);
       GtkScaleMark *mark;
@@ -266,7 +258,6 @@ gtk_scale_class_init (GtkScaleClass *class)
   widget_class->get_preferred_width = gtk_scale_get_preferred_width;
   widget_class->get_preferred_height = gtk_scale_get_preferred_height;
 
-  range_class->slider_detail = "Xscale";
   range_class->get_range_border = gtk_scale_get_range_border;
 
   class->get_layout_offsets = gtk_scale_real_get_layout_offsets;
@@ -495,8 +486,7 @@ gtk_scale_init (GtkScale *scale)
   priv->digits = 1;
   gtk_range_set_round_digits (range, priv->digits);
 
-  gtk_range_set_flippable (range,
-                           gtk_orientable_get_orientation (GTK_ORIENTABLE (range)) == GTK_ORIENTATION_HORIZONTAL);
+  gtk_range_set_flippable (range, TRUE);
 
   context = gtk_widget_get_style_context (GTK_WIDGET (scale));
   gtk_style_context_add_class (context, GTK_STYLE_CLASS_SCALE);
@@ -900,16 +890,16 @@ gtk_scale_get_range_border (GtkRange  *range,
       if (gtk_orientable_get_orientation (GTK_ORIENTABLE (scale)) == GTK_ORIENTATION_HORIZONTAL)
         {
           if (n1 > 0)
-            border->top += h1 + value_spacing + slider_width / 2;
+            border->top += h1 + value_spacing + slider_width / 4;
           if (n2 > 0)
-            border->bottom += h2 + value_spacing + slider_width / 2;
+            border->bottom += h2 + value_spacing + slider_width / 4;
         }
       else
         {
           if (n1 > 0)
-            border->left += w1 + value_spacing + slider_width / 2;
+            border->left += w1 + value_spacing + slider_width / 4;
           if (n2 > 0)
-            border->right += w2 + value_spacing + slider_width / 2;
+            border->right += w2 + value_spacing + slider_width / 4;
         }
     }
 }
@@ -1172,14 +1162,14 @@ gtk_scale_draw (GtkWidget *widget,
               if (mark->position == GTK_POS_TOP)
                 {
                   y1 = range_rect.y;
-                  y2 = y1 - slider_width / 2;
+                  y2 = y1 - slider_width / 4;
                   min_pos = min_pos_before;
                   max_pos = find_next_pos (widget, m, marks + i, GTK_POS_TOP) - min_sep;
                 }
               else
                 {
                   y1 = range_rect.y + range_rect.height;
-                  y2 = y1 + slider_width / 2;
+                  y2 = y1 + slider_width / 4;
                   min_pos = min_pos_after;
                   max_pos = find_next_pos (widget, m, marks + i, GTK_POS_BOTTOM) - min_sep;
                 }
@@ -1224,14 +1214,14 @@ gtk_scale_draw (GtkWidget *widget,
               if (mark->position == GTK_POS_TOP)
                 {
                   x1 = range_rect.x;
-                  x2 = range_rect.x - slider_width / 2;
+                  x2 = range_rect.x - slider_width / 4;
                   min_pos = min_pos_before;
                   max_pos = find_next_pos (widget, m, marks + i, GTK_POS_TOP) - min_sep;
                 }
               else
                 {
                   x1 = range_rect.x + range_rect.width;
-                  x2 = range_rect.x + range_rect.width + slider_width / 2;
+                  x2 = range_rect.x + range_rect.width + slider_width / 4;
                   min_pos = min_pos_after;
                   max_pos = find_next_pos (widget, m, marks + i, GTK_POS_BOTTOM) - min_sep;
                 }

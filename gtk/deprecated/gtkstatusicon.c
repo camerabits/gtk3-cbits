@@ -84,7 +84,9 @@
  * on Win32 doesn’t allow to embed arbitrary widgets.
  *
  * GtkStatusIcon has been deprecated in 3.14. You should consider using
- * notifications or more modern platform-specific APIs instead.
+ * notifications or more modern platform-specific APIs instead. GLib provides
+ * the #GNotification API which works well with #GtkApplication. Also see this
+ * [HowDoI](https://wiki.gnome.org/HowDoI/GNotification).
  */
 
 
@@ -2197,8 +2199,8 @@ gtk_status_icon_is_embedded (GtkStatusIcon *status_icon)
 /**
  * gtk_status_icon_position_menu:
  * @menu: the #GtkMenu
- * @x: (out): return location for the x position
- * @y: (out): return location for the y position
+ * @x: (inout): return location for the x position
+ * @y: (inout): return location for the y position
  * @push_in: (out): whether the first menu item should be offset
  *           (pushed in) to be aligned with the menu popup position
  *           (only useful for GtkOptionMenu).

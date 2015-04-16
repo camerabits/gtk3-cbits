@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <!-- interface-requires gtk+ 3.8 -->
-  <object class="GtkListStore" id="store">
-    <columns>
-      <column type="gchararray"/>
-      <column type="gchararray"/>
-      <column type="gchararray"/>
-      <column type="gchararray"/>
-    </columns>
+  <object class="IconStore" id="store">
   </object>
   <object class="GtkTreeModelFilter" id="filter_model">
     <property name="child_model">store</property>
@@ -16,6 +10,7 @@
     <property name="title" translatable="yes">Icon Browser</property>
     <property name="default-width">600</property>
     <property name="default-height">800</property>
+    <signal name="key-press-event" handler="key_press_event_cb"/>
     <child type="titlebar">
       <object class="GtkHeaderBar" id="header">
         <property name="visible">True</property>
@@ -47,7 +42,7 @@
         </child>
         <child>
           <object class="GtkToggleButton" id="search">
-            <property name="visible">False</property>
+            <property name="visible">True</property>
             <style>
               <class name="image-button"/>
             </style>
@@ -77,16 +72,22 @@
           </object>
         </child>
         <child>
+          <object class="GtkVSeparator">
+            <property name="visible">True</property>
+          </object>
+        </child>
+        <child>
           <object class="GtkBox" id="content_box">
             <property name="visible">True</property>
             <property name="orientation">vertical</property>
             <child>
               <object class="GtkSearchBar" id="searchbar">
                 <property name="visible">True</property>
+                <property name="search-mode-enabled" bind-source="search" bind-property="active" bind-flags="bidirectional"/>
                 <child>
                   <object class="GtkSearchEntry" id="searchentry">
-                    <signal name="search-changed" handler="search_text_changed"/>
                     <property name="visible">True</property>
+                    <signal name="search-changed" handler="search_text_changed"/>
                   </object>
                 </child>
               </object>
@@ -97,12 +98,12 @@
                 <property name="expand">True</property>
                 <property name="hscrollbar-policy">never</property>
                 <property name="vscrollbar-policy">automatic</property>
-                <property name="shadow-type">in</property>
                 <child>
                   <object class="GtkIconView" id="list">
                     <property name="visible">True</property>
                     <property name="model">filter_model</property>
-                    <signal name="selection_changed" handler="selection_changed"/>
+                    <property name="selection-mode">none</property>
+                    <property name="activate-on-single-click">True</property>
                     <signal name="item_activated" handler="item_activated"/>
                     <child>
                       <object class="GtkCellRendererPixbuf" id="cell">
@@ -150,12 +151,17 @@
             <property name="row-spacing">10</property>
             <property name="column-spacing">10</property>
             <child>
-              <object class="GtkImage" id="image1">
+              <object class="GtkEventBox">
                 <property name="visible">True</property>
-                <property name="xpad">4</property>
-                <property name="ypad">4</property>
-                <property name="halign">center</property>
-                <property name="valign">end</property>
+                <child>
+                  <object class="GtkImage" id="image1">
+                    <property name="visible">True</property>
+                    <property name="xpad">4</property>
+                    <property name="ypad">4</property>
+                    <property name="halign">center</property>
+                    <property name="valign">end</property>
+                  </object>
+                </child>
               </object>
               <packing>
                 <property name="left-attach">0</property>
@@ -163,12 +169,17 @@
               </packing>
             </child>
             <child>
-              <object class="GtkImage" id="image2">
+              <object class="GtkEventBox">
                 <property name="visible">True</property>
-                <property name="xpad">4</property>
-                <property name="ypad">4</property>
-                <property name="halign">center</property>
-                <property name="valign">end</property>
+                <child>
+                  <object class="GtkImage" id="image2">
+                    <property name="visible">True</property>
+                    <property name="xpad">4</property>
+                    <property name="ypad">4</property>
+                    <property name="halign">center</property>
+                    <property name="valign">end</property>
+                  </object>
+                </child>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -176,12 +187,17 @@
               </packing>
             </child>
             <child>
-              <object class="GtkImage" id="image3">
+              <object class="GtkEventBox">
                 <property name="visible">True</property>
-                <property name="xpad">4</property>
-                <property name="ypad">4</property>
-                <property name="halign">center</property>
-                <property name="valign">end</property>
+                <child>
+                  <object class="GtkImage" id="image3">
+                    <property name="visible">True</property>
+                    <property name="xpad">4</property>
+                    <property name="ypad">4</property>
+                    <property name="halign">center</property>
+                    <property name="valign">end</property>
+                  </object>
+                </child>
               </object>
               <packing>
                 <property name="left-attach">2</property>
@@ -189,12 +205,17 @@
               </packing>
             </child>
             <child>
-              <object class="GtkImage" id="image4">
+              <object class="GtkEventBox">
                 <property name="visible">True</property>
-                <property name="xpad">4</property>
-                <property name="ypad">4</property>
-                <property name="halign">center</property>
-                <property name="valign">end</property>
+                <child>
+                  <object class="GtkImage" id="image4">
+                    <property name="visible">True</property>
+                    <property name="xpad">4</property>
+                    <property name="ypad">4</property>
+                    <property name="halign">center</property>
+                    <property name="valign">end</property>
+                  </object>
+                </child>
               </object>
               <packing>
                 <property name="left-attach">3</property>
@@ -202,12 +223,17 @@
               </packing>
             </child>
             <child>
-              <object class="GtkImage" id="image5">
+              <object class="GtkEventBox">
                 <property name="visible">True</property>
-                <property name="xpad">4</property>
-                <property name="ypad">4</property>
-                <property name="halign">center</property>
-                <property name="valign">end</property>
+                <child>
+                  <object class="GtkImage" id="image5">
+                    <property name="visible">True</property>
+                    <property name="xpad">4</property>
+                    <property name="ypad">4</property>
+                    <property name="halign">center</property>
+                    <property name="valign">end</property>
+                  </object>
+                </child>
               </object>
               <packing>
                 <property name="left-attach">4</property>

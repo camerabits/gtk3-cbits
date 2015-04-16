@@ -29,6 +29,8 @@
 #include <gtk/gtksocket.h>
 #include <gtk/gtkplug.h>
 
+#include <gtk/gtkx-autocleanups.h>
+
 #undef __GTKX_H_INSIDE__
 
 #endif /* __GTK_X_H__ */

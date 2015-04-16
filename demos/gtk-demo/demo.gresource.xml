@@ -95,6 +95,7 @@
     <file>expander.c</file>
     <file>flowbox.c</file>
     <file>gestures.c</file>
+    <file>glarea.c</file>
     <file>headerbar.c</file>
     <file>hypertext.c</file>
     <file>iconview.c</file>
@@ -118,6 +119,7 @@
     <file>search_entry.c</file>
     <file>search_entry2.c</file>
     <file>sizegroup.c</file>
+    <file>sidebar.c</file>
     <file>stack.c</file>
     <file>spinner.c</file>
     <file>textview.c</file>
@@ -137,5 +139,9 @@
   </gresource>
   <gresource prefix="/popover">
     <file>popover.ui</file>
+  </gresource>
+  <gresource prefix="/glarea">
+    <file>glarea-fragment.glsl</file>
+    <file>glarea-vertex.glsl</file>
   </gresource>
 </gresources>

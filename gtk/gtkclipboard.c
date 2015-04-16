@@ -286,7 +286,7 @@ gtk_clipboard_finalize (GObject *object)
   if (clipboard->store_timeout != 0)
     g_source_remove (clipboard->store_timeout);
 
-  if (clipboard->notify_signal_id != 0)
+  if (clipboard_widget != NULL && clipboard->notify_signal_id != 0)
     g_signal_handler_disconnect (clipboard_widget, clipboard->notify_signal_id);
 
   g_free (clipboard->storable_targets);
@@ -376,6 +376,26 @@ GtkClipboard *
 gtk_clipboard_get (GdkAtom selection)
 {
   return gtk_clipboard_get_for_display (gdk_display_get_default (), selection);
+}
+
+/**
+ * gtk_clipboard_get_default:
+ * @display: the #GdkDisplay for which the clipboard is to be retrieved.
+ *
+ * Returns the default clipboard object for use with cut/copy/paste menu items
+ * and keyboard shortcuts.
+ *
+ * Return value: (transfer none): the default clipboard object.
+ *
+ * Since: 3.16
+ **/
+GtkClipboard *
+gtk_clipboard_get_default (GdkDisplay *display)
+{
+  g_return_val_if_fail (display != NULL, NULL);
+  g_return_val_if_fail (GDK_IS_DISPLAY (display), NULL);
+
+  return gtk_clipboard_get_for_display (display, GDK_SELECTION_CLIPBOARD);
 }
 
 static void 

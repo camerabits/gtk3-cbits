@@ -22,6 +22,10 @@
 #ifndef __GTK_STACK_H__
 #define __GTK_STACK_H__
 
+#if !defined (__GTK_H_INSIDE__) && !defined (GTK_COMPILATION)
+#error "Only <gtk/gtk.h> can be included directly."
+#endif
+
 #include <gtk/gtkcontainer.h>
 
 G_BEGIN_DECLS
@@ -104,6 +108,16 @@ void                   gtk_stack_set_homogeneous         (GtkStack              
                                                           gboolean                homogeneous);
 GDK_AVAILABLE_IN_3_10
 gboolean               gtk_stack_get_homogeneous         (GtkStack               *stack);
+GDK_AVAILABLE_IN_3_16
+void                   gtk_stack_set_hhomogeneous        (GtkStack               *stack,
+                                                          gboolean                hhomogeneous);
+GDK_AVAILABLE_IN_3_16
+gboolean               gtk_stack_get_hhomogeneous        (GtkStack               *stack);
+GDK_AVAILABLE_IN_3_16
+void                   gtk_stack_set_vhomogeneous        (GtkStack               *stack,
+                                                          gboolean                vhomogeneous);
+GDK_AVAILABLE_IN_3_16
+gboolean               gtk_stack_get_vhomogeneous        (GtkStack               *stack);
 GDK_AVAILABLE_IN_3_10
 void                   gtk_stack_set_transition_duration (GtkStack               *stack,
                                                           guint                   duration);

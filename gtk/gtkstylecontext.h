@@ -177,6 +177,17 @@ struct _GtkStyleContextClass
 #define GTK_STYLE_CLASS_ENTRY "entry"
 
 /**
+ * GTK_STYLE_CLASS_LABEL:
+ *
+ * A CSS class to match labels.
+ *
+ * This is used by #GtkLabel.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_LABEL "label"
+
+/**
  * GTK_STYLE_CLASS_COMBOBOX_ENTRY:
  *
  * A CSS class to match combobox entries.
@@ -286,6 +297,16 @@ struct _GtkStyleContextClass
 #define GTK_STYLE_CLASS_CONTEXT_MENU "context-menu"
 
 /**
+ * GTK_STYLE_CLASS_TOUCH_SELECTION:
+ *
+ * A CSS class for touch selection popups on entries
+ * and text views.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_TOUCH_SELECTION "touch-selection"
+
+/**
  * GTK_STYLE_CLASS_MENUBAR:
  *
  * A CSS class to menubars.
@@ -332,6 +353,17 @@ struct _GtkStyleContextClass
  * file chooser.
  */
 #define GTK_STYLE_CLASS_INLINE_TOOLBAR "inline-toolbar"
+
+/**
+ * GTK_STYLE_CLASS_STATUSBAR:
+ *
+ * A CSS class to match statusbars.
+ *
+ * This is used in #GtkStatusbar.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_STATUSBAR "statusbar"
 
 /**
  * GTK_STYLE_CLASS_RADIO:
@@ -873,6 +905,47 @@ struct _GtkStyleContextClass
  */
 #define GTK_STYLE_CLASS_OVERSHOOT "overshoot"
 
+/*
+ * GTK_STYLE_CLASS_UNDERSHOOT:
+ * A CSS class that is added on the visual hints that happen
+ * where content is 'scrolled off' and can be made visible
+ * by scrolling.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_UNDERSHOOT "undershoot"
+
+/*
+ * GTK_STYLE_CLASS_PAPER:
+ * A CSS class that is added to areas that should look like paper.
+ *
+ * This is used in print previews and themes are encouraged to
+ * style it as black text on white background.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_PAPER "paper"
+
+/**
+ * GTK_STYLE_CLASS_MONOSPACE:
+ *
+ * A CSS class that is added to text view that should use
+ * a monospace font.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_MONOSPACE "monospace"
+
+/**
+ * GTK_STYLE_CLASS_WIDE:
+ *
+ * A CSS class to indicate that a UI element should be 'wide'.
+ * Used by #GtkPaned.
+ *
+ * Since: 3.16
+ */
+#define GTK_STYLE_CLASS_WIDE "wide"
+
 /**
  * GTK_STYLE_REGION_ROW:
  *
@@ -1083,11 +1156,11 @@ GDK_AVAILABLE_IN_ALL
 void gtk_style_context_get_color            (GtkStyleContext *context,
                                              GtkStateFlags    state,
                                              GdkRGBA         *color);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16_FOR(gtk_render_background)
 void gtk_style_context_get_background_color (GtkStyleContext *context,
                                              GtkStateFlags    state,
                                              GdkRGBA         *color);
-GDK_AVAILABLE_IN_ALL
+GDK_DEPRECATED_IN_3_16_FOR(gtk_render_frame)
 void gtk_style_context_get_border_color     (GtkStyleContext *context,
                                              GtkStateFlags    state,
                                              GdkRGBA         *color);
@@ -1118,125 +1191,6 @@ GDK_AVAILABLE_IN_ALL
 void gtk_style_context_set_background       (GtkStyleContext *context,
                                              GdkWindow       *window);
 
-/* Paint methods */
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_check       (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_option      (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_arrow       (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              angle,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              size);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_background  (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_frame       (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_expander    (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_focus       (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_layout      (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    PangoLayout         *layout);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_line        (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x0,
-                                    gdouble              y0,
-                                    gdouble              x1,
-                                    gdouble              y1);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_slider      (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height,
-                                    GtkOrientation       orientation);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_frame_gap   (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height,
-                                    GtkPositionType      gap_side,
-                                    gdouble              xy0_gap,
-                                    gdouble              xy1_gap);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_extension   (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height,
-                                    GtkPositionType      gap_side);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_handle      (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_AVAILABLE_IN_ALL
-void        gtk_render_activity    (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    gdouble              x,
-                                    gdouble              y,
-                                    gdouble              width,
-                                    gdouble              height);
-GDK_DEPRECATED_IN_3_10_FOR(gtk_icon_theme_load_icon)
-GdkPixbuf * gtk_render_icon_pixbuf (GtkStyleContext     *context,
-                                    const GtkIconSource *source,
-                                    GtkIconSize          size);
-GDK_AVAILABLE_IN_3_2
-void        gtk_render_icon        (GtkStyleContext     *context,
-                                    cairo_t             *cr,
-                                    GdkPixbuf           *pixbuf,
-                                    gdouble              x,
-                                    gdouble              y);
-GDK_AVAILABLE_IN_3_10
-void        gtk_render_icon_surface (GtkStyleContext    *context,
-				     cairo_t            *cr,
-				     cairo_surface_t    *surface,
-				     gdouble             x,
-				     gdouble             y);
 GDK_AVAILABLE_IN_3_4
 void        gtk_render_insertion_cursor
                                    (GtkStyleContext     *context,

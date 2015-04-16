@@ -18,11 +18,9 @@ EXTRA_DIST +=	\
 	gtk3-demo-application.vcxproj.filters	\
 	gtk3-icon-browser.vcxproj	\
 	gtk3-icon-browser.vcxproj.filters	\
-	gtk-inspector.vcxproj	\
-	gtk-inspector.vcxproj.filters	\
 	gailutil.vcxproj	\
 	gailutil.vcxproj.filters	\
-	install.vcxproj	\
+	gtk-install.vcxproj	\
 	broadwayd.vcxproj	\
 	broadwayd.vcxproj.filters	\
 	gdk-broadway.vcxproj	\

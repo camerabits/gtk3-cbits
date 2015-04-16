@@ -19,7 +19,7 @@
 
 #include "gtkcssenumvalueprivate.h"
 
-#include "gtkcsscomputedvaluesprivate.h"
+#include "gtkcssstyleprivate.h"
 #include "gtkcssnumbervalueprivate.h"
 #include "gtkstyleproviderprivate.h"
 
@@ -41,9 +41,8 @@ static GtkCssValue *
 gtk_css_value_enum_compute (GtkCssValue             *value,
                             guint                    property_id,
                             GtkStyleProviderPrivate *provider,
-			    int                      scale,
-                            GtkCssComputedValues    *values,
-                            GtkCssComputedValues    *parent_values,
+                            GtkCssStyle             *style,
+                            GtkCssStyle             *parent_style,
                             GtkCssDependencies      *dependencies)
 {
   return _gtk_css_value_ref (value);
@@ -165,9 +164,8 @@ static GtkCssValue *
 gtk_css_value_font_size_compute (GtkCssValue             *value,
                                  guint                    property_id,
                                  GtkStyleProviderPrivate *provider,
-				 int                      scale,
-                                 GtkCssComputedValues    *values,
-                                 GtkCssComputedValues    *parent_values,
+                                 GtkCssStyle             *style,
+                                 GtkCssStyle             *parent_style,
                                  GtkCssDependencies      *dependencies)
 {
   double font_size;
@@ -200,8 +198,8 @@ gtk_css_value_font_size_compute (GtkCssValue             *value,
       break;
     case GTK_CSS_FONT_SIZE_SMALLER:
       *dependencies = GTK_CSS_DEPENDS_ON_PARENT;
-      if (parent_values)
-        font_size = _gtk_css_number_value_get (_gtk_css_computed_values_get_value (parent_values, GTK_CSS_PROPERTY_FONT_SIZE), 100);
+      if (parent_style)
+        font_size = _gtk_css_number_value_get (gtk_css_style_get_value (parent_style, GTK_CSS_PROPERTY_FONT_SIZE), 100);
       else
         font_size = _gtk_css_font_size_get_default (provider);
       /* XXX: This is what WebKit does... */
@@ -209,8 +207,8 @@ gtk_css_value_font_size_compute (GtkCssValue             *value,
       break;
     case GTK_CSS_FONT_SIZE_LARGER:
       *dependencies = GTK_CSS_DEPENDS_ON_PARENT;
-      if (parent_values)
-        font_size = _gtk_css_number_value_get (_gtk_css_computed_values_get_value (parent_values, GTK_CSS_PROPERTY_FONT_SIZE), 100);
+      if (parent_style)
+        font_size = _gtk_css_number_value_get (gtk_css_style_get_value (parent_style, GTK_CSS_PROPERTY_FONT_SIZE), 100);
       else
         font_size = _gtk_css_font_size_get_default (provider);
       /* XXX: This is what WebKit does... */
@@ -339,7 +337,7 @@ static GtkCssValue font_variant_values[] = {
 GtkCssValue *
 _gtk_css_font_variant_value_new (PangoVariant font_variant)
 {
-  g_return_val_if_fail (font_variant < G_N_ELEMENTS (font_variant_values), NULL);
+  g_return_val_if_fail ((gint)font_variant < G_N_ELEMENTS (font_variant_values), NULL);
 
   return _gtk_css_value_ref (&font_variant_values[font_variant]);
 }
@@ -370,15 +368,84 @@ _gtk_css_font_variant_value_get (const GtkCssValue *value)
 
 /* PangoWeight */
 
+#define BOLDER -1
+#define LIGHTER -2
+
+static GtkCssValue *
+gtk_css_value_font_weight_compute (GtkCssValue             *value,
+                                   guint                    property_id,
+                                   GtkStyleProviderPrivate *provider,
+                                   GtkCssStyle             *style,
+                                   GtkCssStyle             *parent_style,
+                                   GtkCssDependencies      *dependencies)
+{
+  PangoWeight new_weight;
+  int parent_value;
+
+  if (value->value >= 0)
+    return _gtk_css_value_ref (value);
+
+  *dependencies = GTK_CSS_DEPENDS_ON_PARENT;
+
+  if (parent_style)
+    parent_value = gtk_css_style_get_value (parent_style, property_id)->value;
+  else
+    parent_value = 400;
+
+  if (value->value == BOLDER)
+    {
+      if (parent_value < 400)
+        new_weight = PANGO_WEIGHT_NORMAL;
+      else if (parent_value < 600)
+        new_weight = PANGO_WEIGHT_BOLD;
+      else
+        new_weight = PANGO_WEIGHT_HEAVY;
+    }
+  else if (value->value == LIGHTER)
+    {
+      if (parent_value > 700)
+        new_weight = PANGO_WEIGHT_BOLD;
+      else if (parent_value > 500)
+        new_weight = PANGO_WEIGHT_NORMAL;
+      else
+        new_weight = PANGO_WEIGHT_THIN;
+    }
+  else
+    {
+      g_assert_not_reached ();
+      new_weight = PANGO_WEIGHT_NORMAL;
+    }
+
+  return _gtk_css_font_weight_value_new (new_weight);
+}
+
+static GtkCssValue *
+gtk_css_value_font_weight_transition (GtkCssValue *start,
+                                      GtkCssValue *end,
+                                      guint        property_id,
+                                      double       progress)
+{
+  PangoWeight new_weight;
+
+  if (start->value < 0 || end->value < 0)
+    return NULL;
+
+  new_weight = (start->value + end->value + 50) / 200 * 100;
+
+  return _gtk_css_font_weight_value_new (new_weight);
+}
+
 static const GtkCssValueClass GTK_CSS_VALUE_FONT_WEIGHT = {
   gtk_css_value_enum_free,
-  gtk_css_value_enum_compute,
+  gtk_css_value_font_weight_compute,
   gtk_css_value_enum_equal,
-  gtk_css_value_enum_transition,
+  gtk_css_value_font_weight_transition,
   gtk_css_value_enum_print
 };
 
 static GtkCssValue font_weight_values[] = {
+  { &GTK_CSS_VALUE_FONT_WEIGHT, 1, BOLDER, "bolder" },
+  { &GTK_CSS_VALUE_FONT_WEIGHT, 1, LIGHTER, "lighter" },
   { &GTK_CSS_VALUE_FONT_WEIGHT, 1, PANGO_WEIGHT_THIN, "100" },
   { &GTK_CSS_VALUE_FONT_WEIGHT, 1, PANGO_WEIGHT_ULTRALIGHT, "200" },
   { &GTK_CSS_VALUE_FONT_WEIGHT, 1, PANGO_WEIGHT_LIGHT, "300" },
@@ -398,7 +465,7 @@ _gtk_css_font_weight_value_new (PangoWeight font_weight)
 
   w = ((font_weight + 50) / 100) * 100;
 
-  for (i = 0; i < G_N_ELEMENTS (font_weight_values); i++)
+  for (i = 2; i < G_N_ELEMENTS (font_weight_values); i++)
     {
       if (font_weight_values[i].value == w)
         return _gtk_css_value_ref (&font_weight_values[i]);
@@ -435,6 +502,9 @@ _gtk_css_font_weight_value_get (const GtkCssValue *value)
 
   return value->value;
 }
+
+#undef BOLDER
+#undef LIGHTER
 
 /* PangoStretch */
 

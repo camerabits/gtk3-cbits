@@ -596,7 +596,7 @@ gtk_tree_selection_get_selected_rows (GtkTreeSelection   *selection,
   node = _gtk_rbtree_first (tree);
   path = gtk_tree_path_new_first ();
 
-  do
+  while (node != NULL)
     {
       if (GTK_RBNODE_FLAG_SET (node, GTK_RBNODE_IS_SELECTED))
 	list = g_list_prepend (list, gtk_tree_path_copy (path));
@@ -638,7 +638,6 @@ gtk_tree_selection_get_selected_rows (GtkTreeSelection   *selection,
 	  while (!done);
 	}
     }
-  while (TRUE);
 
   gtk_tree_path_free (path);
 
@@ -652,6 +651,8 @@ gtk_tree_selection_count_selected_rows_helper (GtkRBTree *tree,
 					       gpointer   data)
 {
   gint *count = (gint *)data;
+
+  g_return_if_fail (node != NULL);
 
   if (GTK_RBNODE_FLAG_SET (node, GTK_RBNODE_IS_SELECTED))
     (*count)++;
@@ -789,7 +790,7 @@ gtk_tree_selection_selected_foreach (GtkTreeSelection            *selection,
   /* find the node internally */
   path = gtk_tree_path_new_first ();
 
-  do
+  while (node != NULL)
     {
       if (GTK_RBNODE_FLAG_SET (node, GTK_RBNODE_IS_SELECTED))
         {
@@ -838,7 +839,6 @@ gtk_tree_selection_selected_foreach (GtkTreeSelection            *selection,
 	  while (!done);
 	}
     }
-  while (TRUE);
 
 out:
   if (path)
@@ -1297,7 +1297,7 @@ gtk_tree_selection_real_modify_range (GtkTreeSelection *selection,
 				      GtkTreePath      *end_path)
 {
   GtkTreeSelectionPrivate *priv = selection->priv;
-  GtkRBNode *start_node, *end_node;
+  GtkRBNode *start_node = NULL, *end_node = NULL;
   GtkRBTree *start_tree, *end_tree;
   GtkTreePath *anchor_path = NULL;
   gboolean dirty = FALSE;
@@ -1337,8 +1337,9 @@ gtk_tree_selection_real_modify_range (GtkTreeSelection *selection,
       break;
     }
 
-  g_return_val_if_fail (start_node != NULL, FALSE);
-  g_return_val_if_fail (end_node != NULL, FALSE);
+  /* Invalid start or end node? */
+  if (start_node == NULL || end_node == NULL)
+    return dirty;
 
   if (anchor_path)
     _gtk_tree_view_set_anchor_path (priv->tree_view, anchor_path);
@@ -1613,6 +1614,8 @@ gtk_tree_selection_real_select_node (GtkTreeSelection *selection,
   GtkTreeSelectionPrivate *priv = selection->priv;
   gboolean toggle = FALSE;
   GtkTreePath *path = NULL;
+
+  g_return_val_if_fail (node != NULL, FALSE);
 
   select = !! select;
 

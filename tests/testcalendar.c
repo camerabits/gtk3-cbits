@@ -67,10 +67,16 @@ calendar_date_to_string (CalendarData *data,
 
   gtk_calendar_get_date (GTK_CALENDAR(data->window),
 			 &year, &month, &day);
-  date = g_date_new_dmy (day, month + 1, year);
-  g_date_strftime (buffer, buff_len-1, "%x", date);
-
-  g_date_free (date);
+  if (g_date_valid_dmy (day, month + 1, year))
+    {
+      date = g_date_new_dmy (day, month + 1, year);
+      g_date_strftime (buffer, buff_len-1, "%x", date);
+      g_date_free (date);
+    }
+  else
+    {
+      g_snprintf (buffer, buff_len - 1, "%d/%d/%d (invalid)", month + 1, day, year);
+    }
 }
 
 static void
@@ -242,14 +248,22 @@ void calendar_select_font (GtkWidget    *button,
                                  CalendarData *calendar)
 {
   const char *font = NULL;
-  PangoFontDescription *font_desc;
+  GtkCssProvider *provider;
+  gchar *data;
 
   if (calendar->window)
     {
+      provider = g_object_get_data (G_OBJECT (calendar->window), "css-provider");
+      if (!provider)
+        {
+          provider = gtk_css_provider_new ();
+          gtk_style_context_add_provider (gtk_widget_get_style_context (calendar->window), GTK_STYLE_PROVIDER (provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+          g_object_set_data_full (G_OBJECT (calendar->window), "css-provider", provider, g_object_unref);
+        }
       font = gtk_font_button_get_font_name (GTK_FONT_BUTTON (button));
-      font_desc = pango_font_description_from_string (font);
-      gtk_widget_override_font (calendar->window, font_desc);
-      pango_font_description_free (font_desc);
+      data = g_strdup_printf ("GtkCalendar { font: %s; }", font);
+      gtk_css_provider_load_from_data (provider, data, -1, NULL);
+      g_free (data);
     }
 }
 

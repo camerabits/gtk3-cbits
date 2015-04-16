@@ -73,6 +73,37 @@ Patches should be in unified diff form. (The -up option to GNU diff)
 Even better are git-formatted patches. (Use git format-patch)
 
 
+Release notes for 3.16
+======================
+
+* GTK+ now includes an OpenGL rendering widget. To support GL on
+  various platforms, GTK+ uses libepoxy.
+
+* GTK+ no longer uses gtk-update-icon-cache during its build. The
+  --enable-gtk2-dependency configure option has been removed.
+
+* The introspection annotations for the x and y parameters of
+  GtkMenuPositionFunc have been corrected from 'out' to 'inout'.
+  If you are using such a function from language-bindings, this
+  may require adjustments.
+
+* The lookup order for actions that are activated via keyboard
+  accelerators has been changed to start at the currently focused
+  widget. If your application is making use fo nested action groups
+  via gtk_widget_insert_action_group, you may want to check that
+  this change does not upset your accelerators.
+
+* The GtkScrollable interface has gained a new vfunc, get_border,
+  that is used to position overshoot and undershoot indications that
+  are drawn over the content by GtkScrolledWindow. Unless your scrollable
+  has non-scrolling parts similar to treeview headers, there is no need
+  to implement this vfunc.
+
+* The GtkSearchEntry widget has gained a number of new signals that
+  are emitted when certain key sequences are seen. In particular, it
+  now handles the Escape key and emits ::stop-search. Applications that
+  expect to handle Escape themselves will need to be updated.
+
 Release notes for 3.14
 ======================
 
@@ -98,6 +129,14 @@ Release notes for 3.14
 * Using GTK+ under X11 without the X Render extension has been observed
   to be problematic. This combination is using code paths in cairo and
   graphics drivers which are rarely tested and likely buggy.
+
+* GtkTextView is now using a pixel-cache internally, and is drawing
+  a background underneath the text. This can cause problems for applications
+  which assumed that they could draw things below and above the text
+  by chaining up in the ::draw implementation of their GtkTextView subclass.
+  As a short-term workaround, you can make the application apply a
+  custom theme to the text view with a transparent background. For
+  a proper fix, use the new ::draw_layer vfunc.
 
 Release notes for 3.12
 ======================

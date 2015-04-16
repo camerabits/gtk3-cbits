@@ -25,6 +25,7 @@
 #include "config.h"
 #include "gtkcontainer.h"
 #include "gtkmisc.h"
+#include "gtklabel.h"
 #include "gtkintl.h"
 #include "gtkprivate.h"
 
@@ -105,7 +106,7 @@ gtk_misc_class_init (GtkMiscClass *class)
 						       0.0,
 						       1.0,
 						       0.5,
-						       GTK_PARAM_READWRITE));
+						       GTK_PARAM_READWRITE|G_PARAM_DEPRECATED));
 
   g_object_class_install_property (gobject_class,
                                    PROP_YALIGN,
@@ -115,7 +116,7 @@ gtk_misc_class_init (GtkMiscClass *class)
 						       0.0,
 						       1.0,
 						       0.5,
-						       GTK_PARAM_READWRITE));
+						       GTK_PARAM_READWRITE|G_PARAM_DEPRECATED));
 
   g_object_class_install_property (gobject_class,
                                    PROP_XPAD,
@@ -218,7 +219,7 @@ gtk_misc_get_property (GObject      *object,
  *
  * Sets the alignment of the widget.
  *
- * Deprecated: 3.14: Use #GtkWidget alignment and margin properties.
+ * Deprecated: 3.14: Use #GtkWidget's alignment (#GtkWidget:halign and #GtkWidget:valign) and margin properties or #GtkLabel's #GtkLabel:xalign and #GtkLabel:yalign properties.
  */
 void
 gtk_misc_set_alignment (GtkMisc *misc,
@@ -254,6 +255,12 @@ gtk_misc_set_alignment (GtkMisc *misc,
       priv->xalign = xalign;
       priv->yalign = yalign;
       
+      if (GTK_IS_LABEL (misc))
+        {
+          gtk_label_set_xalign (GTK_LABEL (misc), xalign);
+          gtk_label_set_yalign (GTK_LABEL (misc), yalign);
+        }
+
       /* clear the area that was allocated before the change
        */
       widget = GTK_WIDGET (misc);

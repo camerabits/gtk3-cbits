@@ -18,15 +18,20 @@ LDADD = \
 	$(top_builddir)/gtk/libgtk-3.la	\
 	$(top_builddir)/gdk/libgdk-3.la	\
 	$(GTK_DEP_LIBS)			\
+	$(GDK_DEP_LIBS)			\
 	-lm
+
 
 if USE_X11
 testsocket_programs = testsocket testsocket_child
 endif
 
 noinst_PROGRAMS =  $(TEST_PROGS)	\
+	overlayscroll			\
+	syncscroll			\
 	subsurface			\
 	animated-resizing		\
+	animated-revealing		\
 	motion-compression		\
 	scrolling-performance		\
 	blur-performance		\
@@ -68,6 +73,8 @@ noinst_PROGRAMS =  $(TEST_PROGS)	\
 	testfullscreen			\
 	testgeometry			\
 	testgiconpixbuf			\
+	testglarea			\
+	testglblending			\
 	testgrid			\
 	testgtk				\
 	testheaderbar			\
@@ -129,6 +136,7 @@ noinst_PROGRAMS =  $(TEST_PROGS)	\
 	testexpander			\
 	testvolumebutton		\
 	testscrolledwindow		\
+	testscrolledge			\
 	testswitch			\
 	testcellarea			\
 	testswitch			\
@@ -152,6 +160,7 @@ noinst_PROGRAMS =  $(TEST_PROGS)	\
 	testactionbar			\
 	testwindowsize			\
 	testpopover			\
+	gdkgears			\
 	$(NULL)
 
 if USE_X11
@@ -175,6 +184,7 @@ endif
 endif
 
 animated_resizing_DEPENDENCIES = $(TEST_DEPS)
+animated_revealing_DEPENDENCIES = $(TEST_DEPS)
 flicker_DEPENDENCIES = $(TEST_DEPS)
 motion_compression_DEPENDENCIES = $(TEST_DEPS)
 scrolling_performance_DEPENDENCIES = $(TEST_DEPS)
@@ -265,6 +275,7 @@ testgrouping_DEPENDENCIES = $(TEST_DEPS)
 testtooltips_DEPENDENCIES = $(TEST_DEPS)
 testvolumebutton_DEPENDENCIES = $(TEST_DEPS)
 testscrolledwindow_DEPENDENCIES = $(TEST_DEPS)
+testscrolledge_DEPENDENCIES = $(TEST_DEPS)
 testcellarea_DEPENDENCIES = $(TEST_DEPS)
 testtreemenu_DEPENDENCIES = $(TEST_DEPS)
 testwindows_DEPENDENCIES = $(TEST_DEPS)
@@ -290,6 +301,13 @@ testwindowsize_DEPENDENCIES = $(TEST_DEPS)
 
 animated_resizing_SOURCES = 	\
 	animated-resizing.c	\
+	frame-stats.c		\
+	frame-stats.h		\
+	variable.c		\
+	variable.h
+
+animated_revealing_SOURCES = 	\
+	animated-revealing.c	\
 	frame-stats.c		\
 	frame-stats.h		\
 	variable.c		\
@@ -495,6 +513,16 @@ testrevealer_SOURCES = testrevealer.c
 testtitlebar_SOURCES = testtitlebar.c
 
 testwindowsize_SOURCES = testwindowsize.c
+
+gdkgears_SOURCES =	\
+	gdkgears.c	\
+	gtkgears.c	\
+	gtkgears.h
+
+testglblending_SOURCES =	\
+	testglblending.c	\
+	gtkgears.c	\
+	gtkgears.h
 
 EXTRA_DIST += 			\
 	gradient1.png		\

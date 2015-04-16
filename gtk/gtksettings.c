@@ -59,6 +59,12 @@
 
 #include "deprecated/gtkrc.h"
 
+#ifdef GDK_WINDOWING_QUARTZ
+#define PRINT_PREVIEW_COMMAND "open -a /Applications/Preview.app %f"
+#else
+#define PRINT_PREVIEW_COMMAND "evince --unlink-tempfile --preview --print-settings %s %f"
+#endif
+
 /**
  * SECTION:gtksettings
  * @Short_description: Sharing settings between applications
@@ -80,13 +86,13 @@
  * for settings by installing a `settings.ini` file
  * next to their `gtk.css` file.
  *
- * Applications can override system-wide settings with
- * gtk_settings_set_string_property(), gtk_settings_set_long_property(),
- * etc. This should be restricted to special cases though; GtkSettings are
- * not meant as an application configuration facility. When doing so, you
- * need to be aware that settings that are specific to individual widgets
- * may not be available before the widget type has been realized at least
- * once. The following example demonstrates a way to do this:
+ * Applications can override system-wide settings by setting the property
+ * of the GtkSettings object with g_object_set(). This should be restricted
+ * to special cases though; GtkSettings are not meant as an application
+ * configuration facility. When doing so, you need to be aware that settings
+ * that are specific to individual widgets may not be available before the
+ * widget type has been realized at least once. The following example
+ * demonstrates a way to do this:
  * |[<!-- language="C" -->
  *   gtk_init (&argc, &argv);
  *
@@ -115,7 +121,7 @@ struct _GtkSettingsPrivate
   GData *queued_settings;      /* of type GtkSettingsValue* */
   GtkSettingsPropertyValue *property_values;
   GdkScreen *screen;
-  GtkStyleCascade *style_cascade;
+  GSList *style_cascades;
   GtkCssProvider *theme_provider;
   GtkCssProvider *key_theme_provider;
 };
@@ -288,7 +294,7 @@ gtk_settings_init (GtkSettings *settings)
   g_datalist_init (&priv->queued_settings);
   object_list = g_slist_prepend (object_list, settings);
 
-  priv->style_cascade = _gtk_style_cascade_new ();
+  priv->style_cascades = g_slist_prepend (NULL, _gtk_style_cascade_new ());
   priv->theme_provider = gtk_css_provider_new ();
 
   /* build up property array for all yet existing properties and queue
@@ -916,7 +922,7 @@ gtk_settings_class_init (GtkSettingsClass *class)
   g_assert (result == PROP_ERROR_BELL);
 
   /**
-   * GtkSettings:color-hash: (element-type utf8 Gdk.Color):
+   * GtkSettings:color-hash: (element-type utf8 Gdk.Color)
    *
    * Holds a hash table representation of the #GtkSettings:gtk-color-scheme
    * setting, mapping color names to #GdkColors.
@@ -987,7 +993,7 @@ gtk_settings_class_init (GtkSettingsClass *class)
                                              g_param_spec_string ("gtk-print-preview-command",
                                                                   P_("Default command to run when displaying a print preview"),
                                                                   P_("Command to run when displaying a print preview"),
-                                                                  GTK_PRINT_PREVIEW_COMMAND,
+                                                                  PRINT_PREVIEW_COMMAND,
                                                                   GTK_PARAM_READWRITE),
                                              NULL);
   g_assert (result == PROP_PRINT_PREVIEW_COMMAND);
@@ -1710,14 +1716,6 @@ gtk_settings_provider_iface_init (GtkStyleProviderIface *iface)
 {
 }
 
-static GtkCssChange
-gtk_settings_style_provider_get_change (GtkStyleProviderPrivate *provider,
-					const GtkCssMatcher *matcher)
-{
-  return 0;
-}
-
-
 static GtkSettings *
 gtk_settings_style_provider_get_settings (GtkStyleProviderPrivate *provider)
 {
@@ -1728,7 +1726,6 @@ static void
 gtk_settings_provider_private_init (GtkStyleProviderPrivateInterface *iface)
 {
   iface->get_settings = gtk_settings_style_provider_get_settings;
-  iface->get_change = gtk_settings_style_provider_get_change;
 }
 
 static void
@@ -1748,24 +1745,46 @@ gtk_settings_finalize (GObject *object)
 
   settings_update_provider (priv->screen, &priv->theme_provider, NULL);
   settings_update_provider (priv->screen, &priv->key_theme_provider, NULL);
-  g_clear_object (&priv->style_cascade);
+  g_slist_free_full (priv->style_cascades, g_object_unref);
 
   G_OBJECT_CLASS (gtk_settings_parent_class)->finalize (object);
 }
 
 GtkStyleCascade *
-_gtk_settings_get_style_cascade (GtkSettings *settings)
+_gtk_settings_get_style_cascade (GtkSettings *settings,
+                                 gint         scale)
 {
+  GtkSettingsPrivate *priv = settings->priv;
+  GtkStyleCascade *new_cascade;
+  GSList *list;
+
   g_return_val_if_fail (GTK_IS_SETTINGS (settings), NULL);
 
-  return settings->priv->style_cascade;
+  for (list = priv->style_cascades; list; list = list->next)
+    {
+      if (_gtk_style_cascade_get_scale (list->data) == scale)
+        return list->data;
+    }
+
+  /* We are guaranteed to have the special cascade with scale == 1.
+   * It's created in gtk_settings_init()
+   */
+  g_assert (scale != 1);
+
+  new_cascade = _gtk_style_cascade_new ();
+  _gtk_style_cascade_set_parent (new_cascade, _gtk_settings_get_style_cascade (settings, 1));
+  _gtk_style_cascade_set_scale (new_cascade, scale);
+
+  priv->style_cascades = g_slist_prepend (priv->style_cascades, new_cascade);
+
+  return new_cascade;
 }
 
 static void
 settings_init_style (GtkSettings *settings)
 {
   static GtkCssProvider *css_provider = NULL;
-  GtkSettingsPrivate *priv = settings->priv;
+  GtkStyleCascade *cascade;
 
   /* Add provider for user file */
   if (G_UNLIKELY (!css_provider))
@@ -1785,15 +1804,16 @@ settings_init_style (GtkSettings *settings)
       g_free (css_path);
     }
 
-  _gtk_style_cascade_add_provider (priv->style_cascade,
+  cascade = _gtk_settings_get_style_cascade (settings, 1);
+  _gtk_style_cascade_add_provider (cascade,
                                    GTK_STYLE_PROVIDER (css_provider),
                                    GTK_STYLE_PROVIDER_PRIORITY_USER);
 
-  _gtk_style_cascade_add_provider (priv->style_cascade,
+  _gtk_style_cascade_add_provider (cascade,
                                    GTK_STYLE_PROVIDER (settings),
                                    GTK_STYLE_PROVIDER_PRIORITY_SETTINGS);
 
-  _gtk_style_cascade_add_provider (priv->style_cascade,
+  _gtk_style_cascade_add_provider (cascade,
                                    GTK_STYLE_PROVIDER (settings->priv->theme_provider),
                                    GTK_STYLE_PROVIDER_PRIORITY_SETTINGS);
 
@@ -2231,6 +2251,12 @@ _gtk_rc_property_parser_from_type (GType type)
     return NULL;
 }
 
+/**
+ * gtk_settings_install_property:
+ * @pspec:
+ *
+ * Deprecated: 3.16: This function is not useful outside GTK+.
+ */
 void
 gtk_settings_install_property (GParamSpec *pspec)
 {
@@ -2252,6 +2278,8 @@ gtk_settings_install_property (GParamSpec *pspec)
  * gtk_settings_install_property_parser:
  * @pspec:
  * @parser: (scope call):
+ *
+ * Deprecated: 3.16: This function is not useful outside GTK+.
  */
 void
 gtk_settings_install_property_parser (GParamSpec          *pspec,
@@ -2324,16 +2352,24 @@ gtk_settings_set_property_value_internal (GtkSettings            *settings,
     apply_queued_setting (settings, pspec, qvalue);
 }
 
+/**
+ * gtk_settings_set_property_value:
+ * @settings:
+ * @name:
+ * @svalue:
+ *
+ * Deprecated: 3.16: Use g_object_set() instead.
+ */
 void
 gtk_settings_set_property_value (GtkSettings            *settings,
-                                 const gchar            *prop_name,
-                                 const GtkSettingsValue *new_value)
+                                 const gchar            *name,
+                                 const GtkSettingsValue *svalue)
 {
   g_return_if_fail (GTK_SETTINGS (settings));
-  g_return_if_fail (prop_name != NULL);
-  g_return_if_fail (new_value != NULL);
+  g_return_if_fail (name != NULL);
+  g_return_if_fail (svalue != NULL);
 
-  gtk_settings_set_property_value_internal (settings, prop_name, new_value,
+  gtk_settings_set_property_value_internal (settings, name, svalue,
                                             GTK_SETTINGS_SOURCE_APPLICATION);
 }
 
@@ -2350,6 +2386,15 @@ _gtk_settings_set_property_value_from_rc (GtkSettings            *settings,
                                             GTK_SETTINGS_SOURCE_THEME);
 }
 
+/**
+ * gtk_settings_set_string_property:
+ * @settings:
+ * @name:
+ * @v_string:
+ * @origin:
+ *
+ * Deprecated: 3.16: Use g_object_set() instead.
+ */
 void
 gtk_settings_set_string_property (GtkSettings *settings,
                                   const gchar *name,
@@ -2365,10 +2410,20 @@ gtk_settings_set_string_property (GtkSettings *settings,
   svalue.origin = (gchar*) origin;
   g_value_init (&svalue.value, G_TYPE_STRING);
   g_value_set_static_string (&svalue.value, v_string);
-  gtk_settings_set_property_value (settings, name, &svalue);
+  gtk_settings_set_property_value_internal (settings, name, &svalue,
+                                            GTK_SETTINGS_SOURCE_APPLICATION);
   g_value_unset (&svalue.value);
 }
 
+/**
+ * gtk_settings_set_long_property:
+ * @settings:
+ * @name:
+ * @v_long:
+ * @origin:
+ *
+ * Deprecated: 3.16: Use g_object_set() instead.
+ */
 void
 gtk_settings_set_long_property (GtkSettings *settings,
                                 const gchar *name,
@@ -2383,10 +2438,20 @@ gtk_settings_set_long_property (GtkSettings *settings,
   svalue.origin = (gchar*) origin;
   g_value_init (&svalue.value, G_TYPE_LONG);
   g_value_set_long (&svalue.value, v_long);
-  gtk_settings_set_property_value (settings, name, &svalue);
+  gtk_settings_set_property_value_internal (settings, name, &svalue,
+                                            GTK_SETTINGS_SOURCE_APPLICATION);
   g_value_unset (&svalue.value);
 }
 
+/**
+ * gtk_settings_set_double_property:
+ * @settings:
+ * @name:
+ * @v_double:
+ * @origin:
+ *
+ * Deprecated: 3.16: Use g_object_set() instead.
+ */
 void
 gtk_settings_set_double_property (GtkSettings *settings,
                                   const gchar *name,
@@ -2401,7 +2466,8 @@ gtk_settings_set_double_property (GtkSettings *settings,
   svalue.origin = (gchar*) origin;
   g_value_init (&svalue.value, G_TYPE_DOUBLE);
   g_value_set_double (&svalue.value, v_double);
-  gtk_settings_set_property_value (settings, name, &svalue);
+  gtk_settings_set_property_value_internal (settings, name, &svalue,
+                                            GTK_SETTINGS_SOURCE_APPLICATION);
   g_value_unset (&svalue.value);
 }
 

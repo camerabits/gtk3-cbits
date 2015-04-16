@@ -29,6 +29,7 @@
 #include <cairo-gobject.h>
 
 #include "gtkcontainer.h"
+#include "gtkcssstylepropertyprivate.h"
 #include "gtkiconhelperprivate.h"
 #include "gtkimageprivate.h"
 #include "deprecated/gtkiconfactory.h"
@@ -38,6 +39,9 @@
 #include "gtkintl.h"
 #include "gtkprivate.h"
 #include "gtktypebuiltins.h"
+#include "gtkcssshadowsvalueprivate.h"
+#include "gtkstylecontextprivate.h"
+#include "gtkwidgetprivate.h"
 
 #include "a11y/gtkimageaccessible.h"
 
@@ -146,6 +150,8 @@ struct _GtkImagePrivate
 #define DEFAULT_ICON_SIZE GTK_ICON_SIZE_BUTTON
 static gint gtk_image_draw                 (GtkWidget    *widget,
                                             cairo_t      *cr);
+static void gtk_image_size_allocate        (GtkWidget    *widget,
+                                            GtkAllocation*allocation);
 static void gtk_image_unmap                (GtkWidget    *widget);
 static void gtk_image_realize              (GtkWidget    *widget);
 static void gtk_image_unrealize            (GtkWidget    *widget);
@@ -218,6 +224,7 @@ gtk_image_class_init (GtkImageClass *class)
   widget_class->get_preferred_width = gtk_image_get_preferred_width;
   widget_class->get_preferred_height = gtk_image_get_preferred_height;
   widget_class->get_preferred_height_and_baseline_for_width = gtk_image_get_preferred_height_and_baseline_for_width;
+  widget_class->size_allocate = gtk_image_size_allocate;
   widget_class->unmap = gtk_image_unmap;
   widget_class->realize = gtk_image_realize;
   widget_class->unrealize = gtk_image_unrealize;
@@ -1523,6 +1530,27 @@ gtk_image_reset_anim_iter (GtkImage *image)
 }
 
 static void
+gtk_image_size_allocate (GtkWidget     *widget,
+                         GtkAllocation *allocation)
+{
+  GtkAllocation clip;
+
+  GTK_WIDGET_CLASS (gtk_image_parent_class)->size_allocate (widget, allocation);
+
+  /* XXX: This is not strictly correct, we could compute the area
+   * actually occupied by the image, but I'm lazy...
+   */
+  _gtk_style_context_get_icon_extents (gtk_widget_get_style_context (widget),
+                                       &clip,
+                                       allocation->x,
+                                       allocation->y,
+                                       allocation->width,
+                                       allocation->height);
+
+  _gtk_widget_set_simple_clip (widget, &clip);
+}
+
+static void
 gtk_image_unmap (GtkWidget *widget)
 {
   gtk_image_reset_anim_iter (GTK_IMAGE (widget));
@@ -1846,12 +1874,19 @@ icon_theme_changed (GtkImage *image)
 static void
 gtk_image_style_updated (GtkWidget *widget)
 {
+  static GtkBitmask *affects_icon = NULL;
   GtkImage *image = GTK_IMAGE (widget);
   GtkImagePrivate *priv = image->priv;
+  const GtkBitmask *changes;
 
   GTK_WIDGET_CLASS (gtk_image_parent_class)->style_updated (widget);
 
-  icon_theme_changed (image);
+  if (G_UNLIKELY (affects_icon == NULL))
+    affects_icon = _gtk_css_style_property_get_mask_affecting (GTK_CSS_AFFECTS_ICON);
+
+  changes = _gtk_style_context_get_changes (gtk_widget_get_style_context (widget));
+  if (changes == NULL || _gtk_bitmask_intersects (changes, affects_icon))
+    icon_theme_changed (image);
   priv->baseline_align = 0.0;
 }
 

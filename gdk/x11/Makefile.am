@@ -39,6 +39,8 @@ libgdk_x11_la_SOURCES = 	\
 	gdkeventtranslator.c	\
 	gdkeventtranslator.h	\
 	gdkgeometry-x11.c  	\
+	gdkglcontext-x11.c	\
+	gdkglcontext-x11.h	\
 	gdkkeys-x11.c		\
 	gdkmain-x11.c		\
 	gdkproperty-x11.c	\
@@ -60,6 +62,7 @@ libgdkinclude_HEADERS = 	\
 	gdkx.h
 
 libgdkx11include_HEADERS = 	\
+	gdkx-autocleanups.h	\
 	gdkx11applaunchcontext.h \
 	gdkx11cursor.h		\
 	gdkx11device.h		\
@@ -71,6 +74,7 @@ libgdkx11include_HEADERS = 	\
 	gdkx11display.h		\
 	gdkx11displaymanager.h	\
 	gdkx11dnd.h		\
+	gdkx11glcontext.h	\
 	gdkx11keys.h		\
 	gdkx11property.h	\
 	gdkx11screen.h		\

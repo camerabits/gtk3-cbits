@@ -1384,7 +1384,7 @@ get_effective_direction (GtkNotebook      *notebook,
   return translate_direction[text_dir][priv->tab_pos][direction];
 }
 
-static gint
+static GtkPositionType
 get_effective_tab_pos (GtkNotebook *notebook)
 {
   GtkNotebookPrivate *priv = notebook->priv;
@@ -1407,7 +1407,7 @@ get_effective_tab_pos (GtkNotebook *notebook)
 static gint
 get_tab_gap_pos (GtkNotebook *notebook)
 {
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   gint gap_side = GTK_POS_BOTTOM;
 
   switch (tab_pos)
@@ -1741,7 +1741,7 @@ gtk_notebook_get_event_window_position (GtkNotebook  *notebook,
   guint border_width = gtk_container_get_border_width (GTK_CONTAINER (notebook));
   GtkNotebookPage *visible_page = NULL;
   GList *tmp_list;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   gboolean is_rtl;
   gint i;
 
@@ -1809,6 +1809,8 @@ gtk_notebook_get_event_window_position (GtkNotebook  *notebook,
                     }
                 }
               break;
+            default:
+              g_assert_not_reached ();
             }
         }
 
@@ -2017,7 +2019,7 @@ notebook_tab_prepare_style_context (GtkNotebook *notebook,
                                     GtkStyleContext *context,
                                     gboolean use_flags)
 {
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   GtkRegionFlags flags = 0;
   GtkStateFlags state = gtk_style_context_get_state (context);
 
@@ -2241,15 +2243,17 @@ get_padding_and_border (GtkNotebook *notebook,
                         GtkBorder *border)
 {
   GtkStyleContext *context;
+  GtkStateFlags state;
 
   context = gtk_widget_get_style_context (GTK_WIDGET (notebook));
-  gtk_style_context_get_padding (context, 0, border);
+  state = gtk_style_context_get_state (context);
+  gtk_style_context_get_padding (context, state, border);
 
   if (notebook->priv->show_border || notebook->priv->show_tabs)
     {
       GtkBorder tmp;
 
-      gtk_style_context_get_border (context, 0, &tmp);
+      gtk_style_context_get_border (context, state, &tmp);
       border->top += tmp.top;
       border->right += tmp.right;
       border->bottom += tmp.bottom;
@@ -2455,7 +2459,7 @@ gtk_notebook_size_allocate (GtkWidget     *widget,
 {
   GtkNotebook *notebook = GTK_NOTEBOOK (widget);
   GtkNotebookPrivate *priv = notebook->priv;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   gboolean is_rtl;
 
   gtk_widget_set_allocation (widget, allocation);
@@ -2635,7 +2639,7 @@ gtk_notebook_draw (GtkWidget *widget,
       }
     }
 
-  if (priv->operation == DRAG_OPERATION_REORDER &&
+  if (priv->cur_page && priv->operation == DRAG_OPERATION_REORDER &&
       gtk_cairo_should_draw_window (cr, priv->drag_window))
     {
       cairo_save (cr);
@@ -3397,7 +3401,7 @@ scroll_notebook_timer (gpointer data)
   first_tab = gtk_notebook_search_page (notebook, priv->first_tab,
                                         (pointer_position == POINTER_BEFORE) ? STEP_PREV : STEP_NEXT,
                                         TRUE);
-  if (first_tab)
+  if (first_tab && priv->cur_page)
     {
       priv->first_tab = first_tab;
       gtk_notebook_pages_allocate (notebook);
@@ -3688,6 +3692,8 @@ gtk_notebook_drag_begin (GtkWidget        *widget,
       priv->dnd_timer = 0;
     }
 
+  g_assert (priv->cur_page != NULL);
+
   priv->operation = DRAG_OPERATION_DETACH;
   gtk_notebook_pages_allocate (notebook);
 
@@ -3823,6 +3829,8 @@ gtk_notebook_drag_motion (GtkWidget      *widget,
       goto out;
     }
 
+  g_assert (priv->cur_page != NULL);
+
   stop_scrolling (notebook);
   target = gtk_drag_dest_find_target (widget, context, NULL);
   tab_target = gdk_atom_intern_static_string ("GTK_NOTEBOOK_TAB");
@@ -3923,6 +3931,29 @@ gtk_notebook_drag_drop (GtkWidget        *widget,
   return FALSE;
 }
 
+/**
+ * gtk_notebook_detach_tab:
+ * @notebook: a #GtkNotebook
+ * @child: a child
+ *
+ * Removes the child from the notebook.
+ *
+ * This function is very similar to gtk_container_remove(),
+ * but additionally informs the notebook that the removal
+ * is happening as part of a tab DND operation, which should
+ * not be cancelled.
+ *
+ * Since: 3.16
+ */
+void
+gtk_notebook_detach_tab (GtkNotebook *notebook,
+                         GtkWidget   *child)
+{
+  notebook->priv->remove_in_detach = TRUE;
+  gtk_container_remove (GTK_CONTAINER (notebook), child);
+  notebook->priv->remove_in_detach = FALSE;
+}
+
 static void
 do_detach_tab (GtkNotebook     *from,
                GtkNotebook     *to,
@@ -3957,9 +3988,7 @@ do_detach_tab (GtkNotebook     *from,
                            "detachable", &detachable,
                            NULL);
 
-  from->priv->remove_in_detach = TRUE;
-  gtk_container_remove (GTK_CONTAINER (from), child);
-  from->priv->remove_in_detach = FALSE;
+  gtk_notebook_detach_tab (from, child);
 
   gtk_widget_get_allocation (GTK_WIDGET (to), &to_allocation);
   to_priv->mouse_x = x + to_allocation.x;
@@ -4778,7 +4807,7 @@ gtk_notebook_redraw_tabs (GtkNotebook *notebook)
   GtkNotebookPage *page;
   GdkRectangle redraw_rect;
   gint border;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   GtkBorder padding;
 
   widget = GTK_WIDGET (notebook);
@@ -4837,7 +4866,7 @@ gtk_notebook_redraw_tabs_junction (GtkNotebook *notebook)
   GtkNotebookPage *page;
   GdkRectangle redraw_rect;
   gint border;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   GtkBorder padding;
 
   widget = GTK_WIDGET (notebook);
@@ -5212,7 +5241,6 @@ gtk_notebook_search_page (GtkNotebook *notebook,
     }
   else
     {
-      old_list = list;
       list = list->prev;
     }
   while (list)
@@ -5223,7 +5251,6 @@ gtk_notebook_search_page (GtkNotebook *notebook,
            (gtk_widget_get_visible (page->child) &&
             (!page->tab_label || NOTEBOOK_IS_TAB_LABEL_PARENT (notebook, page)))))
         return list;
-      old_list = list;
       list = list->prev;
     }
   return NULL;
@@ -5253,7 +5280,7 @@ gtk_notebook_paint (GtkWidget    *widget,
   gint gap_x = 0, gap_width = 0, step = STEP_PREV;
   gboolean is_rtl;
   gboolean has_tab_gap;
-  gint tab_pos;
+  GtkPositionType tab_pos;
   GtkStyleContext *context;
 
   notebook = GTK_NOTEBOOK (widget);
@@ -5654,7 +5681,7 @@ gtk_notebook_tab_space (GtkNotebook *notebook,
   GtkAllocation allocation, action_allocation;
   GtkWidget *widget;
   GList *children;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   gint tab_overlap;
   gint arrow_spacing;
   gint scroll_arrow_hlength;
@@ -6028,7 +6055,7 @@ get_allocate_at_bottom (GtkWidget *widget,
                         gint       search_direction)
 {
   gboolean is_rtl = (gtk_widget_get_direction (widget) == GTK_TEXT_DIR_RTL);
-  gboolean tab_pos = get_effective_tab_pos (GTK_NOTEBOOK (widget));
+  GtkPositionType tab_pos = get_effective_tab_pos (GTK_NOTEBOOK (widget));
 
   switch (tab_pos)
     {
@@ -6067,12 +6094,15 @@ gtk_notebook_calculate_tabs_allocation (GtkNotebook  *notebook,
   GtkNotebookPage *page;
   GtkStyleContext *context;
   gboolean allocate_at_bottom;
-  gint tab_overlap, tab_pos, tab_extra_space;
+  gint tab_overlap, tab_extra_space;
+  GtkPositionType tab_pos;
   gint left_x, right_x, top_y, bottom_y, anchor;
   guint border_width;
   gboolean gap_left, packing_changed;
   GtkAllocation child_allocation = { 0, };
   GtkOrientation tab_expand_orientation;
+
+  g_assert (priv->cur_page != NULL);
 
   widget = GTK_WIDGET (notebook);
   container = GTK_CONTAINER (notebook);
@@ -6454,7 +6484,7 @@ gtk_notebook_page_allocate (GtkNotebook     *notebook,
   GtkStyleContext *context;
   gint padding;
   gint tab_curvature, tab_overlap;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
   gboolean tab_allocation_changed;
   gboolean was_visible = page->tab_allocated_visible;
   GtkBorder tab_padding;
@@ -6574,6 +6604,8 @@ gtk_notebook_page_allocate (GtkNotebook     *notebook,
       child_allocation.width = MAX (1, (page->allocation.width -
                                         tab_padding.left - tab_padding.right));
       break;
+    default:
+      g_assert_not_reached ();
     }
 
   gtk_widget_get_allocation (page->tab_label, &label_allocation);
@@ -6605,7 +6637,7 @@ gtk_notebook_calc_tabs (GtkNotebook  *notebook,
   GtkNotebookPage *page = NULL;
   GList *children;
   GList *last_calculated_child = NULL;
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
 
   if (!start)
     return;
@@ -6805,7 +6837,7 @@ gtk_notebook_page_select (GtkNotebook *notebook,
   GtkNotebookPrivate *priv = notebook->priv;
   GtkNotebookPage *page;
   GtkDirectionType dir = GTK_DIR_DOWN; /* Quiet GCC */
-  gint tab_pos = get_effective_tab_pos (notebook);
+  GtkPositionType tab_pos = get_effective_tab_pos (notebook);
 
   if (!priv->focus_tab)
     return FALSE;
@@ -8162,8 +8194,7 @@ gtk_notebook_query_tab_label_packing (GtkNotebook *notebook,
   g_return_if_fail (GTK_IS_WIDGET (child));
 
   list = CHECK_FIND_CHILD (notebook, child);
-  if (!list)
-    return;
+  g_return_if_fail (list != NULL);
 
   if (expand)
     *expand = GTK_NOTEBOOK_PAGE (list)->expand;
@@ -8406,6 +8437,14 @@ gtk_notebook_get_tab_detachable (GtkNotebook *notebook,
  * destination and accept the target “GTK_NOTEBOOK_TAB”. The notebook
  * will fill the selection with a GtkWidget** pointing to the child
  * widget that corresponds to the dropped tab.
+ *
+ * Note that you should use gtk_notebook_detach_tab() instead
+ * of gtk_container_remove() if you want to remove the tab from
+ * the source notebook as part of accepting a drop. Otherwise,
+ * the source notebook will think that the dragged tab was
+ * removed from underneath the ongoing drag operation, and
+ * will initiate a drag cancel animation.
+ *
  * |[<!-- language="C" -->
  *  static void
  *  on_drag_data_received (GtkWidget        *widget,
@@ -8419,14 +8458,12 @@ gtk_notebook_get_tab_detachable (GtkNotebook *notebook,
  *  {
  *    GtkWidget *notebook;
  *    GtkWidget **child;
- *    GtkContainer *container;
  *
  *    notebook = gtk_drag_get_source_widget (context);
  *    child = (void*) gtk_selection_data_get_data (data);
  *
  *    process_widget (*child);
- *    container = GTK_CONTAINER (notebook);
- *    gtk_container_remove (container, *child);
+ *    gtk_notebook_detach_tab (GTK_NOTEBOOK (notebook), *child);
  *  }
  * ]|
  *

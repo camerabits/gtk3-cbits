@@ -20,7 +20,7 @@
 
 #include <glib-object.h>
 #include "gtk/gtkbitmaskprivate.h"
-#include "gtk/gtkcsscomputedvaluesprivate.h"
+#include "gtk/gtkcssstaticstyleprivate.h"
 #include "gtk/gtkcsssection.h"
 
 
@@ -31,7 +31,6 @@ typedef struct _GtkCssLookup GtkCssLookup;
 typedef struct {
   GtkCssSection     *section;
   GtkCssValue       *value;
-  GtkCssValue       *computed;
 } GtkCssLookupValue;
 
 struct _GtkCssLookup {
@@ -49,15 +48,10 @@ void                    _gtk_css_lookup_set                     (GtkCssLookup   
                                                                  guint                       id,
                                                                  GtkCssSection              *section,
                                                                  GtkCssValue                *value);
-void                    _gtk_css_lookup_set_computed            (GtkCssLookup               *lookup,
-                                                                 guint                       id,
-                                                                 GtkCssSection              *section,
-                                                                 GtkCssValue                *value);
 void                    _gtk_css_lookup_resolve                 (GtkCssLookup               *lookup,
                                                                  GtkStyleProviderPrivate    *provider,
-								 int                         scale,
-                                                                 GtkCssComputedValues       *values,
-                                                                 GtkCssComputedValues       *parent_values);
+                                                                 GtkCssStaticStyle          *style,
+                                                                 GtkCssStyle                *parent_style);
 
 static inline const GtkBitmask *
 _gtk_css_lookup_get_missing (const GtkCssLookup *lookup)

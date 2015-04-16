@@ -276,7 +276,8 @@ _gdk_x11_screen_init_visuals (GdkScreen *screen)
        * Additional formats (like ABGR) could be added later if they
        * turn up.
        */
-      if (visuals[i]->depth == 32 &&
+      if (x11_screen->rgba_visual == NULL &&
+          visuals[i]->depth == 32 &&
 	  (visuals[i]->red_mask   == 0xff0000 &&
 	   visuals[i]->green_mask == 0x00ff00 &&
 	   visuals[i]->blue_mask  == 0x0000ff))
@@ -340,6 +341,11 @@ _gdk_x11_screen_init_visuals (GdkScreen *screen)
 
   x11_screen->visuals = visuals;
   x11_screen->nvisuals = nvisuals;
+
+  /* If GL is available we want to pick better default/rgba visuals,
+     as we care about glx details such as alpha/depth/stencil depth,
+     stereo and double buffering */
+  _gdk_x11_screen_update_visuals_for_gl (screen);
 }
 
 gint

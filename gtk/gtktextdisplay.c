@@ -75,6 +75,7 @@
 
 #define GTK_TEXT_USE_INTERNAL_UNSUPPORTED_API
 #include "config.h"
+#include "gtktextattributesprivate.h"
 #include "gtktextdisplay.h"
 #include "gtkwidgetprivate.h"
 #include "gtkstylecontextprivate.h"
@@ -204,9 +205,25 @@ gtk_text_renderer_prepare_run (PangoRenderer  *renderer,
     fg_rgba = appearance->rgba[1];
 
   text_renderer_set_rgba (text_renderer, PANGO_RENDER_PART_FOREGROUND, fg_rgba);
-  text_renderer_set_rgba (text_renderer, PANGO_RENDER_PART_STRIKETHROUGH, fg_rgba);
 
-  if (appearance->underline == PANGO_UNDERLINE_ERROR)
+  if (GTK_TEXT_APPEARANCE_GET_STRIKETHROUGH_RGBA_SET (appearance))
+    {
+      GdkRGBA rgba;
+
+      GTK_TEXT_APPEARANCE_GET_STRIKETHROUGH_RGBA (appearance, &rgba);
+      text_renderer_set_rgba (text_renderer, PANGO_RENDER_PART_STRIKETHROUGH, &rgba);
+    }
+  else
+    text_renderer_set_rgba (text_renderer, PANGO_RENDER_PART_STRIKETHROUGH, fg_rgba);
+
+  if (GTK_TEXT_APPEARANCE_GET_UNDERLINE_RGBA_SET (appearance))
+    {
+      GdkRGBA rgba;
+
+      GTK_TEXT_APPEARANCE_GET_UNDERLINE_RGBA (appearance, &rgba);
+      text_renderer_set_rgba (text_renderer, PANGO_RENDER_PART_UNDERLINE, &rgba);
+    }
+  else if (appearance->underline == PANGO_UNDERLINE_ERROR)
     {
       if (!text_renderer->error_color)
         {
@@ -587,11 +604,17 @@ render_para (GtkTextRenderer    *text_renderer,
   screen_width = line_display->total_width;
 
   context = gtk_widget_get_style_context (text_renderer->widget);
-  state = gtk_widget_get_state_flags (text_renderer->widget);
+  gtk_style_context_save (context);
 
+  state = gtk_style_context_get_state (context);
   state |= GTK_STATE_FLAG_SELECTED;
+  gtk_style_context_set_state (context, state);
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
   gtk_style_context_get_background_color (context, state, &selection);
+G_GNUC_END_IGNORE_DEPRECATIONS
+
+ gtk_style_context_restore (context);
 
   do
     {
@@ -783,7 +806,9 @@ render_para (GtkTextRenderer    *text_renderer,
                   GdkRGBA color;
 
                   state = gtk_widget_get_state_flags (text_renderer->widget);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
                   gtk_style_context_get_background_color (context, state, &color);
+G_GNUC_END_IGNORE_DEPRECATIONS
 
                   gdk_cairo_set_source_rgba (cr, &color);
 

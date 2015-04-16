@@ -19,7 +19,8 @@
 #include "config.h"
 #include "gdk.h"
 #include "gdkprivate-win32.h"
-#include "gdkdisplayprivate.h"
+#include "gdkdisplay-win32.h"
+#include "gdkglcontext-win32.h"
 #include "gdkwin32display.h"
 #include "gdkwin32screen.h"
 #include "gdkwin32window.h"
@@ -216,16 +217,6 @@ _gdk_win32_display_open (const gchar *display_name)
   return _gdk_display;
 }
 
-struct _GdkWin32Display
-{
-  GdkDisplay display;
-};
-
-struct _GdkWin32DisplayClass
-{
-  GdkDisplayClass display_class;
-};
-
 G_DEFINE_TYPE (GdkWin32Display, gdk_win32_display, GDK_TYPE_DISPLAY)
 
 static const gchar *
@@ -364,7 +355,12 @@ inner_clipboard_window_procedure (HWND   hwnd,
         GdkWindow *owner;
 
         success = OpenClipboard (hwnd);
-        g_return_val_if_fail (success, 0);
+        if (!success)
+          {
+            g_warning ("Failed to OpenClipboard on window handle %p", hwnd);
+            return 0;
+          }
+
         hwndOwner = GetClipboardOwner ();
         owner = gdk_win32_window_lookup_for_display (_gdk_display, hwndOwner);
         if (owner == NULL)
@@ -600,19 +596,6 @@ gdk_win32_display_notify_startup_complete (GdkDisplay  *display,
   /* nothing */
 }
 static void
-gdk_win32_display_event_data_copy (GdkDisplay    *display,
-                                   const GdkEvent *src,
-                                   GdkEvent       *dst)
-{
-  /* nothing */
-}
-static void
-gdk_win32_display_event_data_free (GdkDisplay *display,
-                                   GdkEvent *event)
-{
-  /* nothing */
-}
-static void
 gdk_win32_display_push_error_trap (GdkDisplay *display)
 {
   /* nothing */
@@ -665,8 +648,6 @@ gdk_win32_display_class_init (GdkWin32DisplayClass *klass)
   display_class->after_process_all_updates = gdk_win32_display_after_process_all_updates;
   display_class->get_next_serial = gdk_win32_display_get_next_serial;
   display_class->notify_startup_complete = gdk_win32_display_notify_startup_complete;
-  display_class->event_data_copy = gdk_win32_display_event_data_copy;
-  display_class->event_data_free = gdk_win32_display_event_data_free;
   display_class->create_window_impl = _gdk_win32_display_create_window_impl;
 
   display_class->get_keymap = _gdk_win32_display_get_keymap;
@@ -679,6 +660,7 @@ gdk_win32_display_class_init (GdkWin32DisplayClass *klass)
   display_class->convert_selection = _gdk_win32_display_convert_selection;
   display_class->text_property_to_utf8_list = _gdk_win32_display_text_property_to_utf8_list;
   display_class->utf8_to_string_target = _gdk_win32_display_utf8_to_string_target;
+  display_class->make_gl_context_current = _gdk_win32_display_make_gl_context_current;
   
   _gdk_win32_windowing_init ();
 }
