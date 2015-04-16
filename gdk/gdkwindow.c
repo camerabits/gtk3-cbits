@@ -3629,10 +3629,10 @@ gdk_window_process_updates (GdkWindow *window,
 {
   g_return_if_fail (GDK_IS_WINDOW (window));
 
-  return gdk_window_process_updates_with_mode (window,
-                                               update_children ?
-                                               PROCESS_UPDATES_WITH_ALL_CHILDREN :
-                                               PROCESS_UPDATES_NO_RECURSE);
+  gdk_window_process_updates_with_mode (window,
+                                        update_children ?
+                                        PROCESS_UPDATES_WITH_ALL_CHILDREN :
+                                        PROCESS_UPDATES_NO_RECURSE);
 }
 
 static void
@@ -4367,6 +4367,8 @@ gdk_window_get_device_position_double (GdkWindow       *window,
   g_return_val_if_fail (GDK_IS_DEVICE (device), NULL);
   g_return_val_if_fail (gdk_device_get_source (device) != GDK_SOURCE_KEYBOARD, NULL);
 
+  tmp_x = tmp_y = 0;
+  tmp_mask = 0;
   normal_child = GDK_WINDOW_IMPL_GET_CLASS (window->impl)->get_device_state (window,
                                                                              device,
                                                                              &tmp_x, &tmp_y,
@@ -10620,6 +10622,8 @@ gdk_window_flush_events (GdkFrameClock *clock,
   _gdk_display_pause_events (display);
 
   gdk_frame_clock_request_phase (clock, GDK_FRAME_CLOCK_PHASE_RESUME_EVENTS);
+
+  window->frame_clock_events_paused = TRUE;
 }
 
 static void
@@ -10646,6 +10650,8 @@ gdk_window_resume_events (GdkFrameClock *clock,
 
   display = gdk_window_get_display (window);
   _gdk_display_unpause_events (display);
+
+  window->frame_clock_events_paused = FALSE;
 }
 
 static void
@@ -10678,6 +10684,9 @@ gdk_window_set_frame_clock (GdkWindow     *window,
 
   if (window->frame_clock)
     {
+      if (window->frame_clock_events_paused)
+        gdk_window_resume_events (window->frame_clock, G_OBJECT (window));
+
       g_signal_handlers_disconnect_by_func (G_OBJECT (window->frame_clock),
                                             G_CALLBACK (gdk_window_flush_events),
                                             window);
@@ -10787,7 +10796,7 @@ gdk_window_set_opaque_region (GdkWindow      *window,
   impl_class = GDK_WINDOW_IMPL_GET_CLASS (window->impl);
 
   if (impl_class->set_opaque_region)
-    return impl_class->set_opaque_region (window, region);
+    impl_class->set_opaque_region (window, region);
 }
 
 /**

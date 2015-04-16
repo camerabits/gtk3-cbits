@@ -34,6 +34,7 @@
 #include "gtkadjustmentprivate.h"
 #include "gtkcolorscaleprivate.h"
 #include "gtkintl.h"
+#include "gtkgesturelongpressprivate.h"
 #include "gtkmain.h"
 #include "gtkmarshalers.h"
 #include "gtkorientableprivate.h"
@@ -782,6 +783,7 @@ gtk_range_init (GtkRange *range)
                     G_CALLBACK (gtk_range_multipress_gesture_released), range);
 
   priv->long_press_gesture = gtk_gesture_long_press_new (GTK_WIDGET (range));
+  g_object_set (priv->long_press_gesture, "delay-factor", 2.0, NULL);
   gtk_gesture_group (priv->drag_gesture, priv->long_press_gesture);
   g_signal_connect (priv->long_press_gesture, "pressed",
                     G_CALLBACK (gtk_range_long_press_gesture_pressed), range);
@@ -1667,14 +1669,13 @@ gtk_range_realize (GtkWidget *widget)
   attributes.height = allocation.height;
   attributes.wclass = GDK_INPUT_ONLY;
   attributes.event_mask = gtk_widget_get_events (widget);
-  attributes.event_mask |= (GDK_BUTTON_PRESS_MASK |
-                            GDK_BUTTON_RELEASE_MASK |
-                            GDK_SCROLL_MASK |
-                            GDK_SMOOTH_SCROLL_MASK |
-                            GDK_ENTER_NOTIFY_MASK |
-                            GDK_LEAVE_NOTIFY_MASK |
-                            GDK_POINTER_MOTION_MASK |
-                            GDK_POINTER_MOTION_HINT_MASK);
+  attributes.event_mask |= GDK_BUTTON_PRESS_MASK |
+                           GDK_BUTTON_RELEASE_MASK |
+                           GDK_SCROLL_MASK |
+                           GDK_SMOOTH_SCROLL_MASK |
+                           GDK_ENTER_NOTIFY_MASK |
+                           GDK_LEAVE_NOTIFY_MASK |
+                           GDK_POINTER_MOTION_MASK;
 
   attributes_mask = GDK_WA_X | GDK_WA_Y;
 
@@ -2055,8 +2056,6 @@ gtk_range_draw (GtkWidget *widget,
             }
           else
             {
-              gboolean is_rtl = gtk_widget_get_direction (widget) == GTK_TEXT_DIR_RTL;
-
               gint trough_change_pos_x = width;
               gint trough_change_pos_y = height;
 
@@ -2071,14 +2070,12 @@ gtk_range_draw (GtkWidget *widget,
 
               gtk_style_context_save (context);
               if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
-                {
-                  gtk_style_context_add_class (context, GTK_STYLE_CLASS_LEFT);
-
-                  if (!is_rtl)
-                    gtk_style_context_add_class (context, GTK_STYLE_CLASS_HIGHLIGHT);
-                }
+                gtk_style_context_add_class (context, GTK_STYLE_CLASS_LEFT);
               else
                 gtk_style_context_add_class (context, GTK_STYLE_CLASS_TOP);
+
+              if (!should_invert (range))
+                gtk_style_context_add_class (context, GTK_STYLE_CLASS_HIGHLIGHT);
 
               gtk_render_background (context, cr, x, y,
                                      trough_change_pos_x,
@@ -2097,17 +2094,12 @@ gtk_range_draw (GtkWidget *widget,
 
               gtk_style_context_save (context);
               if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
-                {
-                  gtk_style_context_add_class (context, GTK_STYLE_CLASS_RIGHT);
-
-                  if (is_rtl)
-                    gtk_style_context_add_class (context, GTK_STYLE_CLASS_HIGHLIGHT);
-                }
+                gtk_style_context_add_class (context, GTK_STYLE_CLASS_RIGHT);
               else
-                {
-                  gtk_style_context_add_class (context, GTK_STYLE_CLASS_BOTTOM);
-                  gtk_style_context_add_class (context, GTK_STYLE_CLASS_HIGHLIGHT);
-                }
+                gtk_style_context_add_class (context, GTK_STYLE_CLASS_BOTTOM);
+
+              if (should_invert (range))
+                gtk_style_context_add_class (context, GTK_STYLE_CLASS_HIGHLIGHT);
 
               gtk_render_background (context, cr,
                                      x + trough_change_pos_x, y + trough_change_pos_y,
@@ -2129,11 +2121,12 @@ gtk_range_draw (GtkWidget *widget,
           gtk_adjustment_get_upper (priv->adjustment) - gtk_adjustment_get_page_size (priv->adjustment) -
           gtk_adjustment_get_lower (priv->adjustment) != 0)
         {
-          gdouble  fill_level  = priv->fill_level;
-          gint     fill_x      = x;
-          gint     fill_y      = y;
-          gint     fill_width  = width;
-          gint     fill_height = height;
+          gdouble  fill_level      = priv->fill_level;
+          gint     fill_x          = x;
+          gint     fill_y          = y;
+          gint     fill_width      = width;
+          gint     fill_height     = height;
+          gdouble  fill_proportion = 0.0;
 
           gtk_style_context_save (context);
           gtk_style_context_add_class (context, GTK_STYLE_CLASS_PROGRESSBAR);
@@ -2142,33 +2135,36 @@ gtk_range_draw (GtkWidget *widget,
                               gtk_adjustment_get_upper (priv->adjustment) -
                               gtk_adjustment_get_page_size (priv->adjustment));
 
-          if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
-            {
-              fill_x     = priv->trough.x;
-              fill_width = (priv->slider.width +
-                            (fill_level - gtk_adjustment_get_lower (priv->adjustment)) /
+          fill_proportion = (fill_level - gtk_adjustment_get_lower (priv->adjustment)) /
                             (gtk_adjustment_get_upper (priv->adjustment) -
                              gtk_adjustment_get_lower (priv->adjustment) -
-                             gtk_adjustment_get_page_size (priv->adjustment)) *
-                            (priv->trough.width -
-                             priv->slider.width));
+                             gtk_adjustment_get_page_size (priv->adjustment));
 
-              if (should_invert (range))
-                fill_x += priv->trough.width - fill_width;
+          if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+            {
+              if (!should_invert (range))
+                {
+                  fill_x     = priv->slider.x + (priv->slider.width / 2);
+                  fill_width = (width * fill_proportion) - fill_x + x;
+                }
+              else
+                {
+                  fill_x     = x + width * (1.0 - fill_proportion);
+                  fill_width = priv->slider.x + (priv->slider.width / 2) - fill_x;
+                }
             }
           else
             {
-              fill_y      = priv->trough.y;
-              fill_height = (priv->slider.height +
-                             (fill_level - gtk_adjustment_get_lower (priv->adjustment)) /
-                             (gtk_adjustment_get_upper (priv->adjustment) -
-                              gtk_adjustment_get_lower (priv->adjustment) -
-                              gtk_adjustment_get_page_size (priv->adjustment)) *
-                             (priv->trough.height -
-                              priv->slider.height));
-
-              if (should_invert (range))
-                fill_y += priv->trough.height - fill_height;
+              if (!should_invert (range))
+                {
+                  fill_y      = priv->slider.y + (priv->slider.height / 2);
+                  fill_height = (height * fill_proportion) - fill_y + y;
+                }
+              else
+                {
+                  fill_y      = y + height * (1.0 - fill_proportion);
+                  fill_height = priv->slider.y + (priv->slider.height / 2) - fill_y;
+                }
             }
 
           gtk_render_background (context, cr, fill_x, fill_y, fill_width, fill_height);
@@ -2453,8 +2449,24 @@ gtk_range_long_press_gesture_pressed (GtkGestureLongPress *gesture,
                                       gdouble              y,
                                       GtkRange            *range)
 {
-  update_zoom_state (range, TRUE);
-  range->priv->zoom_set = TRUE;
+  GtkRangePrivate *priv = range->priv;
+
+  if (!priv->zoom)
+    {
+      if (priv->orientation == GTK_ORIENTATION_VERTICAL)
+        {
+          priv->slide_initial_slider_position = priv->slider.y;
+          priv->slide_initial_coordinate_delta = y - priv->slider.y;
+        }
+      else
+        {
+          priv->slide_initial_slider_position = priv->slider.x;
+          priv->slide_initial_coordinate_delta = x - priv->slider.x;
+        }
+
+      update_zoom_state (range, TRUE);
+      range->priv->zoom_set = TRUE;
+    }
 }
 
 static void
@@ -2802,10 +2814,11 @@ _gtk_range_get_wheel_delta (GtkRange       *range,
   GtkRangePrivate *priv = range->priv;
   GtkAdjustment *adjustment = priv->adjustment;
   gdouble dx, dy;
-  gdouble delta;
+  gdouble delta = 0;
   gdouble page_size;
   gdouble page_increment;
   gdouble scroll_unit;
+  GdkScrollDirection direction;
 
   page_size = gtk_adjustment_get_page_size (adjustment);
   page_increment = gtk_adjustment_get_page_increment (adjustment);
@@ -2821,16 +2834,15 @@ _gtk_range_get_wheel_delta (GtkRange       *range,
       scroll_unit = 1;
 #endif
 
-      if (dx != 0 &&
-          gtk_orientable_get_orientation (GTK_ORIENTABLE (range)) == GTK_ORIENTATION_HORIZONTAL)
-        delta = dx * scroll_unit;
+      if (gtk_orientable_get_orientation (GTK_ORIENTABLE (range)) == GTK_ORIENTATION_HORIZONTAL)
+        delta = - (dx ? dx : dy) * scroll_unit;
       else
         delta = dy * scroll_unit;
     }
-  else
+  else if (gdk_event_get_scroll_direction ((GdkEvent *) event, &direction))
     {
-      if (event->direction == GDK_SCROLL_UP ||
-          event->direction == GDK_SCROLL_LEFT)
+      if (direction == GDK_SCROLL_UP ||
+          direction == GDK_SCROLL_RIGHT)
         delta = - scroll_unit;
       else
         delta = scroll_unit;

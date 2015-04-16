@@ -502,7 +502,9 @@ gtk_application_focus_in_event_cb (GtkWindow      *window,
       priv->windows = g_list_concat (link, priv->windows);
     }
 
-  gtk_application_impl_active_window_changed (application->priv->impl, window);
+  if (application->priv->impl)
+    gtk_application_impl_active_window_changed (application->priv->impl, window);
+
   g_object_notify (G_OBJECT (application), "active-window");
 
   return FALSE;
@@ -1774,14 +1776,16 @@ void
 gtk_application_handle_window_realize (GtkApplication *application,
                                        GtkWindow      *window)
 {
-  gtk_application_impl_handle_window_realize (application->priv->impl, window);
+  if (application->priv->impl)
+    gtk_application_impl_handle_window_realize (application->priv->impl, window);
 }
 
 void
 gtk_application_handle_window_map (GtkApplication *application,
                                    GtkWindow      *window)
 {
-  gtk_application_impl_handle_window_map (application->priv->impl, window);
+  if (application->priv->impl)
+    gtk_application_impl_handle_window_map (application->priv->impl, window);
 }
 
 /**

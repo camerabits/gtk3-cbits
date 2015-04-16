@@ -228,6 +228,8 @@ static gboolean gtk_drag_dest_drop              (GtkWidget        *widget,
                                                  gint              x,
                                                  gint              y,
                                                  guint             time);
+static void     gtk_drag_dest_set_widget        (GtkDragDestInfo  *info,
+                                                 GtkWidget        *widget);
 
 static GtkDragDestInfo *  gtk_drag_get_dest_info     (GdkDragContext *context,
                                                       gboolean        create);
@@ -245,7 +247,7 @@ static void gtk_drag_drop                      (GtkDragSourceInfo *info,
 static void gtk_drag_drop_finished             (GtkDragSourceInfo *info,
                                                 GtkDragResult      result,
                                                 guint              time);
-static void gtk_drag_cancel                    (GtkDragSourceInfo *info,
+static void gtk_drag_cancel_internal           (GtkDragSourceInfo *info,
                                                 GtkDragResult      result,
                                                 guint32            time);
 
@@ -1640,7 +1642,7 @@ _gtk_drag_dest_handle_event (GtkWidget *toplevel,
       if (info->widget)
         {
           gtk_drag_dest_leave (info->widget, context, event->dnd.time);
-          info->widget = NULL;
+          gtk_drag_dest_set_widget (info, NULL);
         }
       break;
       
@@ -1660,7 +1662,7 @@ _gtk_drag_dest_handle_event (GtkWidget *toplevel,
             if (info->widget)
               {
                 gtk_drag_dest_leave (info->widget, context, event->dnd.time);
-                info->widget = NULL;
+                gtk_drag_dest_set_widget (info, NULL);
               }
           }
 
@@ -1692,7 +1694,7 @@ _gtk_drag_dest_handle_event (GtkWidget *toplevel,
         if (info->widget && !found)
           {
             gtk_drag_dest_leave (info->widget, context, event->dnd.time);
-            info->widget = NULL;
+            gtk_drag_dest_set_widget (info, NULL);
           }
         
         /* Send a reply.
@@ -1920,14 +1922,12 @@ gtk_drag_find_widget (GtkWidget           *widget,
           found = callback (widget, context, x, y, time);
 
           /* If so, send a "drag-leave" to the last widget */
-          if (found)
+          if (found && info->widget != widget)
             {
-              if (info->widget && info->widget != widget)
-                {
-                  gtk_drag_dest_leave (info->widget, context, time);
-                }
+              if (info->widget)
+                gtk_drag_dest_leave (info->widget, context, time);
 
-              info->widget = widget;
+              gtk_drag_dest_set_widget (info, widget);
             }
         }
 
@@ -2010,8 +2010,25 @@ gtk_drag_proxy_begin (GtkWidget       *widget,
 }
 
 static void
+gtk_drag_dest_set_widget (GtkDragDestInfo *info,
+                          GtkWidget       *widget)
+{
+  if (info->widget)
+    g_object_remove_weak_pointer (G_OBJECT (info->widget), (gpointer *) &info->widget);
+
+  info->widget = widget;
+
+  if (info->widget)
+    g_object_add_weak_pointer (G_OBJECT (info->widget), (gpointer *) &info->widget);
+}
+
+static void
 gtk_drag_dest_info_destroy (gpointer data)
 {
+  GtkDragDestInfo *info = (GtkDragDestInfo *)data;
+
+  gtk_drag_dest_set_widget (info, NULL);
+
   g_slice_free (GtkDragDestInfo, data);
 }
 
@@ -2516,7 +2533,11 @@ gtk_drag_begin_internal (GtkWidget         *widget,
    * not have set one.
    */
   if (!info->icon_window && !info->icon_helper)
-    info->icon_helper = gtk_drag_source_site_get_icon_helper (site);
+    {
+      info->icon_helper = gtk_drag_source_site_get_icon_helper (site);
+      set_icon_helper (info->context, info->icon_helper,
+                       0, 0, TRUE);
+    }
 
   /* We need to composite the icon into the cursor, if we are
    * not using an icon window.
@@ -3016,7 +3037,7 @@ gtk_drag_get_icon (GtkDragSourceInfo  *info,
            */
           save_icon_window = info->icon_window;
           save_hot_x = info->hot_x;
-          save_hot_y = info->hot_x;
+          save_hot_y = info->hot_y;
           save_destroy_icon = info->destroy_icon;
 
           info->icon_window = NULL;
@@ -3569,7 +3590,6 @@ _gtk_drag_source_handle_event (GtkWidget *widget,
     case GDK_DRAG_STATUS:
       {
         GdkCursor *cursor;
-
         if (info->proxy_dest)
           {
             if (!event->dnd.send_event)
@@ -3934,15 +3954,23 @@ gtk_drag_anim_destroy (GtkDragAnim *anim)
 static gboolean
 gtk_drag_anim_timeout (gpointer data)
 {
-  GtkWidget *icon_window;
   GtkDragAnim *anim = data;
   GtkDragSourceInfo *info = anim->info;
-  GtkWidget *widget = info->widget;
-  GdkFrameClock *frame_clock = gtk_widget_get_frame_clock (widget);
-  gint64 current_time = gdk_frame_clock_get_frame_time (frame_clock);
+  GtkWidget *icon_window;
+  GdkFrameClock *frame_clock;
+  gint64 current_time;
   int hot_x, hot_y;
-  double f = (current_time - anim->start_time) / (double) ANIM_TIME;
+  double f;
   double t;
+
+  frame_clock = gtk_widget_get_frame_clock (info->widget);
+
+  if (!frame_clock)
+    return G_SOURCE_REMOVE;
+
+  current_time = gdk_frame_clock_get_frame_time (frame_clock);
+
+  f = (current_time - anim->start_time) / (double) ANIM_TIME;
 
   if (f >= 1.0)
     return G_SOURCE_REMOVE;
@@ -3964,6 +3992,7 @@ gtk_drag_remove_icon (GtkDragSourceInfo *info)
   if (info->icon_window)
     {
       gtk_widget_hide (info->icon_window);
+      gtk_widget_set_opacity (info->icon_window, 1.0);
       if (info->destroy_icon)
         gtk_widget_destroy (info->icon_window);
 
@@ -4218,9 +4247,9 @@ gtk_drag_end (GtkDragSourceInfo *info,
  * or programmatically.
  */
 static void
-gtk_drag_cancel (GtkDragSourceInfo *info,
-                 GtkDragResult      result,
-                 guint32            time)
+gtk_drag_cancel_internal (GtkDragSourceInfo *info,
+                          GtkDragResult      result,
+                          guint32            time)
 {
   gtk_drag_end (info, time);
   gdk_drag_abort (info->context, time);
@@ -4277,7 +4306,7 @@ gtk_drag_key_cb (GtkWidget   *widget,
       switch (event->keyval)
         {
         case GDK_KEY_Escape:
-          gtk_drag_cancel (info, GTK_DRAG_RESULT_USER_CANCELLED, event->time);
+          gtk_drag_cancel_internal (info, GTK_DRAG_RESULT_USER_CANCELLED, event->time);
           return TRUE;
 
         case GDK_KEY_space:
@@ -4293,7 +4322,7 @@ gtk_drag_key_cb (GtkWidget   *widget,
             }
           else
             {
-              gtk_drag_cancel (info, GTK_DRAG_RESULT_NO_TARGET, event->time);
+              gtk_drag_cancel_internal (info, GTK_DRAG_RESULT_NO_TARGET, event->time);
             }
 
           return TRUE;
@@ -4360,7 +4389,7 @@ gtk_drag_grab_broken_event_cb (GtkWidget          *widget,
       || event->grab_window == gtk_widget_get_window (info->ipc_widget))
     return FALSE;
 
-  gtk_drag_cancel (info, GTK_DRAG_RESULT_GRAB_BROKEN, gtk_get_current_event_time ());
+  gtk_drag_cancel_internal (info, GTK_DRAG_RESULT_GRAB_BROKEN, gtk_get_current_event_time ());
   return TRUE;
 }
 
@@ -4377,9 +4406,10 @@ gtk_drag_grab_notify_cb (GtkWidget *widget,
   if (gtk_widget_device_is_shadowed (widget, pointer))
     {
       /* We have to block callbacks to avoid recursion here, because
-         gtk_drag_cancel calls gtk_grab_remove (via gtk_drag_end) */
+       * gtk_drag_cancel_internal calls gtk_grab_remove (via gtk_drag_end)
+       */
       g_signal_handlers_block_by_func (widget, gtk_drag_grab_notify_cb, data);
-      gtk_drag_cancel (info, GTK_DRAG_RESULT_GRAB_BROKEN, gtk_get_current_event_time ());
+      gtk_drag_cancel_internal (info, GTK_DRAG_RESULT_GRAB_BROKEN, gtk_get_current_event_time ());
       g_signal_handlers_unblock_by_func (widget, gtk_drag_grab_notify_cb, data);
     }
 }
@@ -4403,7 +4433,7 @@ gtk_drag_button_release_cb (GtkWidget      *widget,
     }
   else
     {
-      gtk_drag_cancel (info, GTK_DRAG_RESULT_NO_TARGET, event->time);
+      gtk_drag_cancel_internal (info, GTK_DRAG_RESULT_NO_TARGET, event->time);
     }
 
   return TRUE;
@@ -4455,4 +4485,16 @@ gtk_drag_check_threshold (GtkWidget *widget,
   
   return (ABS (current_x - start_x) > drag_threshold ||
           ABS (current_y - start_y) > drag_threshold);
+}
+
+void
+gtk_drag_cancel (GdkDragContext *context)
+{
+  GtkDragSourceInfo *info;
+
+  g_return_if_fail (GDK_IS_DRAG_CONTEXT (context));
+
+  info = gtk_drag_get_source_info (context, FALSE);
+  if (info != NULL)
+    gtk_drag_cancel_internal (info, GTK_DRAG_RESULT_ERROR, gtk_get_current_event_time ());
 }

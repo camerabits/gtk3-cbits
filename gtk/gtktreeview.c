@@ -2120,6 +2120,7 @@ gtk_tree_view_destroy (GtkWidget *widget)
   GList *list;
 
   gtk_tree_view_stop_editing (tree_view, TRUE);
+  gtk_tree_view_stop_rubber_band (tree_view);
 
   if (tree_view->priv->columns != NULL)
     {
@@ -5289,14 +5290,14 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
 	  if (draw_hgrid_lines)
 	    {
-	      if (background_area.y > 0)
+	      if (background_area.y >= clip.y)
                 gtk_tree_view_draw_line (tree_view, cr,
                                          GTK_TREE_VIEW_GRID_LINE,
                                          background_area.x, background_area.y,
                                          background_area.x + background_area.width,
 			                 background_area.y);
 
-	      if (y_offset + max_height >= clip.height)
+	      if (background_area.y + max_height < clip.y + clip.height)
                 gtk_tree_view_draw_line (tree_view, cr,
                                          GTK_TREE_VIEW_GRID_LINE,
                                          background_area.x, background_area.y + max_height,
@@ -5576,8 +5577,8 @@ gtk_tree_view_draw (GtkWidget *widget,
 
       view_rect.x = 0;
       view_rect.y = gtk_tree_view_get_effective_header_height (tree_view);
-      view_rect.width = gdk_window_get_width (tree_view->priv->bin_window);
-      view_rect.height = gdk_window_get_height (tree_view->priv->bin_window);
+      view_rect.width = gtk_widget_get_allocated_width (widget);
+      view_rect.height = gtk_widget_get_allocated_height (widget) - view_rect.y;
 
       gdk_window_get_position (tree_view->priv->bin_window, &canvas_rect.x, &canvas_rect.y);
       canvas_rect.y = -gtk_adjustment_get_value (tree_view->priv->vadjustment);

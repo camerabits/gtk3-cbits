@@ -162,6 +162,7 @@ struct _GtkNotebookPrivate
   guint          click_child        : 3;
   guint          during_detach      : 1;
   guint          during_reorder     : 1;
+  guint          remove_in_detach   : 1;
   guint          focus_out          : 1; /* Flag used by ::move-focus-out implementation */
   guint          has_scrolled       : 1;
   guint          in_child           : 3;
@@ -3709,6 +3710,7 @@ gtk_notebook_drag_begin (GtkWidget        *widget,
                     G_CALLBACK (on_drag_icon_draw), notebook);
 
   gtk_drag_set_icon_widget (context, priv->dnd_window, -2, -2);
+  g_object_set_data (G_OBJECT (priv->dnd_window), "drag-context", context);
 }
 
 static void
@@ -3955,7 +3957,9 @@ do_detach_tab (GtkNotebook     *from,
                            "detachable", &detachable,
                            NULL);
 
+  from->priv->remove_in_detach = TRUE;
   gtk_container_remove (GTK_CONTAINER (from), child);
+  from->priv->remove_in_detach = FALSE;
 
   gtk_widget_get_allocation (GTK_WIDGET (to), &to_allocation);
   to_priv->mouse_x = x + to_allocation.x;
@@ -4789,6 +4793,8 @@ gtk_notebook_redraw_tabs (GtkNotebook *notebook)
   redraw_rect.y = border;
 
   gtk_widget_get_allocation (widget, &allocation);
+  if (allocation.width <= 1)
+    return;
 
   get_padding_and_border (notebook, &padding);
 
@@ -4799,7 +4805,7 @@ gtk_notebook_redraw_tabs (GtkNotebook *notebook)
         page->allocation.height - padding.bottom;
       /* fall through */
     case GTK_POS_TOP:
-      redraw_rect.width = allocation.width - 2 * border;
+      redraw_rect.width = MAX (1, allocation.width - 2 * border);
       redraw_rect.height = page->allocation.height + padding.top;
 
       break;
@@ -4810,7 +4816,7 @@ gtk_notebook_redraw_tabs (GtkNotebook *notebook)
       /* fall through */
     case GTK_POS_LEFT:
       redraw_rect.width = page->allocation.width + padding.left;
-      redraw_rect.height = allocation.height - 2 * border;
+      redraw_rect.height = MAX (1, allocation.height - 2 * border);
 
       break;
     }
@@ -5045,10 +5051,22 @@ gtk_notebook_real_remove (GtkNotebook *notebook,
       priv->cur_page = NULL;
       if (next_list && !destroying)
         gtk_notebook_switch_page (notebook, GTK_NOTEBOOK_PAGE (next_list));
+      if (priv->operation == DRAG_OPERATION_REORDER && !priv->remove_in_detach)
+        gtk_notebook_stop_reorder (notebook);
     }
 
   if (priv->detached_tab == list->data)
-    priv->detached_tab = NULL;
+    {
+      priv->detached_tab = NULL;
+
+      if (priv->operation == DRAG_OPERATION_DETACH && !priv->remove_in_detach)
+        {
+          GdkDragContext *context;
+
+          context = (GdkDragContext *)g_object_get_data (G_OBJECT (priv->dnd_window), "drag-context");
+          gtk_drag_cancel (context);
+        }
+    }
   if (priv->prelight_tab == list->data)
     update_prelight_tab (notebook, NULL);
   if (priv->switch_tab == list)

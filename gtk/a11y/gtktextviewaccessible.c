@@ -97,11 +97,14 @@ gtk_text_view_accessible_ref_state_set (AtkObject *accessible)
   AtkStateSet *state_set;
   GtkWidget *widget;
 
+  state_set = ATK_OBJECT_CLASS (gtk_text_view_accessible_parent_class)->ref_state_set (accessible);
+
   widget = gtk_accessible_get_widget (GTK_ACCESSIBLE (accessible));
   if (widget == NULL)
-    return NULL;
-
-  state_set = ATK_OBJECT_CLASS (gtk_text_view_accessible_parent_class)->ref_state_set (accessible);
+    {
+      atk_state_set_add_state (state_set, ATK_STATE_DEFUNCT);
+      return state_set;
+    }
 
   if (gtk_text_view_get_editable (GTK_TEXT_VIEW (widget)))
     atk_state_set_add_state (state_set, ATK_STATE_EDITABLE);
@@ -506,6 +509,11 @@ gtk_text_view_accessible_get_character_extents (AtkText      *text,
   GdkWindow *window;
   gint x_widget, y_widget, x_window, y_window;
 
+  *x = 0;
+  *y = 0;
+  *width = 0;
+  *height = 0;
+
   widget = gtk_accessible_get_widget (GTK_ACCESSIBLE (text));
   if (widget == NULL)
     return;
@@ -516,6 +524,9 @@ gtk_text_view_accessible_get_character_extents (AtkText      *text,
   gtk_text_view_get_iter_location (view, &iter, &rectangle);
 
   window = gtk_text_view_get_window (view, GTK_TEXT_WINDOW_WIDGET);
+  if (window == NULL)
+    return;
+
   gdk_window_get_origin (window, &x_widget, &y_widget);
 
   *height = rectangle.height;

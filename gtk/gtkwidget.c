@@ -2268,7 +2268,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 		  G_TYPE_NONE, 1,
 		  GDK_TYPE_EVENT | G_SIGNAL_TYPE_STATIC_SCOPE);
   g_signal_set_va_marshaller (widget_signals[EVENT_AFTER], G_TYPE_FROM_CLASS (klass),
-                              _gtk_marshal_BOOLEAN__BOXEDv);
+                              _gtk_marshal_VOID__BOXEDv);
 
   /**
    * GtkWidget::button-press-event:
@@ -5072,6 +5072,7 @@ gtk_widget_unmap (GtkWidget *widget)
 
   if (gtk_widget_get_mapped (widget))
     {
+      g_object_ref (widget);
       gtk_widget_push_verify_invariants (widget);
 
       if (!gtk_widget_get_has_window (widget))
@@ -5084,6 +5085,7 @@ gtk_widget_unmap (GtkWidget *widget)
       g_signal_emit (widget, widget_signals[UNMAP], 0);
 
       gtk_widget_pop_verify_invariants (widget);
+      g_object_unref (widget);
     }
 }
 
@@ -5551,6 +5553,7 @@ gtk_widget_unrealize (GtkWidget *widget)
 {
   g_return_if_fail (GTK_IS_WIDGET (widget));
 
+  g_object_ref (widget);
   gtk_widget_push_verify_invariants (widget);
 
   if (widget->priv->has_shape_mask)
@@ -5561,8 +5564,6 @@ gtk_widget_unrealize (GtkWidget *widget)
 
   if (gtk_widget_get_realized (widget))
     {
-      g_object_ref (widget);
-
       if (widget->priv->mapped)
         gtk_widget_unmap (widget);
 
@@ -5572,11 +5573,10 @@ gtk_widget_unrealize (GtkWidget *widget)
       g_signal_emit (widget, widget_signals[UNREALIZE], 0);
       g_assert (!widget->priv->mapped);
       gtk_widget_set_realized (widget, FALSE);
-
-      g_object_unref (widget);
     }
 
   gtk_widget_pop_verify_invariants (widget);
+  g_object_unref (widget);
 }
 
 /*****************************************
@@ -10263,6 +10263,12 @@ update_pango_context (GtkWidget    *widget,
 			      PANGO_DIRECTION_LTR : PANGO_DIRECTION_RTL);
 
   pango_font_description_free (font_desc);
+
+  pango_cairo_context_set_resolution (context,
+                                      _gtk_css_number_value_get (
+                                          _gtk_style_context_peek_property (style_context,
+                                                                            GTK_CSS_PROPERTY_DPI),
+                                          100));
 }
 
 static void
@@ -10279,8 +10285,6 @@ gtk_widget_update_pango_context (GtkWidget *widget)
       screen = gtk_widget_get_screen_unchecked (widget);
       if (screen)
 	{
-	  pango_cairo_context_set_resolution (context,
-					      gdk_screen_get_resolution (screen));
 	  pango_cairo_context_set_font_options (context,
 						gdk_screen_get_font_options (screen));
 	}
@@ -15170,14 +15174,12 @@ gtk_widget_real_set_has_tooltip (GtkWidget *widget,
 	    gdk_window_set_events (priv->window,
 				   gdk_window_get_events (priv->window) |
 				   GDK_LEAVE_NOTIFY_MASK |
-				   GDK_POINTER_MOTION_MASK |
-				   GDK_POINTER_MOTION_HINT_MASK);
+				   GDK_POINTER_MOTION_MASK);
 
 	  if (gtk_widget_get_has_window (widget))
 	      gtk_widget_add_events (widget,
 				     GDK_LEAVE_NOTIFY_MASK |
-				     GDK_POINTER_MOTION_MASK |
-				     GDK_POINTER_MOTION_HINT_MASK);
+				     GDK_POINTER_MOTION_MASK);
 	}
 
       g_object_set_qdata (G_OBJECT (widget), quark_has_tooltip,
@@ -17075,8 +17077,8 @@ _gtk_widget_has_controller (GtkWidget          *widget,
 }
 
 void
-_gtk_widget_add_controller (GtkWidget           *widget,
-                            GtkEventController  *controller)
+_gtk_widget_add_controller (GtkWidget          *widget,
+                            GtkEventController *controller)
 {
   EventControllerData *data;
   GtkWidgetPrivate *priv;
@@ -17099,6 +17101,8 @@ _gtk_widget_add_controller (GtkWidget           *widget,
   data->grab_notify_id =
     g_signal_connect (widget, "grab-notify",
                       G_CALLBACK (event_controller_grab_notify), data);
+
+  g_object_add_weak_pointer (G_OBJECT (data->controller), (gpointer *) &data->controller);
 
   if (GTK_IS_GESTURE (controller))
     {
@@ -17125,6 +17129,8 @@ _gtk_widget_remove_controller (GtkWidget          *widget,
 
   if (!data)
     return;
+
+  g_object_remove_weak_pointer (G_OBJECT (data->controller), (gpointer *) &data->controller);
 
   if (g_signal_handler_is_connected (widget, data->grab_notify_id))
     g_signal_handler_disconnect (widget, data->grab_notify_id);

@@ -5880,7 +5880,7 @@ gtk_text_view_move_cursor (GtkTextView     *text_view,
       gtk_text_view_move_viewport (text_view, scroll_step, count);
       if ((old_xpos == gtk_adjustment_get_target_value (priv->hadjustment) &&
            old_ypos == gtk_adjustment_get_target_value (priv->vadjustment)) &&
-          leave_direction != -1 &&
+          leave_direction != (GtkDirectionType)-1 &&
           !gtk_widget_keynav_failed (GTK_WIDGET (text_view),
                                      leave_direction))
         {
@@ -6053,7 +6053,7 @@ gtk_text_view_move_cursor (GtkTextView     *text_view,
       if (step == GTK_MOVEMENT_DISPLAY_LINES)
         gtk_text_view_set_virtual_cursor_pos (text_view, cursor_x_pos, -1);
     }
-  else if (leave_direction != -1)
+  else if (leave_direction != (GtkDirectionType)-1)
     {
       if (!gtk_widget_keynav_failed (GTK_WIDGET (text_view),
                                      leave_direction))
@@ -9234,15 +9234,14 @@ text_window_realize (GtkTextWindow *win,
   attributes.y = 0;
   attributes.width = win->allocation.width;
   attributes.height = win->allocation.height;
-  attributes.event_mask = (GDK_EXPOSURE_MASK            |
-                           GDK_SCROLL_MASK              |
-                           GDK_SMOOTH_SCROLL_MASK       |
-                           GDK_KEY_PRESS_MASK           |
-                           GDK_BUTTON_PRESS_MASK        |
-                           GDK_BUTTON_RELEASE_MASK      |
-                           GDK_POINTER_MOTION_MASK      |
-                           GDK_POINTER_MOTION_HINT_MASK |
-                           gtk_widget_get_events (win->widget));
+  attributes.event_mask = gtk_widget_get_events (win->widget)
+                          | GDK_EXPOSURE_MASK
+                          | GDK_SCROLL_MASK
+                          | GDK_SMOOTH_SCROLL_MASK
+                          | GDK_KEY_PRESS_MASK
+                          | GDK_BUTTON_PRESS_MASK
+                          | GDK_BUTTON_RELEASE_MASK
+                          | GDK_POINTER_MOTION_MASK;
 
   win->bin_window = gdk_window_new (win->window,
                                     &attributes,

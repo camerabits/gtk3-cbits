@@ -25,6 +25,32 @@
 #include <math.h>
 #include <string.h>
 
+/*
+ * Gets the size for a single box blur.
+ *
+ * Much of this, the 3 * sqrt(2 * pi) / 4, is the known value for
+ * approximating a Gaussian using box blurs.  This yields quite a good
+ * approximation for a Gaussian.  For more details, see:
+ * http://www.w3.org/TR/SVG11/filters.html#feGaussianBlurElement
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=590039#c19
+ */
+#define GAUSSIAN_SCALE_FACTOR ((3.0 * sqrt(2 * G_PI) / 4))
+
+#define get_box_filter_size(radius) ((int)(GAUSSIAN_SCALE_FACTOR * (radius)))
+
+/* Sadly, clang is picky about get_box_filter_size(2) not being a
+ * constant expression, thus we have to use precomputed values.
+ */
+#define BOX_FILTER_SIZE_2 3
+#define BOX_FILTER_SIZE_3 5
+#define BOX_FILTER_SIZE_4 7
+#define BOX_FILTER_SIZE_5 9
+#define BOX_FILTER_SIZE_6 11
+#define BOX_FILTER_SIZE_7 13
+#define BOX_FILTER_SIZE_8 15
+#define BOX_FILTER_SIZE_9 16
+#define BOX_FILTER_SIZE_10 18
+
 /* This applies a single box blur pass to a horizontal range of pixels;
  * since the box blur has the same weight for all pixels, we can
  * implement an efficient sliding window algorithm where we add
@@ -60,18 +86,37 @@ blur_xspan (guchar *row,
    * only divide down after all three passes. (SSE parallel implementation
    * of the divide step is possible.)
    */
-  for (i = -d + offset; i < row_width + offset; i++)
+
+#define BLUR_ROW_KERNEL(D)                                      \
+  for (i = -(D) + offset; i < row_width + offset; i++)		\
+    {                                                           \
+      if (i >= 0 && i < row_width)                              \
+        sum += row[i];                                          \
+                                                                \
+      if (i >= offset)						\
+	{							\
+	  if (i >= (D))						\
+	    sum -= row[i - (D)];				\
+                                                                \
+	  tmp_buffer[i - offset] = (sum + (D) / 2) / (D);	\
+	}							\
+    }								\
+  break;
+
+  /* We unroll the values for d for radius 2-10 to avoid a generic
+   * divide operation (not radius 1, because its a no-op) */
+  switch (d)
     {
-      if (i >= 0 && i < row_width)
-        sum += row[i];
-
-      if (i >= offset)
-        {
-          if (i >= d)
-            sum -= row[i - d];
-
-          tmp_buffer[i - offset] = (sum + d / 2) / d;
-        }
+    case BOX_FILTER_SIZE_2: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_2);
+    case BOX_FILTER_SIZE_3: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_3);
+    case BOX_FILTER_SIZE_4: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_4);
+    case BOX_FILTER_SIZE_5: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_5);
+    case BOX_FILTER_SIZE_6: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_6);
+    case BOX_FILTER_SIZE_7: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_7);
+    case BOX_FILTER_SIZE_8: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_8);
+    case BOX_FILTER_SIZE_9: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_9);
+    case BOX_FILTER_SIZE_10: BLUR_ROW_KERNEL (BOX_FILTER_SIZE_10);
+    default: BLUR_ROW_KERNEL (d);
     }
 
   memcpy (row, tmp_buffer, row_width);
@@ -218,8 +263,6 @@ _gtk_cairo_blur_surface (cairo_surface_t* surface,
  * http://www.w3.org/TR/SVG11/filters.html#feGaussianBlurElement
  * https://bugzilla.mozilla.org/show_bug.cgi?id=590039#c19
  */
-#define GAUSSIAN_SCALE_FACTOR ((3.0 * sqrt(2 * G_PI) / 4) * 1.5)
-
 int
 _gtk_cairo_blur_compute_pixels (double radius)
 {

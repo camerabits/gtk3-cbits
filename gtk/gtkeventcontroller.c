@@ -75,6 +75,8 @@ gtk_event_controller_set_property (GObject      *object,
     {
     case PROP_WIDGET:
       priv->widget = g_value_get_object (value);
+      if (priv->widget)
+        g_object_add_weak_pointer (G_OBJECT (priv->widget), (gpointer *) &priv->widget);
       break;
     case PROP_PROPAGATION_PHASE:
       gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (object),
@@ -114,6 +116,8 @@ gtk_event_controller_constructed (GObject *object)
   GtkEventController *controller = GTK_EVENT_CONTROLLER (object);
   GtkEventControllerPrivate *priv;
 
+  G_OBJECT_CLASS (gtk_event_controller_parent_class)->constructed (object);
+
   priv = gtk_event_controller_get_instance_private (controller);
   if (priv->widget)
     _gtk_widget_add_controller (priv->widget, controller);
@@ -127,7 +131,11 @@ gtk_event_controller_dispose (GObject *object)
 
   priv = gtk_event_controller_get_instance_private (controller);
   if (priv->widget)
-    _gtk_widget_remove_controller (priv->widget, controller);
+    {
+      _gtk_widget_remove_controller (priv->widget, controller);
+      g_object_remove_weak_pointer (G_OBJECT (priv->widget), (gpointer *) &priv->widget);
+      priv->widget = NULL;
+    }
 
   G_OBJECT_CLASS (gtk_event_controller_parent_class)->dispose (object);
 }
