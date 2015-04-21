@@ -298,6 +298,7 @@
    UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
    >
    <File RelativePath="..\..\..\gdk\deprecated\gdkcolor.c" />
+   <File RelativePath="..\..\..\gdk\gdk-private.c" />
    <File RelativePath="..\..\..\gdk\gdk.c" />
    <File RelativePath="..\..\..\gdk\gdkapplaunchcontext.c" />
    <File RelativePath="..\..\..\gdk\gdkcairo.c" />
@@ -310,6 +311,8 @@
    <File RelativePath="..\..\..\gdk\gdkdnd.c" />
    <File RelativePath="..\..\..\gdk\gdkevents.c" />
    <File RelativePath="..\..\..\gdk\gdkframetimings.c" />
+   <File RelativePath="..\..\..\gdk\gdkgl.c" />
+   <File RelativePath="..\..\..\gdk\gdkglcontext.c" />
    <File RelativePath="..\..\..\gdk\gdkglobals.c" />
    <File RelativePath="..\..\..\gdk\gdkkeys.c" />
    <File RelativePath="..\..\..\gdk\gdkkeyuni.c" />

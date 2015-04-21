@@ -579,6 +579,7 @@ gdk_grab_status_get_type (void)
             { GDK_GRAB_INVALID_TIME, "GDK_GRAB_INVALID_TIME", "invalid-time" },
             { GDK_GRAB_NOT_VIEWABLE, "GDK_GRAB_NOT_VIEWABLE", "not-viewable" },
             { GDK_GRAB_FROZEN, "GDK_GRAB_FROZEN", "frozen" },
+            { GDK_GRAB_FAILED, "GDK_GRAB_FAILED", "failed" },
             { 0, NULL, NULL }
         };
         etype = g_enum_register_static (g_intern_static_string ("GdkGrabStatus"), values);
@@ -635,6 +636,22 @@ gdk_event_mask_get_type (void)
             { 0, NULL, NULL }
         };
         etype = g_flags_register_static (g_intern_static_string ("GdkEventMask"), values);
+    }
+    return etype;
+}
+
+GType
+gdk_gl_error_get_type (void)
+{
+    static GType etype = 0;
+    if (G_UNLIKELY(etype == 0)) {
+        static const GEnumValue values[] = {
+            { GDK_GL_ERROR_NOT_AVAILABLE, "GDK_GL_ERROR_NOT_AVAILABLE", "not-available" },
+            { GDK_GL_ERROR_UNSUPPORTED_FORMAT, "GDK_GL_ERROR_UNSUPPORTED_FORMAT", "unsupported-format" },
+            { GDK_GL_ERROR_UNSUPPORTED_PROFILE, "GDK_GL_ERROR_UNSUPPORTED_PROFILE", "unsupported-profile" },
+            { 0, NULL, NULL }
+        };
+        etype = g_enum_register_static (g_intern_static_string ("GdkGLError"), values);
     }
     return etype;
 }

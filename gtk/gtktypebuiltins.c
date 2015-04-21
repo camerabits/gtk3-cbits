@@ -1467,6 +1467,23 @@ gtk_buttons_type_get_type (void)
     return etype;
 }
 
+/* enumerations from "gtkmodelbutton.h" */
+GType
+gtk_button_role_get_type (void)
+{
+    static GType etype = 0;
+    if (G_UNLIKELY(etype == 0)) {
+        static const GEnumValue values[] = {
+            { GTK_BUTTON_ROLE_NORMAL, "GTK_BUTTON_ROLE_NORMAL", "normal" },
+            { GTK_BUTTON_ROLE_CHECK, "GTK_BUTTON_ROLE_CHECK", "check" },
+            { GTK_BUTTON_ROLE_RADIO, "GTK_BUTTON_ROLE_RADIO", "radio" },
+            { 0, NULL, NULL }
+        };
+        etype = g_enum_register_static (g_intern_static_string ("GtkButtonRole"), values);
+    }
+    return etype;
+}
+
 /* enumerations from "gtknotebook.h" */
 GType
 gtk_notebook_tab_get_type (void)
@@ -1695,6 +1712,7 @@ gtk_policy_type_get_type (void)
             { GTK_POLICY_ALWAYS, "GTK_POLICY_ALWAYS", "always" },
             { GTK_POLICY_AUTOMATIC, "GTK_POLICY_AUTOMATIC", "automatic" },
             { GTK_POLICY_NEVER, "GTK_POLICY_NEVER", "never" },
+            { GTK_POLICY_EXTERNAL, "GTK_POLICY_EXTERNAL", "external" },
             { 0, NULL, NULL }
         };
         etype = g_enum_register_static (g_intern_static_string ("GtkPolicyType"), values);
@@ -1838,6 +1856,21 @@ gtk_text_view_layer_get_type (void)
             { 0, NULL, NULL }
         };
         etype = g_enum_register_static (g_intern_static_string ("GtkTextViewLayer"), values);
+    }
+    return etype;
+}
+
+GType
+gtk_text_extend_selection_get_type (void)
+{
+    static GType etype = 0;
+    if (G_UNLIKELY(etype == 0)) {
+        static const GEnumValue values[] = {
+            { GTK_TEXT_EXTEND_SELECTION_WORD, "GTK_TEXT_EXTEND_SELECTION_WORD", "word" },
+            { GTK_TEXT_EXTEND_SELECTION_LINE, "GTK_TEXT_EXTEND_SELECTION_LINE", "line" },
+            { 0, NULL, NULL }
+        };
+        etype = g_enum_register_static (g_intern_static_string ("GtkTextExtendSelection"), values);
     }
     return etype;
 }

@@ -13,6 +13,10 @@
 
 G_BEGIN_DECLS
 
+/* enumerations from "gtkcsstypesprivate.h" */
+GType _gtk_css_affects_get_type (void) G_GNUC_CONST;
+#define GTK_TYPE_CSS_AFFECTS (_gtk_css_affects_get_type ())
+
 /* enumerations from "gtktexthandleprivate.h" */
 GType _gtk_text_handle_position_get_type (void) G_GNUC_CONST;
 #define GTK_TYPE_TEXT_HANDLE_POSITION (_gtk_text_handle_position_get_type ())

@@ -217,6 +217,10 @@ GDK_AVAILABLE_IN_ALL GType gtk_arrow_placement_get_type (void) G_GNUC_CONST;
 GDK_AVAILABLE_IN_ALL GType gtk_buttons_type_get_type (void) G_GNUC_CONST;
 #define GTK_TYPE_BUTTONS_TYPE (gtk_buttons_type_get_type ())
 
+/* enumerations from "gtkmodelbutton.h" */
+GDK_AVAILABLE_IN_ALL GType gtk_button_role_get_type (void) G_GNUC_CONST;
+#define GTK_TYPE_BUTTON_ROLE (gtk_button_role_get_type ())
+
 /* enumerations from "gtknotebook.h" */
 GDK_AVAILABLE_IN_ALL GType gtk_notebook_tab_get_type (void) G_GNUC_CONST;
 #define GTK_TYPE_NOTEBOOK_TAB (gtk_notebook_tab_get_type ())
@@ -282,6 +286,8 @@ GDK_AVAILABLE_IN_ALL GType gtk_text_window_type_get_type (void) G_GNUC_CONST;
 #define GTK_TYPE_TEXT_WINDOW_TYPE (gtk_text_window_type_get_type ())
 GDK_AVAILABLE_IN_ALL GType gtk_text_view_layer_get_type (void) G_GNUC_CONST;
 #define GTK_TYPE_TEXT_VIEW_LAYER (gtk_text_view_layer_get_type ())
+GDK_AVAILABLE_IN_ALL GType gtk_text_extend_selection_get_type (void) G_GNUC_CONST;
+#define GTK_TYPE_TEXT_EXTEND_SELECTION (gtk_text_extend_selection_get_type ())
 
 /* enumerations from "gtktoolbar.h" */
 GDK_AVAILABLE_IN_ALL GType gtk_toolbar_space_style_get_type (void) G_GNUC_CONST;

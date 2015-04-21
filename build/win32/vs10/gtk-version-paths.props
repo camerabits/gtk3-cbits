@@ -3,9 +3,9 @@
   <PropertyGroup Label="UserMacros">
     <VSVer>10</VSVer>
     <GlibEtcInstallRoot>$(SolutionDir)..\..\..\..\gtk-dependencies-root</GlibEtcInstallRoot>
-    <CopyDir>..\..\..\..\vs$(VSVer)\$(Platform)</CopyDir>
+    <CopyDir>$(GlibEtcInstallRoot)</CopyDir>
     <ApiVersion>3.0</ApiVersion>
-    <GtkVersion>3.14.4</GtkVersion>
+    <GtkVersion>3.16.2</GtkVersion>
     <GtkLibtoolCompatibleDllPrefix>lib</GtkLibtoolCompatibleDllPrefix>
     <GtkLibtoolCompatibleDllSuffix>-$(ApiVersion)-0</GtkLibtoolCompatibleDllSuffix>
     <GtkSeparateVSDllPrefix />

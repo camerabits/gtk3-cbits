@@ -78,6 +78,8 @@ GDK_AVAILABLE_IN_ALL GType gdk_grab_ownership_get_type (void) G_GNUC_CONST;
 #define GDK_TYPE_GRAB_OWNERSHIP (gdk_grab_ownership_get_type ())
 GDK_AVAILABLE_IN_ALL GType gdk_event_mask_get_type (void) G_GNUC_CONST;
 #define GDK_TYPE_EVENT_MASK (gdk_event_mask_get_type ())
+GDK_AVAILABLE_IN_ALL GType gdk_gl_error_get_type (void) G_GNUC_CONST;
+#define GDK_TYPE_GL_ERROR (gdk_gl_error_get_type ())
 
 /* enumerations from "gdkvisual.h" */
 GDK_AVAILABLE_IN_ALL GType gdk_visual_type_get_type (void) G_GNUC_CONST;

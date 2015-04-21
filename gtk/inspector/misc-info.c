@@ -380,16 +380,6 @@ update_info (gpointer data)
   return G_SOURCE_CONTINUE;
 }
 
-static void
-show_mnemonic_label (GtkWidget *button, GtkInspectorMiscInfo *sl)
-{
-  GtkWidget *widget;
-
-  widget = g_object_get_data (G_OBJECT (button), "mnemonic-label");
-  if (widget)
-    show_object (sl, G_OBJECT (widget), NULL, "properties");
-}
-
 void
 gtk_inspector_misc_info_set_object (GtkInspectorMiscInfo *sl,
                                     GObject              *object)
