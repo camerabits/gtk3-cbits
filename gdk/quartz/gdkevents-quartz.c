@@ -428,14 +428,21 @@ get_toplevel_from_ns_event (NSEvent *nsevent,
   if (nswindow)
     {
       NSView *view = nil;
-      NSPoint point, view_point;
-      NSRect view_frame;
+      NSPoint window_point, content_point;
+      NSRect content_frame;
 
       view = [nswindow contentView];
+      content_frame = [view frame];
 
-      point = [nsevent locationInWindow];
-      view_point = [view convertPoint:point fromView:nil];
-      view_frame = [view frame];
+      window_point = [nsevent locationInWindow];
+      *screen_point = [nswindow convertBaseToScreen:window_point];
+
+      /* now convert window coordinates to content view coordinates: */
+      content_point = [view convertPoint:window_point fromView:nil];
+      /* now test if the location is inside some NSView of the whole view hierarchy of the window: */
+      view = [view hitTest:content_point];
+      if (![view isKindOfClass:[GdkQuartzView class]])
+        return NULL;
 
       /* NSEvents come in with a window set, but with window coordinates
        * out of window bounds. For e.g. moved events this is fine, we use
@@ -450,7 +457,7 @@ get_toplevel_from_ns_event (NSEvent *nsevent,
        * toplevel window below.
        */
       if (is_mouse_button_press_event ([nsevent type]) &&
-          !NSPointInRect(view_point, view_frame))
+          !NSPointInRect(content_point, content_frame))
         {
           toplevel = NULL;
 
@@ -467,17 +474,15 @@ get_toplevel_from_ns_event (NSEvent *nsevent,
         }
       else
         {
-          NSRect boundsRect = [view bounds];
+          NSPoint view_point = [view convertPoint:window_point fromView:nil];
 
           toplevel = find_gdkwindow_for_nsevent(nsevent);
 
-          *screen_point = [nswindow convertBaseToScreen:point];
-
-          *x = point.x;
-          *y = boundsRect.size.height - point.y;
+          *x = view_point.x;
+          *y = view_point.y;
         }
     }
-
+#if 0
   if (!toplevel)
     {
       /* Fallback used when no NSWindow set.  This happens e.g. when
@@ -491,7 +496,7 @@ get_toplevel_from_ns_event (NSEvent *nsevent,
                                              *screen_point,
                                              x, y);
     }
-
+#endif
   return toplevel;
 }
 
@@ -1105,7 +1110,7 @@ fill_motion_event (GdkWindow *window,
                    gint       y_root)
 {
   /* Show coordinates for local and root positions */
-  GDK_NOTE (EVENTS, g_print ("fill_motion_event: %p:@L(%d,%d)/@R(%d,%d)\n",
+  GDK_NOTE (EVENTS, g_print ("fill_motion_event: %p:@Local(%d,%d)/@Root(%d,%d)\n",
                              window,
                              x, y, x_root, y_root));
   event->any.type = GDK_MOTION_NOTIFY;
@@ -1131,10 +1136,8 @@ track_mouse_movement_in_subviews (NSPoint pt, NSEvent * nsevent, NSView * hit_vi
   while ((view = [viewEnumerator nextObject]) != nil)
     {
       if ([view isKindOfClass:[GdkQuartzView class]])
-	{
-	  [view trackMouseMovement:pt event:nsevent hitView:hit_view];
-	  track_mouse_movement_in_subviews(pt, nsevent, hit_view, view);
-	}
+	    [view trackMouseMovement:pt event:nsevent hitView:hit_view];
+      track_mouse_movement_in_subviews(pt, nsevent, hit_view, view);
     }
 }
 

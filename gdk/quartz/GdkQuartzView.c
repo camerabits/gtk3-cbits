@@ -766,7 +766,7 @@ queue_tracking_event (GdkWindow * gdk_window, NSEvent * nsevent, NSPoint local_p
        (event->any.type == GDK_LEAVE_NOTIFY)) &&
        (event->crossing.subwindow != NULL))
     g_object_ref (event->crossing.subwindow);
-//  GDK_NOTE (EVENTS, g_print ("sent %s\n", entered? "GDK_ENTER_NOTIFY" : "GDK_LEAVE_NOTIFY"));
+  GDK_NOTE (EVENTS, g_print ("sent %s\n", entered? "GDK_ENTER_NOTIFY" : "GDK_LEAVE_NOTIFY"));
   _gdk_windowing_got_event (_gdk_display, node, event, 0);
 }
 
@@ -792,37 +792,6 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
                                             display->core_pointer);
   if (grab != NULL)
     {
-#if 0
-      /* Implicit grabs do not go through XGrabPointer and thus the
-         event mask should not be checked. */
-      if ((!grab->implicit) && ((grab->event_mask & event_mask) == 0))
-        return NULL;
-
-      if (grab->owner_events)
-        {
-          /* For owner events, we need to use the toplevel under the
-           * pointer, not the window from the NSEvent, since that is
-           * reported with respect to the key window, which could be
-           * wrong.
-           */
-          GdkWindow *toplevel_under_pointer;
-          GdkPointerWindowInfo *info;
-
-          info = _gdk_display_get_pointer_info (display, display->core_pointer);
-          toplevel_under_pointer = info->toplevel_under_pointer;
-
-          return toplevel_under_pointer;
-        }
-      else
-        {
-          /* check the grab window. */
-          GdkWindow *grab_toplevel;
-
-          grab_toplevel = gdk_window_get_effective_toplevel (grab->window);
-
-          return grab_toplevel;
-        }
-#endif
       /* check the grab window. */
       GdkWindow *grab_toplevel;
 
@@ -852,7 +821,7 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
   local_pt = [self convertPoint:local_pt fromView:nil];
   /* hit test local point */
   in_view = NSPointInRect(local_pt, boundsRect);
-#if 0
+#if 1
   GDK_NOTE (EVENTS, g_print ("trackMouseMovement: window:%p (%d,%d) [%d, %d, %d, %d]\n", gdk_window,
                              (int)local_pt.x, (int)local_pt.y,
                              (int)boundsRect.origin.x, (int)boundsRect.origin.y, (int)boundsRect.size.width, (int)boundsRect.size.height));
@@ -967,13 +936,19 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
 -(void)windowDidBecomeKey:(NSNotification *)notification
 {
   if ([self shouldRespondToWindowNotifications])
-    _gdk_quartz_events_update_focus_window (gdk_window, TRUE);
+    {
+      GDK_NOTE (EVENTS, g_print ("windowDidBecomeKey %p, gdk_window:%p\n", self, gdk_window));
+      _gdk_quartz_events_update_focus_window (gdk_window, TRUE);
+    }
 }
 
 -(void)windowDidResignKey:(NSNotification *)notification
 {
   if ([self shouldRespondToWindowNotifications])
-    _gdk_quartz_events_update_focus_window (gdk_window, FALSE);
+    {
+      GDK_NOTE (EVENTS, g_print ("windowDidResignKey %p, gdk_window:%p\n", self, gdk_window));
+      _gdk_quartz_events_update_focus_window (gdk_window, FALSE);
+    }
 }
 
 -(void)windowDidBecomeMain:(NSNotification *)notification
@@ -990,13 +965,17 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
       return;
     }
 
+  GDK_NOTE (EVENTS, g_print ("windowDidBecomeMain %p, gdk_window:%p\n", self, gdk_window));
   _gdk_quartz_window_did_become_main (gdk_window);
 }
 
 -(void)windowDidResignMain:(NSNotification *)notification
 {
   if ([self shouldRespondToWindowNotifications])
-    _gdk_quartz_window_did_resign_main (gdk_window);
+    {
+      GDK_NOTE (EVENTS, g_print ("windowDidBecomeMain %p, gdk_window:%p\n", self, gdk_window));
+      _gdk_quartz_window_did_resign_main (gdk_window);
+    }
 }
 
 -(void)windowDidMove:(NSNotification *)aNotification
@@ -1007,6 +986,7 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
   if (![self shouldRespondToWindowNotifications])
     return;
 
+  GDK_NOTE (EVENTS, g_print ("windowDidMove %p, gdk_window:%p\n", self, gdk_window));
   _gdk_quartz_window_update_position (window);
 
   /* Synthesize a configure event */
