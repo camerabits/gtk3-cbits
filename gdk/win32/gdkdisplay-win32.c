@@ -337,7 +337,7 @@ inner_clipboard_window_procedure (HWND   hwnd,
         if (hwndRemove == _hwnd_next_viewer)
           _hwnd_next_viewer = hwndNext == hwnd ? NULL : hwndNext;
         else if (_hwnd_next_viewer != NULL)
-          return SendMessage (_hwnd_next_viewer, message, wparam, lparam);
+          PostMessage (_hwnd_next_viewer, message, wparam, lparam);  // %%CBITS 150423: changed SendMessage to PostMessage: was hanging here sending msg to unresponsive QTIdle window in a separate process
 
         return 0;
       }
@@ -391,7 +391,7 @@ inner_clipboard_window_procedure (HWND   hwnd,
         CloseClipboard ();
 
         if (_hwnd_next_viewer != NULL)
-          return PostMessage (_hwnd_next_viewer, message, wparam, lparam);  // %%BWK 140924: changed SendMessage to PostMessage: was hanging here sending msg to unresponsive QTIdle window in a separate process
+          PostMessage (_hwnd_next_viewer, message, wparam, lparam);  // %%CBITS 140924: changed SendMessage to PostMessage: was hanging here sending msg to unresponsive QTIdle window in a separate process
 
         /* clear error to avoid confusing SetClipboardViewer() return */
         SetLastError (0);
