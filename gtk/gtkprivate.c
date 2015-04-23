@@ -33,6 +33,84 @@
 #include "gtkresources.h"
 
 
+#if defined GTK_DATA_PREFIX_FROM_ENV
+
+const gchar *
+_gtk_get_data_prefix (void)
+{
+  static const gchar *gtk_prefixdir = NULL;
+  if (gtk_prefixdir == NULL)
+    {
+	  gtk_prefixdir = g_getenv ("GTK_DATA_PREFIX");
+    }
+
+  return (gtk_prefixdir) ? gtk_prefixdir : GTK_DATA_PREFIX;
+}
+
+const gchar *
+_gtk_get_datadir (void)
+{
+  static const gchar *gtk_datadir = NULL;
+  if (gtk_datadir == NULL)
+    {
+      const gchar *root = _gtk_get_data_prefix();
+      gtk_datadir = g_build_filename (root, "share", NULL);
+    }
+
+  return gtk_datadir;
+}
+
+const gchar *
+_gtk_get_libdir (void)
+{
+  static const gchar *gtk_libdir = NULL;
+  if (gtk_libdir == NULL)
+    {
+      const gchar *root = _gtk_get_data_prefix();
+      gtk_libdir = g_build_filename (root, "lib", NULL);
+    }
+
+  return gtk_libdir;
+}
+
+const gchar *
+_gtk_get_sysconfdir (void)
+{
+  static const gchar *gtk_sysconfdir = NULL;
+  if (gtk_sysconfdir == NULL)
+    {
+      const gchar *root = _gtk_get_data_prefix();
+      gtk_sysconfdir = g_build_filename (root, "etc", NULL);
+    }
+
+  return gtk_sysconfdir;
+}
+
+const gchar *
+_gtk_get_localedir (void)
+{
+  static const gchar *gtk_localedir = NULL;
+  if (gtk_localedir == NULL)
+    {
+      const gchar *root = _gtk_get_data_prefix();
+      gtk_localedir = g_build_filename (root, "share", "locale", NULL);
+#if defined G_OS_WIN32
+	    {
+		  const gchar *temp = gtk_localedir;
+         /* gtk_localedir is passed to bindtextdomain() which isn't
+          * UTF-8-aware.
+          */
+          gtk_localedir = g_win32_locale_filename_from_utf8 (temp);
+		  g_free (temp);
+		}
+#endif
+    }
+
+  return gtk_localedir;
+}
+
+#else
+
 #if !defined G_OS_WIN32 && !(defined GDK_WINDOWING_QUARTZ && defined QUARTZ_RELOCATION)
 
 const gchar *
@@ -66,6 +144,9 @@ _gtk_get_data_prefix (void)
 }
 
 #endif
+
+#endif
+
 
 /* _gtk_get_lc_ctype:
  *

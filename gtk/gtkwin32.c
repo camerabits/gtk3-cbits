@@ -142,6 +142,8 @@ _gtk_load_dll_with_libgtk3_manifest (const gchar *dll_name)
     g_free (resource_name);
 }
 
+
+#if !defined(GTK_DATA_PREFIX_FROM_ENV)
 const gchar *
 _gtk_get_libdir (void)
 {
@@ -229,3 +231,5 @@ _gtk_get_data_prefix (void)
 
   return gtk_data_prefix;
 }
+#endif
+
