@@ -90,29 +90,32 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-noinst_PROGRAMS = $(am__EXEEXT_1) subsurface$(EXEEXT) \
-	animated-resizing$(EXEEXT) motion-compression$(EXEEXT) \
-	scrolling-performance$(EXEEXT) simple$(EXEEXT) \
-	flicker$(EXEEXT) print-editor$(EXEEXT) video-timer$(EXEEXT) \
-	testaccel$(EXEEXT) testadjustsize$(EXEEXT) \
-	testappchooser$(EXEEXT) testappchooserbutton$(EXEEXT) \
-	testassistant$(EXEEXT) testbaseline$(EXEEXT) testbbox$(EXEEXT) \
-	testbox$(EXEEXT) testboxcss$(EXEEXT) testbuttons$(EXEEXT) \
-	testcairo$(EXEEXT) testcalendar$(EXEEXT) \
-	testclipboard$(EXEEXT) testcolorchooser$(EXEEXT) \
-	testcombo$(EXEEXT) testcombochange$(EXEEXT) \
-	testcellrenderertext$(EXEEXT) testdialog$(EXEEXT) \
-	testdnd$(EXEEXT) testellipsise$(EXEEXT) testemblems$(EXEEXT) \
-	testentrycompletion$(EXEEXT) testentryicons$(EXEEXT) \
-	testfilechooser$(EXEEXT) testfilechooserbutton$(EXEEXT) \
-	testflowbox$(EXEEXT) testfontselection$(EXEEXT) \
-	testfontselectiondialog$(EXEEXT) testfontchooser$(EXEEXT) \
-	testfontchooserdialog$(EXEEXT) testframe$(EXEEXT) \
-	testfullscreen$(EXEEXT) testgeometry$(EXEEXT) \
-	testgiconpixbuf$(EXEEXT) testgrid$(EXEEXT) testgtk$(EXEEXT) \
-	testheaderbar$(EXEEXT) testheightforwidth$(EXEEXT) \
-	testiconview$(EXEEXT) testiconview-keynav$(EXEEXT) \
-	testicontheme$(EXEEXT) testimage$(EXEEXT) testinput$(EXEEXT) \
+noinst_PROGRAMS = $(am__EXEEXT_1) overlayscroll$(EXEEXT) \
+	syncscroll$(EXEEXT) subsurface$(EXEEXT) \
+	animated-resizing$(EXEEXT) animated-revealing$(EXEEXT) \
+	motion-compression$(EXEEXT) scrolling-performance$(EXEEXT) \
+	blur-performance$(EXEEXT) simple$(EXEEXT) flicker$(EXEEXT) \
+	print-editor$(EXEEXT) video-timer$(EXEEXT) testaccel$(EXEEXT) \
+	testadjustsize$(EXEEXT) testappchooser$(EXEEXT) \
+	testappchooserbutton$(EXEEXT) testassistant$(EXEEXT) \
+	testbaseline$(EXEEXT) testbbox$(EXEEXT) testbox$(EXEEXT) \
+	testboxcss$(EXEEXT) testbuttons$(EXEEXT) testcairo$(EXEEXT) \
+	testcalendar$(EXEEXT) testclipboard$(EXEEXT) \
+	testcolorchooser$(EXEEXT) testcombo$(EXEEXT) \
+	testcombochange$(EXEEXT) testcellrenderertext$(EXEEXT) \
+	testdialog$(EXEEXT) testdnd$(EXEEXT) testellipsise$(EXEEXT) \
+	testemblems$(EXEEXT) testentrycompletion$(EXEEXT) \
+	testentryicons$(EXEEXT) testfilechooser$(EXEEXT) \
+	testfilechooserbutton$(EXEEXT) testflowbox$(EXEEXT) \
+	testfontselection$(EXEEXT) testfontselectiondialog$(EXEEXT) \
+	testfontchooser$(EXEEXT) testfontchooserdialog$(EXEEXT) \
+	testframe$(EXEEXT) testfullscreen$(EXEEXT) \
+	testgeometry$(EXEEXT) testgiconpixbuf$(EXEEXT) \
+	testglarea$(EXEEXT) testglblending$(EXEEXT) testgrid$(EXEEXT) \
+	testgtk$(EXEEXT) testheaderbar$(EXEEXT) \
+	testheightforwidth$(EXEEXT) testiconview$(EXEEXT) \
+	testiconview-keynav$(EXEEXT) testicontheme$(EXEEXT) \
+	testimage$(EXEEXT) testinput$(EXEEXT) \
 	testkineticscrolling$(EXEEXT) testlist$(EXEEXT) \
 	testlist2$(EXEEXT) testlist3$(EXEEXT) testlevelbar$(EXEEXT) \
 	testlockbutton$(EXEEXT) testmenubutton$(EXEEXT) \
@@ -138,7 +141,8 @@ noinst_PROGRAMS = $(am__EXEEXT_1) subsurface$(EXEEXT) \
 	testgrouping$(EXEEXT) testtooltips$(EXEEXT) \
 	testexpand$(EXEEXT) testexpander$(EXEEXT) \
 	testvolumebutton$(EXEEXT) testscrolledwindow$(EXEEXT) \
-	testswitch$(EXEEXT) testcellarea$(EXEEXT) testswitch$(EXEEXT) \
+	testscrolledge$(EXEEXT) testswitch$(EXEEXT) \
+	testcellarea$(EXEEXT) testswitch$(EXEEXT) \
 	styleexamples$(EXEEXT) testtreemenu$(EXEEXT) \
 	testtoplevelembed$(EXEEXT) testnoscreen$(EXEEXT) \
 	testtreepos$(EXEEXT) testsensitive$(EXEEXT) \
@@ -148,18 +152,20 @@ noinst_PROGRAMS = $(am__EXEEXT_1) subsurface$(EXEEXT) \
 	testlogout$(EXEEXT) teststack$(EXEEXT) testrevealer$(EXEEXT) \
 	testtitlebar$(EXEEXT) testsplitheaders$(EXEEXT) \
 	testactionbar$(EXEEXT) testwindowsize$(EXEEXT) \
-	testpopover$(EXEEXT) $(am__EXEEXT_3) $(am__EXEEXT_4)
+	testpopover$(EXEEXT) gdkgears$(EXEEXT) $(am__EXEEXT_3) \
+	$(am__EXEEXT_4)
 @USE_X11_TRUE@am__append_1 = testerrors
 @HAVE_CXX_TRUE@am__append_2 = autotestkeywords
 @HAVE_CXX_TRUE@TESTS = autotestkeywords$(EXEEXT)
 @HAVE_CXX_TRUE@@HAVE_OBJC_TRUE@am__append_3 = -DHAVE_OBJC=1 -x objective-c++
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/gtk-doc.m4 \
-	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
-	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
-	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
+	$(top_srcdir)/m4/gtk-doc.m4 $(top_srcdir)/m4/libtool.m4 \
+	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
+	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/m4/pkg_config_for_build.m4 \
+	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -182,19 +188,40 @@ AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+am_animated_revealing_OBJECTS = animated-revealing.$(OBJEXT) \
+	frame-stats.$(OBJEXT) variable.$(OBJEXT)
+animated_revealing_OBJECTS = $(am_animated_revealing_OBJECTS)
+animated_revealing_LDADD = $(LDADD)
 am__autotestkeywords_SOURCES_DIST = autotestkeywords.cc
 @HAVE_CXX_TRUE@am_autotestkeywords_OBJECTS =  \
 @HAVE_CXX_TRUE@	autotestkeywords-autotestkeywords.$(OBJEXT)
 autotestkeywords_OBJECTS = $(am_autotestkeywords_OBJECTS)
 autotestkeywords_LDADD = $(LDADD)
 autotestkeywords_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_blur_performance_OBJECTS = blur-performance.$(OBJEXT) \
+	gtkcairoblur.$(OBJEXT)
+blur_performance_OBJECTS = $(am_blur_performance_OBJECTS)
+blur_performance_LDADD = $(LDADD)
 flicker_SOURCES = flicker.c
 flicker_OBJECTS = flicker.$(OBJEXT)
 flicker_LDADD = $(LDADD)
+am_gdkgears_OBJECTS = gdkgears.$(OBJEXT) gtkgears.$(OBJEXT)
+gdkgears_OBJECTS = $(am_gdkgears_OBJECTS)
+gdkgears_LDADD = $(LDADD)
+gdkgears_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 motion_compression_SOURCES = motion-compression.c
 motion_compression_OBJECTS = motion-compression.$(OBJEXT)
 motion_compression_LDADD = $(LDADD)
+overlayscroll_SOURCES = overlayscroll.c
+overlayscroll_OBJECTS = overlayscroll.$(OBJEXT)
+overlayscroll_LDADD = $(LDADD)
+overlayscroll_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 print_editor_SOURCES = print-editor.c
 print_editor_OBJECTS = print-editor.$(OBJEXT)
 print_editor_LDADD = $(LDADD)
@@ -209,7 +236,8 @@ stresstest_toolbar_SOURCES = stresstest-toolbar.c
 stresstest_toolbar_OBJECTS = stresstest-toolbar.$(OBJEXT)
 stresstest_toolbar_LDADD = $(LDADD)
 stresstest_toolbar_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_styleexamples_OBJECTS = styleexamples.$(OBJEXT)
 styleexamples_OBJECTS = $(am_styleexamples_OBJECTS)
 styleexamples_LDADD = $(LDADD)
@@ -217,7 +245,14 @@ subsurface_SOURCES = subsurface.c
 subsurface_OBJECTS = subsurface.$(OBJEXT)
 subsurface_LDADD = $(LDADD)
 subsurface_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+syncscroll_SOURCES = syncscroll.c
+syncscroll_OBJECTS = syncscroll.$(OBJEXT)
+syncscroll_LDADD = $(LDADD)
+syncscroll_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testaccel_SOURCES = testaccel.c
 testaccel_OBJECTS = testaccel.$(OBJEXT)
 testaccel_LDADD = $(LDADD)
@@ -225,7 +260,8 @@ testactionbar_SOURCES = testactionbar.c
 testactionbar_OBJECTS = testactionbar.$(OBJEXT)
 testactionbar_LDADD = $(LDADD)
 testactionbar_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testactions_OBJECTS = testactions.$(OBJEXT)
 testactions_OBJECTS = $(am_testactions_OBJECTS)
 testactions_LDADD = $(LDADD)
@@ -254,12 +290,14 @@ testbox_SOURCES = testbox.c
 testbox_OBJECTS = testbox.$(OBJEXT)
 testbox_LDADD = $(LDADD)
 testbox_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testboxcss_OBJECTS = testboxcss.$(OBJEXT)
 testboxcss_OBJECTS = $(am_testboxcss_OBJECTS)
 testboxcss_LDADD = $(LDADD)
 testboxcss_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testbuttons_OBJECTS = testbuttons.$(OBJEXT)
 testbuttons_OBJECTS = $(am_testbuttons_OBJECTS)
 testbuttons_LDADD = $(LDADD)
@@ -291,7 +329,8 @@ testdialog_SOURCES = testdialog.c
 testdialog_OBJECTS = testdialog.$(OBJEXT)
 testdialog_LDADD = $(LDADD)
 testdialog_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testdnd_SOURCES = testdnd.c
 testdnd_OBJECTS = testdnd.$(OBJEXT)
 testdnd_LDADD = $(LDADD)
@@ -302,7 +341,8 @@ testemblems_SOURCES = testemblems.c
 testemblems_OBJECTS = testemblems.$(OBJEXT)
 testemblems_LDADD = $(LDADD)
 testemblems_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testentrycompletion_OBJECTS = testentrycompletion.$(OBJEXT)
 testentrycompletion_OBJECTS = $(am_testentrycompletion_OBJECTS)
 testentrycompletion_LDADD = $(LDADD)
@@ -348,7 +388,8 @@ testfullscreen_SOURCES = testfullscreen.c
 testfullscreen_OBJECTS = testfullscreen.$(OBJEXT)
 testfullscreen_LDADD = $(LDADD)
 testfullscreen_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testgeometry_OBJECTS = testgeometry.$(OBJEXT)
 testgeometry_OBJECTS = $(am_testgeometry_OBJECTS)
 testgeometry_LDADD = $(LDADD)
@@ -356,7 +397,21 @@ am_testgiconpixbuf_OBJECTS = testgiconpixbuf.$(OBJEXT)
 testgiconpixbuf_OBJECTS = $(am_testgiconpixbuf_OBJECTS)
 testgiconpixbuf_LDADD = $(LDADD)
 testgiconpixbuf_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+testglarea_SOURCES = testglarea.c
+testglarea_OBJECTS = testglarea.$(OBJEXT)
+testglarea_LDADD = $(LDADD)
+testglarea_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_testglblending_OBJECTS = testglblending.$(OBJEXT) \
+	gtkgears.$(OBJEXT)
+testglblending_OBJECTS = $(am_testglblending_OBJECTS)
+testglblending_LDADD = $(LDADD)
+testglblending_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testgmenu_SOURCES = testgmenu.c
 testgmenu_OBJECTS = testgmenu.$(OBJEXT)
 testgmenu_LDADD = $(LDADD)
@@ -385,7 +440,8 @@ am_testiconview_keynav_OBJECTS = testiconview-keynav.$(OBJEXT)
 testiconview_keynav_OBJECTS = $(am_testiconview_keynav_OBJECTS)
 testiconview_keynav_LDADD = $(LDADD)
 testiconview_keynav_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testimage_SOURCES = testimage.c
 testimage_OBJECTS = testimage.$(OBJEXT)
 testimage_LDADD = $(LDADD)
@@ -408,7 +464,8 @@ testlist3_SOURCES = testlist3.c
 testlist3_OBJECTS = testlist3.$(OBJEXT)
 testlist3_LDADD = $(LDADD)
 testlist3_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testlockbutton_SOURCES = testlockbutton.c
 testlockbutton_OBJECTS = testlockbutton.$(OBJEXT)
 testlockbutton_LDADD = $(LDADD)
@@ -468,7 +525,8 @@ testpopover_SOURCES = testpopover.c
 testpopover_OBJECTS = testpopover.$(OBJEXT)
 testpopover_LDADD = $(LDADD)
 testpopover_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testprint_OBJECTS = testprint.$(OBJEXT) \
 	testprintfileoperation.$(OBJEXT)
 testprint_OBJECTS = $(am_testprint_OBJECTS)
@@ -488,6 +546,9 @@ testrichtext_LDADD = $(LDADD)
 testscale_SOURCES = testscale.c
 testscale_OBJECTS = testscale.$(OBJEXT)
 testscale_LDADD = $(LDADD)
+testscrolledge_SOURCES = testscrolledge.c
+testscrolledge_OBJECTS = testscrolledge.$(OBJEXT)
+testscrolledge_LDADD = $(LDADD)
 am_testscrolledwindow_OBJECTS = testscrolledwindow.$(OBJEXT)
 testscrolledwindow_OBJECTS = $(am_testscrolledwindow_OBJECTS)
 testscrolledwindow_LDADD = $(LDADD)
@@ -498,7 +559,8 @@ testselectionmode_SOURCES = testselectionmode.c
 testselectionmode_OBJECTS = testselectionmode.$(OBJEXT)
 testselectionmode_LDADD = $(LDADD)
 testselectionmode_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testsensitive_SOURCES = testsensitive.c
 testsensitive_OBJECTS = testsensitive.$(OBJEXT)
 testsensitive_LDADD = $(LDADD)
@@ -517,7 +579,8 @@ testsplitheaders_SOURCES = testsplitheaders.c
 testsplitheaders_OBJECTS = testsplitheaders.$(OBJEXT)
 testsplitheaders_LDADD = $(LDADD)
 testsplitheaders_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_teststack_OBJECTS = teststack.$(OBJEXT)
 teststack_OBJECTS = $(am_teststack_OBJECTS)
 teststack_LDADD = $(LDADD)
@@ -540,12 +603,14 @@ am_testtoolbar_OBJECTS = testtoolbar.$(OBJEXT)
 testtoolbar_OBJECTS = $(am_testtoolbar_OBJECTS)
 testtoolbar_LDADD = $(LDADD)
 testtoolbar_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 testtoolbar2_SOURCES = testtoolbar2.c
 testtoolbar2_OBJECTS = testtoolbar2.$(OBJEXT)
 testtoolbar2_LDADD = $(LDADD)
 testtoolbar2_DEPENDENCIES = $(top_builddir)/gtk/libgtk-3.la \
-	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1)
+	$(top_builddir)/gdk/libgdk-3.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_testtooltips_OBJECTS = testtooltips.$(OBJEXT)
 testtooltips_OBJECTS = $(am_testtooltips_OBJECTS)
 testtooltips_LDADD = $(LDADD)
@@ -658,10 +723,12 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
-SOURCES = $(animated_resizing_SOURCES) $(autotestkeywords_SOURCES) \
-	flicker.c motion-compression.c print-editor.c \
+SOURCES = $(animated_resizing_SOURCES) $(animated_revealing_SOURCES) \
+	$(autotestkeywords_SOURCES) $(blur_performance_SOURCES) \
+	flicker.c $(gdkgears_SOURCES) motion-compression.c \
+	overlayscroll.c print-editor.c \
 	$(scrolling_performance_SOURCES) simple.c stresstest-toolbar.c \
-	$(styleexamples_SOURCES) subsurface.c testaccel.c \
+	$(styleexamples_SOURCES) subsurface.c syncscroll.c testaccel.c \
 	testactionbar.c $(testactions_SOURCES) testadjustsize.c \
 	$(testanimation_SOURCES) $(testappchooser_SOURCES) \
 	$(testappchooserbutton_SOURCES) testassistant.c \
@@ -678,7 +745,8 @@ SOURCES = $(animated_resizing_SOURCES) $(autotestkeywords_SOURCES) \
 	$(testfontselection_SOURCES) \
 	$(testfontselectiondialog_SOURCES) $(testframe_SOURCES) \
 	testfullscreen.c $(testgeometry_SOURCES) \
-	$(testgiconpixbuf_SOURCES) testgmenu.c $(testgrid_SOURCES) \
+	$(testgiconpixbuf_SOURCES) testglarea.c \
+	$(testglblending_SOURCES) testgmenu.c $(testgrid_SOURCES) \
 	$(testgrouping_SOURCES) $(testgtk_SOURCES) testheaderbar.c \
 	testheightforwidth.c testicontheme.c $(testiconview_SOURCES) \
 	$(testiconview_keynav_SOURCES) testimage.c testinput.c \
@@ -694,7 +762,7 @@ SOURCES = $(animated_resizing_SOURCES) $(autotestkeywords_SOURCES) \
 	testpopover.c $(testprint_SOURCES) \
 	$(testrecentchooser_SOURCES) $(testrecentchoosermenu_SOURCES) \
 	$(testrevealer_SOURCES) testrichtext.c testscale.c \
-	$(testscrolledwindow_SOURCES) testselection.c \
+	testscrolledge.c $(testscrolledwindow_SOURCES) testselection.c \
 	testselectionmode.c testsensitive.c $(testsocket_SOURCES) \
 	$(testsocket_child_SOURCES) $(testspinbutton_SOURCES) \
 	testsplitheaders.c $(teststack_SOURCES) \
@@ -711,10 +779,12 @@ SOURCES = $(animated_resizing_SOURCES) $(autotestkeywords_SOURCES) \
 	$(testwindowsize_SOURCES) testxinerama.c treestoretest.c \
 	$(video_timer_SOURCES)
 DIST_SOURCES = $(animated_resizing_SOURCES) \
-	$(am__autotestkeywords_SOURCES_DIST) flicker.c \
-	motion-compression.c print-editor.c \
+	$(animated_revealing_SOURCES) \
+	$(am__autotestkeywords_SOURCES_DIST) \
+	$(blur_performance_SOURCES) flicker.c $(gdkgears_SOURCES) \
+	motion-compression.c overlayscroll.c print-editor.c \
 	$(scrolling_performance_SOURCES) simple.c stresstest-toolbar.c \
-	$(styleexamples_SOURCES) subsurface.c testaccel.c \
+	$(styleexamples_SOURCES) subsurface.c syncscroll.c testaccel.c \
 	testactionbar.c $(testactions_SOURCES) testadjustsize.c \
 	$(testanimation_SOURCES) $(testappchooser_SOURCES) \
 	$(testappchooserbutton_SOURCES) testassistant.c \
@@ -731,7 +801,8 @@ DIST_SOURCES = $(animated_resizing_SOURCES) \
 	$(testfontselection_SOURCES) \
 	$(testfontselectiondialog_SOURCES) $(testframe_SOURCES) \
 	testfullscreen.c $(testgeometry_SOURCES) \
-	$(testgiconpixbuf_SOURCES) testgmenu.c $(testgrid_SOURCES) \
+	$(testgiconpixbuf_SOURCES) testglarea.c \
+	$(testglblending_SOURCES) testgmenu.c $(testgrid_SOURCES) \
 	$(testgrouping_SOURCES) $(testgtk_SOURCES) testheaderbar.c \
 	testheightforwidth.c testicontheme.c $(testiconview_SOURCES) \
 	$(testiconview_keynav_SOURCES) testimage.c testinput.c \
@@ -747,7 +818,7 @@ DIST_SOURCES = $(animated_resizing_SOURCES) \
 	testpopover.c $(testprint_SOURCES) \
 	$(testrecentchooser_SOURCES) $(testrecentchoosermenu_SOURCES) \
 	$(testrevealer_SOURCES) testrichtext.c testscale.c \
-	$(testscrolledwindow_SOURCES) testselection.c \
+	testscrolledge.c $(testscrolledwindow_SOURCES) testselection.c \
 	testselectionmode.c testsensitive.c $(testsocket_SOURCES) \
 	$(testsocket_child_SOURCES) $(testspinbutton_SOURCES) \
 	testsplitheaders.c $(teststack_SOURCES) \
@@ -1051,6 +1122,8 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BASE_DEPENDENCIES_CFLAGS = @BASE_DEPENDENCIES_CFLAGS@
 BASE_DEPENDENCIES_LIBS = @BASE_DEPENDENCIES_LIBS@
+BUILD_EXEEXT = @BUILD_EXEEXT@
+BUILD_OBJEXT = @BUILD_OBJEXT@
 CAIRO_BACKEND_CFLAGS = @CAIRO_BACKEND_CFLAGS@
 CAIRO_BACKEND_LIBS = @CAIRO_BACKEND_LIBS@
 CAIRO_PREFIX = @CAIRO_PREFIX@
@@ -1062,11 +1135,15 @@ CCAS = @CCAS@
 CCASDEPMODE = @CCASDEPMODE@
 CCASFLAGS = @CCASFLAGS@
 CCDEPMODE = @CCDEPMODE@
+CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
+CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
 COLORD_CFLAGS = @COLORD_CFLAGS@
 COLORD_LIBS = @COLORD_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CPPFLAGS_FOR_BUILD = @CPPFLAGS_FOR_BUILD@
+CPP_FOR_BUILD = @CPP_FOR_BUILD@
 CUPS_API_MAJOR = @CUPS_API_MAJOR@
 CUPS_API_MINOR = @CUPS_API_MINOR@
 CUPS_CFLAGS = @CUPS_CFLAGS@
@@ -1144,8 +1221,8 @@ GTK_MAJOR_VERSION = @GTK_MAJOR_VERSION@
 GTK_MICRO_VERSION = @GTK_MICRO_VERSION@
 GTK_MINOR_VERSION = @GTK_MINOR_VERSION@
 GTK_PACKAGES = @GTK_PACKAGES@
+GTK_PRINT_BACKENDS = @GTK_PRINT_BACKENDS@
 GTK_PRIVATE_PACKAGES = @GTK_PRIVATE_PACKAGES@
-GTK_UPDATE_ICON_CACHE = @GTK_UPDATE_ICON_CACHE@
 GTK_VERSION = @GTK_VERSION@
 GTK_XIM_FLAGS = @GTK_XIM_FLAGS@
 HAVE_HTTP_AUTHSTRING = @HAVE_HTTP_AUTHSTRING@
@@ -1172,6 +1249,9 @@ JSON_GLIB_CFLAGS = @JSON_GLIB_CFLAGS@
 JSON_GLIB_LIBS = @JSON_GLIB_LIBS@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LDFLAGS_FOR_BUILD = @LDFLAGS_FOR_BUILD@
+LIBCANBERRA_CFLAGS = @LIBCANBERRA_CFLAGS@
+LIBCANBERRA_LIBS = @LIBCANBERRA_LIBS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -1189,8 +1269,6 @@ MKDIR_P = @MKDIR_P@
 MKINSTALLDIRS = @MKINSTALLDIRS@
 MSGFMT = @MSGFMT@
 MSGFMT_OPTS = @MSGFMT_OPTS@
-NATIVE_GDKPIXBUF_CFLAGS = @NATIVE_GDKPIXBUF_CFLAGS@
-NATIVE_GDKPIXBUF_LIBS = @NATIVE_GDKPIXBUF_LIBS@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
@@ -1209,6 +1287,7 @@ PANGO_REQUIRED_VERSION = @PANGO_REQUIRED_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PERL = @PERL@
 PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_FOR_BUILD = @PKG_CONFIG_FOR_BUILD@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POFILES = @POFILES@
@@ -1242,6 +1321,7 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_CC_FOR_BUILD = @ac_ct_CC_FOR_BUILD@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
@@ -1345,6 +1425,7 @@ LDADD = \
 	$(top_builddir)/gtk/libgtk-3.la	\
 	$(top_builddir)/gdk/libgdk-3.la	\
 	$(GTK_DEP_LIBS)			\
+	$(GDK_DEP_LIBS)			\
 	-lm
 
 @USE_X11_TRUE@testsocket_programs = testsocket testsocket_child
@@ -1353,9 +1434,11 @@ LDADD = \
 @HAVE_CXX_TRUE@autotestkeywords_CPPFLAGS = -I$(srcdir)/dummy-headers \
 @HAVE_CXX_TRUE@	$(am__append_3)
 animated_resizing_DEPENDENCIES = $(TEST_DEPS)
+animated_revealing_DEPENDENCIES = $(TEST_DEPS)
 flicker_DEPENDENCIES = $(TEST_DEPS)
 motion_compression_DEPENDENCIES = $(TEST_DEPS)
 scrolling_performance_DEPENDENCIES = $(TEST_DEPS)
+blur_performance_DEPENDENCIES = $(TEST_DEPS)
 simple_DEPENDENCIES = $(TEST_DEPS)
 print_editor_DEPENDENCIES = $(TEST_DEPS)
 video_timer_DEPENDENCIES = $(TEST_DEPS)
@@ -1442,6 +1525,7 @@ testgrouping_DEPENDENCIES = $(TEST_DEPS)
 testtooltips_DEPENDENCIES = $(TEST_DEPS)
 testvolumebutton_DEPENDENCIES = $(TEST_DEPS)
 testscrolledwindow_DEPENDENCIES = $(TEST_DEPS)
+testscrolledge_DEPENDENCIES = $(TEST_DEPS)
 testcellarea_DEPENDENCIES = $(TEST_DEPS)
 testtreemenu_DEPENDENCIES = $(TEST_DEPS)
 testwindows_DEPENDENCIES = $(TEST_DEPS)
@@ -1471,12 +1555,23 @@ animated_resizing_SOURCES = \
 	variable.c		\
 	variable.h
 
+animated_revealing_SOURCES = \
+	animated-revealing.c	\
+	frame-stats.c		\
+	frame-stats.h		\
+	variable.c		\
+	variable.h
+
 scrolling_performance_SOURCES = \
 	scrolling-performance.c	\
 	frame-stats.c		\
 	frame-stats.h		\
 	variable.c		\
 	variable.h
+
+blur_performance_SOURCES = \
+	blur-performance.c	\
+	../gtk/gtkcairoblur.c
 
 video_timer_SOURCES = \
 	video-timer.c	\
@@ -1652,6 +1747,16 @@ teststack_SOURCES = teststack.c
 testrevealer_SOURCES = testrevealer.c
 testtitlebar_SOURCES = testtitlebar.c
 testwindowsize_SOURCES = testwindowsize.c
+gdkgears_SOURCES = \
+	gdkgears.c	\
+	gtkgears.c	\
+	gtkgears.h
+
+testglblending_SOURCES = \
+	testglblending.c	\
+	gtkgears.c	\
+	gtkgears.h
+
 CLEANFILES = \
 	autotestkeywords.log	\
 	autotestkeywords.trs	\
@@ -1705,17 +1810,33 @@ animated-resizing$(EXEEXT): $(animated_resizing_OBJECTS) $(animated_resizing_DEP
 	@rm -f animated-resizing$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(animated_resizing_OBJECTS) $(animated_resizing_LDADD) $(LIBS)
 
+animated-revealing$(EXEEXT): $(animated_revealing_OBJECTS) $(animated_revealing_DEPENDENCIES) $(EXTRA_animated_revealing_DEPENDENCIES) 
+	@rm -f animated-revealing$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(animated_revealing_OBJECTS) $(animated_revealing_LDADD) $(LIBS)
+
 autotestkeywords$(EXEEXT): $(autotestkeywords_OBJECTS) $(autotestkeywords_DEPENDENCIES) $(EXTRA_autotestkeywords_DEPENDENCIES) 
 	@rm -f autotestkeywords$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(autotestkeywords_OBJECTS) $(autotestkeywords_LDADD) $(LIBS)
+
+blur-performance$(EXEEXT): $(blur_performance_OBJECTS) $(blur_performance_DEPENDENCIES) $(EXTRA_blur_performance_DEPENDENCIES) 
+	@rm -f blur-performance$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(blur_performance_OBJECTS) $(blur_performance_LDADD) $(LIBS)
 
 flicker$(EXEEXT): $(flicker_OBJECTS) $(flicker_DEPENDENCIES) $(EXTRA_flicker_DEPENDENCIES) 
 	@rm -f flicker$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(flicker_OBJECTS) $(flicker_LDADD) $(LIBS)
 
+gdkgears$(EXEEXT): $(gdkgears_OBJECTS) $(gdkgears_DEPENDENCIES) $(EXTRA_gdkgears_DEPENDENCIES) 
+	@rm -f gdkgears$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(gdkgears_OBJECTS) $(gdkgears_LDADD) $(LIBS)
+
 motion-compression$(EXEEXT): $(motion_compression_OBJECTS) $(motion_compression_DEPENDENCIES) $(EXTRA_motion_compression_DEPENDENCIES) 
 	@rm -f motion-compression$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(motion_compression_OBJECTS) $(motion_compression_LDADD) $(LIBS)
+
+overlayscroll$(EXEEXT): $(overlayscroll_OBJECTS) $(overlayscroll_DEPENDENCIES) $(EXTRA_overlayscroll_DEPENDENCIES) 
+	@rm -f overlayscroll$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(overlayscroll_OBJECTS) $(overlayscroll_LDADD) $(LIBS)
 
 print-editor$(EXEEXT): $(print_editor_OBJECTS) $(print_editor_DEPENDENCIES) $(EXTRA_print_editor_DEPENDENCIES) 
 	@rm -f print-editor$(EXEEXT)
@@ -1740,6 +1861,10 @@ styleexamples$(EXEEXT): $(styleexamples_OBJECTS) $(styleexamples_DEPENDENCIES) $
 subsurface$(EXEEXT): $(subsurface_OBJECTS) $(subsurface_DEPENDENCIES) $(EXTRA_subsurface_DEPENDENCIES) 
 	@rm -f subsurface$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(subsurface_OBJECTS) $(subsurface_LDADD) $(LIBS)
+
+syncscroll$(EXEEXT): $(syncscroll_OBJECTS) $(syncscroll_DEPENDENCIES) $(EXTRA_syncscroll_DEPENDENCIES) 
+	@rm -f syncscroll$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(syncscroll_OBJECTS) $(syncscroll_LDADD) $(LIBS)
 
 testaccel$(EXEEXT): $(testaccel_OBJECTS) $(testaccel_DEPENDENCIES) $(EXTRA_testaccel_DEPENDENCIES) 
 	@rm -f testaccel$(EXEEXT)
@@ -1905,6 +2030,14 @@ testgiconpixbuf$(EXEEXT): $(testgiconpixbuf_OBJECTS) $(testgiconpixbuf_DEPENDENC
 	@rm -f testgiconpixbuf$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(testgiconpixbuf_OBJECTS) $(testgiconpixbuf_LDADD) $(LIBS)
 
+testglarea$(EXEEXT): $(testglarea_OBJECTS) $(testglarea_DEPENDENCIES) $(EXTRA_testglarea_DEPENDENCIES) 
+	@rm -f testglarea$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(testglarea_OBJECTS) $(testglarea_LDADD) $(LIBS)
+
+testglblending$(EXEEXT): $(testglblending_OBJECTS) $(testglblending_DEPENDENCIES) $(EXTRA_testglblending_DEPENDENCIES) 
+	@rm -f testglblending$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(testglblending_OBJECTS) $(testglblending_LDADD) $(LIBS)
+
 testgmenu$(EXEEXT): $(testgmenu_OBJECTS) $(testgmenu_DEPENDENCIES) $(EXTRA_testgmenu_DEPENDENCIES) 
 	@rm -f testgmenu$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(testgmenu_OBJECTS) $(testgmenu_LDADD) $(LIBS)
@@ -2069,6 +2202,10 @@ testscale$(EXEEXT): $(testscale_OBJECTS) $(testscale_DEPENDENCIES) $(EXTRA_tests
 	@rm -f testscale$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(testscale_OBJECTS) $(testscale_LDADD) $(LIBS)
 
+testscrolledge$(EXEEXT): $(testscrolledge_OBJECTS) $(testscrolledge_DEPENDENCIES) $(EXTRA_testscrolledge_DEPENDENCIES) 
+	@rm -f testscrolledge$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(testscrolledge_OBJECTS) $(testscrolledge_LDADD) $(LIBS)
+
 testscrolledwindow$(EXEEXT): $(testscrolledwindow_OBJECTS) $(testscrolledwindow_DEPENDENCIES) $(EXTRA_testscrolledwindow_DEPENDENCIES) 
 	@rm -f testscrolledwindow$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(testscrolledwindow_OBJECTS) $(testscrolledwindow_LDADD) $(LIBS)
@@ -2220,17 +2357,24 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/animated-resizing.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/animated-revealing.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/autotestkeywords-autotestkeywords.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/blur-performance.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/flicker.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/frame-stats.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkgears.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gtkcairoblur.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gtkgears.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gtkoffscreenbox.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/motion-compression.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overlayscroll.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/print-editor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scrolling-performance.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simple.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stresstest-toolbar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/styleexamples.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/subsurface.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syncscroll.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testaccel.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testactionbar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testactions.Po@am__quote@
@@ -2272,6 +2416,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testfullscreen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testgeometry.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testgiconpixbuf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testglarea.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testglblending.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testgmenu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testgrid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testgrouping.Po@am__quote@
@@ -2314,6 +2460,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testrevealer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testrichtext.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testscale.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testscrolledge.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testscrolledwindow.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testselection.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testselectionmode.Po@am__quote@
@@ -2373,6 +2520,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+gtkcairoblur.o: ../gtk/gtkcairoblur.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT gtkcairoblur.o -MD -MP -MF $(DEPDIR)/gtkcairoblur.Tpo -c -o gtkcairoblur.o `test -f '../gtk/gtkcairoblur.c' || echo '$(srcdir)/'`../gtk/gtkcairoblur.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gtkcairoblur.Tpo $(DEPDIR)/gtkcairoblur.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../gtk/gtkcairoblur.c' object='gtkcairoblur.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o gtkcairoblur.o `test -f '../gtk/gtkcairoblur.c' || echo '$(srcdir)/'`../gtk/gtkcairoblur.c
+
+gtkcairoblur.obj: ../gtk/gtkcairoblur.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT gtkcairoblur.obj -MD -MP -MF $(DEPDIR)/gtkcairoblur.Tpo -c -o gtkcairoblur.obj `if test -f '../gtk/gtkcairoblur.c'; then $(CYGPATH_W) '../gtk/gtkcairoblur.c'; else $(CYGPATH_W) '$(srcdir)/../gtk/gtkcairoblur.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gtkcairoblur.Tpo $(DEPDIR)/gtkcairoblur.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../gtk/gtkcairoblur.c' object='gtkcairoblur.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o gtkcairoblur.obj `if test -f '../gtk/gtkcairoblur.c'; then $(CYGPATH_W) '../gtk/gtkcairoblur.c'; else $(CYGPATH_W) '$(srcdir)/../gtk/gtkcairoblur.c'; fi`
 
 .cc.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

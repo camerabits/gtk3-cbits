@@ -93,11 +93,12 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = gdk/win32
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/gtk-doc.m4 \
-	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
-	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
-	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
+	$(top_srcdir)/m4/gtk-doc.m4 $(top_srcdir)/m4/libtool.m4 \
+	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
+	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/m4/pkg_config_for_build.m4 \
+	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(libgdkinclude_HEADERS) \
@@ -112,10 +113,11 @@ am_libgdk_win32_la_OBJECTS = gdkcursor-win32.lo \
 	gdkdevicemanager-win32.lo gdkdevice-virtual.lo \
 	gdkdevice-win32.lo gdkdevice-wintab.lo gdkdisplay-win32.lo \
 	gdkdisplaymanager-win32.lo gdkdnd-win32.lo gdkevents-win32.lo \
-	gdkgeometry-win32.lo gdkglobals-win32.lo gdkinput.lo \
-	gdkkeys-win32.lo gdkmain-win32.lo gdkproperty-win32.lo \
-	gdkscreen-win32.lo gdkselection-win32.lo gdktestutils-win32.lo \
-	gdkvisual-win32.lo gdkwin32id.lo gdkwindow-win32.lo
+	gdkgeometry-win32.lo gdkglcontext-win32.lo gdkglobals-win32.lo \
+	gdkinput.lo gdkkeys-win32.lo gdkmain-win32.lo \
+	gdkproperty-win32.lo gdkscreen-win32.lo gdkselection-win32.lo \
+	gdktestutils-win32.lo gdkvisual-win32.lo gdkwin32id.lo \
+	gdkwindow-win32.lo
 libgdk_win32_la_OBJECTS = $(am_libgdk_win32_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -271,6 +273,8 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BASE_DEPENDENCIES_CFLAGS = @BASE_DEPENDENCIES_CFLAGS@
 BASE_DEPENDENCIES_LIBS = @BASE_DEPENDENCIES_LIBS@
+BUILD_EXEEXT = @BUILD_EXEEXT@
+BUILD_OBJEXT = @BUILD_OBJEXT@
 CAIRO_BACKEND_CFLAGS = @CAIRO_BACKEND_CFLAGS@
 CAIRO_BACKEND_LIBS = @CAIRO_BACKEND_LIBS@
 CAIRO_PREFIX = @CAIRO_PREFIX@
@@ -282,11 +286,15 @@ CCAS = @CCAS@
 CCASDEPMODE = @CCASDEPMODE@
 CCASFLAGS = @CCASFLAGS@
 CCDEPMODE = @CCDEPMODE@
+CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
+CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
 COLORD_CFLAGS = @COLORD_CFLAGS@
 COLORD_LIBS = @COLORD_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CPPFLAGS_FOR_BUILD = @CPPFLAGS_FOR_BUILD@
+CPP_FOR_BUILD = @CPP_FOR_BUILD@
 CUPS_API_MAJOR = @CUPS_API_MAJOR@
 CUPS_API_MINOR = @CUPS_API_MINOR@
 CUPS_CFLAGS = @CUPS_CFLAGS@
@@ -364,8 +372,8 @@ GTK_MAJOR_VERSION = @GTK_MAJOR_VERSION@
 GTK_MICRO_VERSION = @GTK_MICRO_VERSION@
 GTK_MINOR_VERSION = @GTK_MINOR_VERSION@
 GTK_PACKAGES = @GTK_PACKAGES@
+GTK_PRINT_BACKENDS = @GTK_PRINT_BACKENDS@
 GTK_PRIVATE_PACKAGES = @GTK_PRIVATE_PACKAGES@
-GTK_UPDATE_ICON_CACHE = @GTK_UPDATE_ICON_CACHE@
 GTK_VERSION = @GTK_VERSION@
 GTK_XIM_FLAGS = @GTK_XIM_FLAGS@
 HAVE_HTTP_AUTHSTRING = @HAVE_HTTP_AUTHSTRING@
@@ -392,6 +400,9 @@ JSON_GLIB_CFLAGS = @JSON_GLIB_CFLAGS@
 JSON_GLIB_LIBS = @JSON_GLIB_LIBS@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LDFLAGS_FOR_BUILD = @LDFLAGS_FOR_BUILD@
+LIBCANBERRA_CFLAGS = @LIBCANBERRA_CFLAGS@
+LIBCANBERRA_LIBS = @LIBCANBERRA_LIBS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -409,8 +420,6 @@ MKDIR_P = @MKDIR_P@
 MKINSTALLDIRS = @MKINSTALLDIRS@
 MSGFMT = @MSGFMT@
 MSGFMT_OPTS = @MSGFMT_OPTS@
-NATIVE_GDKPIXBUF_CFLAGS = @NATIVE_GDKPIXBUF_CFLAGS@
-NATIVE_GDKPIXBUF_LIBS = @NATIVE_GDKPIXBUF_LIBS@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
@@ -429,6 +438,7 @@ PANGO_REQUIRED_VERSION = @PANGO_REQUIRED_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PERL = @PERL@
 PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_FOR_BUILD = @PKG_CONFIG_FOR_BUILD@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POFILES = @POFILES@
@@ -462,6 +472,7 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_CC_FOR_BUILD = @ac_ct_CC_FOR_BUILD@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
@@ -572,10 +583,13 @@ libgdk_win32_la_SOURCES = \
 	gdkdevice-wintab.c \
 	gdkdevice-wintab.h \
 	gdkdisplay-win32.c \
+	gdkdisplay-win32.h \
 	gdkdisplaymanager-win32.c \
 	gdkdnd-win32.c \
 	gdkevents-win32.c \
 	gdkgeometry-win32.c \
+	gdkglcontext-win32.c \
+	gdkglcontext-win32.h \
 	gdkglobals-win32.c \
 	gdkinput.c \
 	gdkkeys-win32.c \
@@ -590,6 +604,7 @@ libgdk_win32_la_SOURCES = \
 	gdkwin32display.h \
 	gdkwin32displaymanager.h \
 	gdkwin32dnd.h \
+	gdkwin32glcontext.h		\
 	gdkwin32.h \
 	gdkwin32id.c \
 	gdkwin32keys.h \
@@ -609,6 +624,7 @@ libgdkwin32include_HEADERS = \
 	gdkwin32display.h	\
 	gdkwin32displaymanager.h\
 	gdkwin32dnd.h		\
+	gdkwin32glcontext.h		\
 	gdkwin32keys.h		\
 	gdkwin32misc.h		\
 	gdkwin32screen.h	\
@@ -679,6 +695,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkdnd-win32.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkevents-win32.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkgeometry-win32.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkglcontext-win32.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkglobals-win32.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkinput.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gdkkeys-win32.Plo@am__quote@

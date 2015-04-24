@@ -6257,9 +6257,6 @@ msgstr "Nyomtatás tesztnyomtatóra"
 #~ msgid "5x7"
 #~ msgstr "5x7"
 
-#~ msgid "The license of the program"
-#~ msgstr "A program licence"
-
 #~ msgid "Please select a folder below"
 #~ msgstr "Válasszon egy mappát lentebb"
 

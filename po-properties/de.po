@@ -1204,7 +1204,7 @@ msgstr "Lizenztyp"
 
 #: ../gtk/gtkaboutdialog.c:441
 msgid "The license type of the program"
-msgstr "Der Lizenztyp des Programms"
+msgstr "Die Lizenz des Programms"
 
 #: ../gtk/gtkaboutdialog.c:456
 msgid "Website URL"
@@ -9277,9 +9277,6 @@ msgstr "Titel des Farbprofils"
 #: ../modules/printbackends/cups/gtkprintercups.c:94
 msgid "The title of the color profile to use"
 msgstr "Der Titel des zu verwendenden Farbprofils"
-
-#~ msgid "Associated stack for this GtkSidebar"
-#~ msgstr "Zugeordneter Stapel für diese »GtkSidebar«"
 
 #~ msgid "Hold Time"
 #~ msgstr "Haltezeit"

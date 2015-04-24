@@ -1937,10 +1937,9 @@ msgstr "2000"
 #.
 #: gtk/gtkcalendar.c:1899 gtk/gtkcalendar.c:2577
 #, c-format
-msgid "A file named “%s” already exists.  Do you want to replace it?"
-msgstr ""
-"\"%s\" adında bir dosya zaten mevcut.  Varolan dosya ile değiştirmek ister "
-"misiniz?"
+msgctxt "calendar:day:digits"
+msgid "%d"
+msgstr "%d"
 
 #. Translators: this defines whether the week numbers should use
 #. * localized digits or the ones used in English (0123...).
@@ -1954,11 +1953,9 @@ msgstr ""
 #.
 #: gtk/gtkcalendar.c:1931 gtk/gtkcalendar.c:2443
 #, c-format
-msgid ""
-"The file already exists in “%s”.  Replacing it will overwrite its contents."
-msgstr ""
-"\"%s\" adında bir dosya zaten mevcut.  Onun yerine koymak, dosya içeriğinin "
-"üzerine yazacak."
+msgctxt "calendar:week:digits"
+msgid "%d"
+msgstr "%d"
 
 #. Translators: This dictates how the year is displayed in
 #. * gtkcalendar widget.  See strftime() manual for the format.
@@ -1984,23 +1981,10 @@ msgctxt "Accelerator"
 msgid "Disabled"
 msgstr "Kapalı"
 
-#: ../gtk/gtkfilechooserwidget.c:6051
-msgid ""
-"The program was not able to create a connection to the indexer daemon.  "
-"Please make sure it is running."
-msgstr ""
-"Program dizinleyici servisine bağlantı oluşturamadı.  Lütfen çalıştığından "
-"emin olun."
-
-#: ../gtk/gtkfilechooserwidget.c:6065
-msgid "Could not send the search request"
-msgstr "Arama isteği gönderilemedi"
-
-# gtk/gtkfilesel.c:651
-#. The pointers we return for a GtkFileSystemVolume are opaque tokens; they are
-#. * really pointers to GDrive, GVolume or GMount objects.  We need an extra
-#. * token for the fake “File System” volume.  So, we’ll return a pointer to
-#. * this particular string.
+# gdk-pixbuf/io-xbm.c:284
+#. This label is displayed in a treeview cell displaying
+#. * an accelerator key combination that is not valid according
+#. * to gtk_accelerator_valid().
 #.
 #: gtk/gtkcellrendereraccel.c:284
 msgctxt "Accelerator"
@@ -2818,16 +2802,11 @@ msgstr "GTK+ Seçenekleri"
 msgid "Show GTK+ Options"
 msgstr "GTK+ Seçeneklerini Göster"
 
-# gdk-pixbuf/io-xpm.c:1257
-#. we create a placeholder menuitem, to be used in case
-#. * the menu is empty. this placeholder will stay around
-#. * for the entire lifetime of the menu, and we just hide it
-#. * when it's not used. we have to do this, and do it here,
-#. * because we need a marker for the beginning of the recent
-#. * items list, so that we can insert the new items at the
-#. * right place when idly populating the menu in case the
-#. * user appended or prepended custom menu items to the
-#. * recent chooser menu widget.
+# gtk/gtkmain.c:475
+#. Translate to default:RTL if you want your widgets
+#. * to be RTL, otherwise translate to default:LTR.
+#. * Do *not* translate it to "predefinito:LTR", if it
+#. * it isn't default:LTR or default:RTL it will not work
 #.
 #: gtk/gtkmain.c:1166
 msgid "default:LTR"
@@ -3265,9 +3244,8 @@ msgstr "Hata ile tamamlandı"
 
 #: gtk/gtkprintoperation.c:2349
 #, c-format
-msgctxt "volume percentage"
-msgid "%d %%"
-msgstr "%d %%"
+msgid "Preparing %d"
+msgstr "%d hazırlanıyor"
 
 # gtk/gtkstock.c:268
 #: gtk/gtkprintoperation.c:2351 gtk/gtkprintoperation.c:2985
@@ -6012,8 +5990,8 @@ msgstr "Tema dizin dosyası yok.\n"
 #: gtk/updateiconcache.c:1748
 #, c-format
 msgid ""
-"Specify one or more page ranges,\n"
-" e.g. 1-3,7,11"
+"No theme index file in '%s'.\n"
+"If you really want to create an icon cache here, use --ignore-theme-index.\n"
 msgstr ""
 "Tema dizin dosyası '%s' içinde yok.\n"
 "Eğer burada gerçekten bir simge önbelleği oluşturmak istiyorsanız, --ignore-"

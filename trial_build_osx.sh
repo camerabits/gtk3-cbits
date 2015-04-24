@@ -21,7 +21,10 @@ export PKG_CONFIG_LIBDIR=/usr/local/cbits-build-i386/homebrew/lib/pkgconfig:/usr
 export PKG_CONFIG_PATH=/usr/local/cbits-build-i386/homebrew/opt/icu4c/lib/pkgconfig
 export VERSIONER_PYTHON_PREFER_32_BIT=yes
 
-export PATH="/usr/local/cbits-build-i386/homebrew/bin:$PATH"
+export PATH="/usr/local/cbits-build-i386/homebrew/bin:$HOME/Development/camerabits/gtk-build/gtk3-cbits/gtk:$PATH"
+
+#autoreconf --force --verbose
+#exit
 
 #./configure --enable-debug=yes --disable-dependency-tracking --prefix=/usr/local/cbits-build-i386/homebrew/Cellar/gtk3-cbits/cbits --disable-glibtest --enable-introspection=yes --disable-schemas-compile --enable-quartz-backend --enable-quartz-relocation
 #exit

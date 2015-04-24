@@ -1,10 +1,10 @@
 # Serbian translation of gtk+
-# Courtesy of Prevod.org team (http://prevod.org/) -- 2003—2015.
+# Courtesy of Prevod.org team (http://prevod.org/) -- 2003—2014.
 # This file is distributed under the same license as the gtk package.
-# Danilo Šegan <dsegan@gmx.net>, 2003.
-# Aleksandar Urošević <urke@users.sourceforge.net>, 2004.
-# Branko Kokanović <branko.kokanovic@gmail.com>, 2009.
-# Miroslav Nikolić <miroslavnikolic@rocketmail.com>, 2011—2015.
+# Maintainer: Danilo Šegan <dsegan@gmx.net>
+# Reviewed on 2004-02-11 by Aleksandar Urošević <urke@users.sourceforge.net>
+# Translated on 2009-10-08 by: Branko Kokanović <branko.kokanovic@gmail.com>
+# Miroslav Nikolić <miroslavnikolic@rocketmail.com>, 2011—2014.
 msgid ""
 msgstr ""
 "Project-Id-Version: gtk+\n"
@@ -225,18 +225,18 @@ msgid "GIcon"
 msgstr "Gikonica"
 
 #: ../gtk/deprecated/gtkaction.c:343 ../gtk/deprecated/gtkstatusicon.c:270
-#: ../gtk/gtkcellrendererpixbuf.c:263 ../gtk/gtkimage.c:343
+#: ../gtk/gtkcellrendererpixbuf.c:258 ../gtk/gtkimage.c:343
 msgid "The GIcon being displayed"
 msgstr "Gikonica koja je prikazana"
 
 #: ../gtk/deprecated/gtkaction.c:365 ../gtk/deprecated/gtkstatusicon.c:253
-#: ../gtk/gtkcellrendererpixbuf.c:228 ../gtk/gtkimage.c:325
+#: ../gtk/gtkcellrendererpixbuf.c:223 ../gtk/gtkimage.c:325
 #: ../gtk/gtkprinter.c:170 ../gtk/gtkwindow.c:859
 msgid "Icon Name"
 msgstr "Naziv ikonice"
 
 #: ../gtk/deprecated/gtkaction.c:366 ../gtk/deprecated/gtkstatusicon.c:254
-#: ../gtk/gtkcellrendererpixbuf.c:229 ../gtk/gtkimage.c:326
+#: ../gtk/gtkcellrendererpixbuf.c:224 ../gtk/gtkimage.c:326
 msgid "The name of the icon from the icon theme"
 msgstr "Naziv ikonice iz teme ikonica"
 
@@ -784,7 +784,7 @@ msgstr "Naziv datoteke"
 msgid "Filename to load and display"
 msgstr "Naziv datoteke za učitavanje i prikaz"
 
-#: ../gtk/deprecated/gtkstatusicon.c:245 ../gtk/gtkcellrendererpixbuf.c:192
+#: ../gtk/deprecated/gtkstatusicon.c:245 ../gtk/gtkcellrendererpixbuf.c:187
 #: ../gtk/gtkimage.c:260
 msgid "Stock ID"
 msgstr "ID pripremljene"
@@ -801,7 +801,7 @@ msgstr "Vrsta smeštaja"
 msgid "The representation being used for image data"
 msgstr "Način zapisa koji se koristi za podatke za sliku"
 
-#: ../gtk/deprecated/gtkstatusicon.c:286 ../gtk/gtkcellrendererpixbuf.c:200
+#: ../gtk/deprecated/gtkstatusicon.c:286 ../gtk/gtkcellrendererpixbuf.c:195
 #: ../gtk/gtkcellrendererspinner.c:159 ../gtk/gtkrecentmanager.c:307
 msgid "Size"
 msgstr "Veličina"
@@ -1236,7 +1236,7 @@ msgstr "Element za prečicu"
 msgid "The widget to be monitored for accelerator changes"
 msgstr "Element koji će biti praćen za izmenama prečice"
 
-#: ../gtk/gtkaccessible.c:156 ../gtk/gtkeventcontroller.c:157
+#: ../gtk/gtkaccessible.c:156 ../gtk/gtkeventcontroller.c:155
 #: ../gtk/gtktreeviewcolumn.c:347
 msgid "Widget"
 msgstr "Element"
@@ -1272,13 +1272,13 @@ msgid ""
 msgstr "Određuje da li je sadržani element vezan za početak ili kraj sadržaoca"
 
 #: ../gtk/gtkactionbar.c:257 ../gtk/gtkbox.c:336 ../gtk/gtkheaderbar.c:1803
-#: ../gtk/gtknotebook.c:775 ../gtk/gtkpaned.c:336 ../gtk/gtkpopover.c:1317
+#: ../gtk/gtknotebook.c:774 ../gtk/gtkpaned.c:336 ../gtk/gtkpopover.c:1317
 #: ../gtk/gtkstack.c:433 ../gtk/gtktoolitemgroup.c:1674
 msgid "Position"
 msgstr "Položaj"
 
 #: ../gtk/gtkactionbar.c:258 ../gtk/gtkbox.c:337 ../gtk/gtkheaderbar.c:1804
-#: ../gtk/gtknotebook.c:776 ../gtk/gtkstack.c:434
+#: ../gtk/gtknotebook.c:775 ../gtk/gtkstack.c:434
 msgid "The index of the child in the parent"
 msgstr "Indeks sadržanog elementa u sadržaocu"
 
@@ -1351,11 +1351,11 @@ msgstr "Prikazuje osnovnu stavku"
 msgid "Whether the combobox should show the default application on top"
 msgstr "Da li prozorče za izbor treba da pokaže osnovni program na vrhu"
 
-#: ../gtk/gtkappchooserbutton.c:647 ../gtk/gtkappchooserdialog.c:683
+#: ../gtk/gtkappchooserbutton.c:647 ../gtk/gtkappchooserdialog.c:678
 msgid "Heading"
 msgstr "Naslov"
 
-#: ../gtk/gtkappchooserbutton.c:648 ../gtk/gtkappchooserdialog.c:684
+#: ../gtk/gtkappchooserbutton.c:648 ../gtk/gtkappchooserdialog.c:679
 msgid "The text to show at the top of the dialog"
 msgstr "Tekst za prikazivanje na vrhu prozorčeta"
 
@@ -1367,59 +1367,59 @@ msgstr "Vrsta sadržaja"
 msgid "The content type used by the open with object"
 msgstr "Vrsta sadržaja koju koristi otvori predmetom"
 
-#: ../gtk/gtkappchooserdialog.c:669
+#: ../gtk/gtkappchooserdialog.c:664
 msgid "GFile"
 msgstr "Gdatoteka"
 
-#: ../gtk/gtkappchooserdialog.c:670
+#: ../gtk/gtkappchooserdialog.c:665
 msgid "The GFile used by the app chooser dialog"
 msgstr "Gdatoteka koju koristi prozorče birača programa"
 
-#: ../gtk/gtkappchooserwidget.c:959
+#: ../gtk/gtkappchooserwidget.c:966
 msgid "Show default app"
 msgstr "Prikazuje osnovni program"
 
-#: ../gtk/gtkappchooserwidget.c:960
+#: ../gtk/gtkappchooserwidget.c:967
 msgid "Whether the widget should show the default application"
 msgstr "Da li element treba da pokaže osnovni program"
 
-#: ../gtk/gtkappchooserwidget.c:974
+#: ../gtk/gtkappchooserwidget.c:981
 msgid "Show recommended apps"
 msgstr "Prikazuje preporučene programe"
 
-#: ../gtk/gtkappchooserwidget.c:975
+#: ../gtk/gtkappchooserwidget.c:982
 msgid "Whether the widget should show recommended applications"
 msgstr "Da li element treba da pokaže preporučene programe"
 
-#: ../gtk/gtkappchooserwidget.c:989
+#: ../gtk/gtkappchooserwidget.c:996
 msgid "Show fallback apps"
 msgstr "Prikazuje programe prebacivanja"
 
-#: ../gtk/gtkappchooserwidget.c:990
+#: ../gtk/gtkappchooserwidget.c:997
 msgid "Whether the widget should show fallback applications"
 msgstr "Da li element treba da pokaže programe prebacivanja"
 
-#: ../gtk/gtkappchooserwidget.c:1002
+#: ../gtk/gtkappchooserwidget.c:1009
 msgid "Show other apps"
 msgstr "Prikazuje druge programe"
 
-#: ../gtk/gtkappchooserwidget.c:1003
+#: ../gtk/gtkappchooserwidget.c:1010
 msgid "Whether the widget should show other applications"
 msgstr "Da li element treba da pokaže druge programe"
 
-#: ../gtk/gtkappchooserwidget.c:1016
+#: ../gtk/gtkappchooserwidget.c:1023
 msgid "Show all apps"
 msgstr "Prikazuje sve programe"
 
-#: ../gtk/gtkappchooserwidget.c:1017
+#: ../gtk/gtkappchooserwidget.c:1024
 msgid "Whether the widget should show all applications"
 msgstr "Da li element treba da pokaže sve programe"
 
-#: ../gtk/gtkappchooserwidget.c:1031
+#: ../gtk/gtkappchooserwidget.c:1038
 msgid "Widget's default text"
 msgstr "Osnovni tekst elementa"
 
-#: ../gtk/gtkappchooserwidget.c:1032
+#: ../gtk/gtkappchooserwidget.c:1039
 msgid "The default text appearing when there are no applications"
 msgstr "Osnovni tekst koji se pojavljuje kada nema programa"
 
@@ -2224,39 +2224,39 @@ msgstr "Sličica za nerazgranate"
 msgid "Pixbuf for closed expander"
 msgstr "Sličica za neprikazano grananje"
 
-#: ../gtk/gtkcellrendererpixbuf.c:179
+#: ../gtk/gtkcellrendererpixbuf.c:174
 msgid "surface"
 msgstr "površina"
 
-#: ../gtk/gtkcellrendererpixbuf.c:180
+#: ../gtk/gtkcellrendererpixbuf.c:175
 msgid "The surface to render"
 msgstr "Površina za iscrtavanje"
 
-#: ../gtk/gtkcellrendererpixbuf.c:193
+#: ../gtk/gtkcellrendererpixbuf.c:188
 msgid "The stock ID of the stock icon to render"
 msgstr "ID pripremljene sličice koja se iscrtava"
 
-#: ../gtk/gtkcellrendererpixbuf.c:201
+#: ../gtk/gtkcellrendererpixbuf.c:196
 msgid "The GtkIconSize value that specifies the size of the rendered icon"
 msgstr "Vrednost veličine Gtk ikonice koja određuje veličinu iscrtane ikonice"
 
-#: ../gtk/gtkcellrendererpixbuf.c:210
+#: ../gtk/gtkcellrendererpixbuf.c:205
 msgid "Detail"
 msgstr "Detalj"
 
-#: ../gtk/gtkcellrendererpixbuf.c:211
+#: ../gtk/gtkcellrendererpixbuf.c:206
 msgid "Render detail to pass to the theme engine"
 msgstr "Detalj iscrtavanja koji se prosleđuje motoru teme"
 
-#: ../gtk/gtkcellrendererpixbuf.c:244
+#: ../gtk/gtkcellrendererpixbuf.c:239
 msgid "Follow State"
 msgstr "Prati stanje"
 
-#: ../gtk/gtkcellrendererpixbuf.c:245
+#: ../gtk/gtkcellrendererpixbuf.c:240
 msgid "Whether the rendered pixbuf should be colorized according to the state"
 msgstr "Da li se iscrtana sličica boji prema stanju ili ne"
 
-#: ../gtk/gtkcellrendererpixbuf.c:262 ../gtk/gtkimage.c:342
+#: ../gtk/gtkcellrendererpixbuf.c:257 ../gtk/gtkimage.c:342
 #: ../gtk/gtkwindow.c:807
 msgid "Icon"
 msgstr "Ikonica"
@@ -2762,7 +2762,7 @@ msgstr "Nedosledno stanje"
 msgid "The inconsistent state of the button"
 msgstr "Nedosledno stanje dugmića"
 
-#: ../gtk/gtkcellrenderertoggle.c:153 ../gtk/gtklistbox.c:3499
+#: ../gtk/gtkcellrenderertoggle.c:153 ../gtk/gtklistbox.c:3498
 msgid "Activatable"
 msgstr "Moguće aktivirati"
 
@@ -2929,7 +2929,7 @@ msgid "Color as RGBA"
 msgstr "Boja kao RGBA"
 
 # Izbirač naiđe na otirač? :) Ali mi ne pada ništa pametnije na pamet :(
-#: ../gtk/gtkcolorswatch.c:763 ../gtk/gtklabel.c:798 ../gtk/gtklistbox.c:3513
+#: ../gtk/gtkcolorswatch.c:763 ../gtk/gtklabel.c:798 ../gtk/gtklistbox.c:3512
 msgid "Selectable"
 msgstr "Izbirljiv"
 
@@ -3687,11 +3687,11 @@ msgstr ""
 msgid "Widget the gesture relates to"
 msgstr "Element na koji se odnosi pokret"
 
-#: ../gtk/gtkeventcontroller.c:172
+#: ../gtk/gtkeventcontroller.c:170
 msgid "Propagation phase"
 msgstr "Faza prostiranja"
 
-#: ../gtk/gtkeventcontroller.c:173
+#: ../gtk/gtkeventcontroller.c:171
 msgid "Propagation phase at which this controller is run"
 msgstr "Faza prostiranja pri kojoj ovaj upravljač radi"
 
@@ -3893,21 +3893,21 @@ msgstr "Uspravni položaj"
 msgid "Y position of child widget"
 msgstr "Uspravni položaj sadržanog elementa"
 
-#: ../gtk/gtkflowbox.c:3664 ../gtk/gtkiconview.c:400 ../gtk/gtklistbox.c:416
+#: ../gtk/gtkflowbox.c:3664 ../gtk/gtkiconview.c:400 ../gtk/gtklistbox.c:415
 #: ../gtk/gtktreeselection.c:131
 msgid "Selection mode"
 msgstr "Režim izbora"
 
-#: ../gtk/gtkflowbox.c:3665 ../gtk/gtkiconview.c:401 ../gtk/gtklistbox.c:417
+#: ../gtk/gtkflowbox.c:3665 ../gtk/gtkiconview.c:401 ../gtk/gtklistbox.c:416
 msgid "The selection mode"
 msgstr "Režim izbora"
 
-#: ../gtk/gtkflowbox.c:3678 ../gtk/gtkiconview.c:657 ../gtk/gtklistbox.c:424
+#: ../gtk/gtkflowbox.c:3678 ../gtk/gtkiconview.c:657 ../gtk/gtklistbox.c:423
 #: ../gtk/gtktreeview.c:1210
 msgid "Activate on Single Click"
 msgstr "Pokreni na jedan klik"
 
-#: ../gtk/gtkflowbox.c:3679 ../gtk/gtkiconview.c:658 ../gtk/gtklistbox.c:425
+#: ../gtk/gtkflowbox.c:3679 ../gtk/gtkiconview.c:658 ../gtk/gtklistbox.c:424
 #: ../gtk/gtktreeview.c:1211
 msgid "Activate row on a single click"
 msgstr "Pokrenite red na jedan klik"
@@ -4050,15 +4050,6 @@ msgstr "Broj tačaka potrebnih za okidanje pokreta"
 #: ../gtk/gtkgesture.c:712 ../gtk/gtkgesture.c:713
 msgid "GdkWindow to receive events about"
 msgstr "Gdk prozor o kome se primaju događaji"
-
-#: ../gtk/gtkgesturelongpress.c:284
-#| msgid "Scale factor"
-msgid "Delay factor"
-msgstr "Činilac zastoja"
-
-#: ../gtk/gtkgesturelongpress.c:285
-msgid "Factor by which to modify the default timeout"
-msgstr "Činilac za izmenu osnovnog vremenskog isteka"
 
 #: ../gtk/gtkgesturepan.c:238
 msgid "Allowed orientations"
@@ -5010,53 +5001,53 @@ msgstr "Da li prikazujemo prozorče"
 msgid "The screen where this window will be displayed."
 msgstr "Ekran na kojem će se prikazati ovaj prozor."
 
-#: ../gtk/gtknotebook.c:700
+#: ../gtk/gtknotebook.c:699
 msgid "Page"
 msgstr "List"
 
-#: ../gtk/gtknotebook.c:701
+#: ../gtk/gtknotebook.c:700
 msgid "The index of the current page"
 msgstr "Broj tekućeg lista"
 
-#: ../gtk/gtknotebook.c:709
+#: ../gtk/gtknotebook.c:708
 msgid "Tab Position"
 msgstr "Položaj jezičaka"
 
-#: ../gtk/gtknotebook.c:710
+#: ../gtk/gtknotebook.c:709
 msgid "Which side of the notebook holds the tabs"
 msgstr "Na kojoj strani se nalaze jezičci"
 
-#: ../gtk/gtknotebook.c:717
+#: ../gtk/gtknotebook.c:716
 msgid "Show Tabs"
 msgstr "Prikaži jezičke"
 
-#: ../gtk/gtknotebook.c:718
+#: ../gtk/gtknotebook.c:717
 msgid "Whether tabs should be shown"
 msgstr "Da li se jezičci prikazuju ili ne"
 
-#: ../gtk/gtknotebook.c:724
+#: ../gtk/gtknotebook.c:723
 msgid "Show Border"
 msgstr "Prikaži ivicu"
 
-#: ../gtk/gtknotebook.c:725
+#: ../gtk/gtknotebook.c:724
 msgid "Whether the border should be shown"
 msgstr "Da li se ivica prikazuje ili ne"
 
-#: ../gtk/gtknotebook.c:731
+#: ../gtk/gtknotebook.c:730
 msgid "Scrollable"
 msgstr "Mnogo jezičaka"
 
-#: ../gtk/gtknotebook.c:732
+#: ../gtk/gtknotebook.c:731
 msgid "If TRUE, scroll arrows are added if there are too many tabs to fit"
 msgstr ""
 "Ako je postavljeno, dodaju se strelice kada ima previše jezičaka da bi stali "
 "na predviđen prostor"
 
-#: ../gtk/gtknotebook.c:738
+#: ../gtk/gtknotebook.c:737
 msgid "Enable Popup"
 msgstr "Omogući izbornik"
 
-#: ../gtk/gtknotebook.c:739
+#: ../gtk/gtknotebook.c:738
 msgid ""
 "If TRUE, pressing the right mouse button on the notebook pops up a menu that "
 "you can use to go to a page"
@@ -5064,133 +5055,133 @@ msgstr ""
 "Ako je postavljeno, pritisak na desni taster miša otvara izbornik koji se "
 "može koristiti za prebacivanje na list"
 
-#: ../gtk/gtknotebook.c:753
+#: ../gtk/gtknotebook.c:752
 msgid "Group Name"
 msgstr "Naziv grupe"
 
-#: ../gtk/gtknotebook.c:754
+#: ../gtk/gtknotebook.c:753
 msgid "Group name for tab drag and drop"
 msgstr "Naziv grupe za prevlačenje i otpuštanje jezička"
 
-#: ../gtk/gtknotebook.c:761
+#: ../gtk/gtknotebook.c:760
 msgid "Tab label"
 msgstr "Oznaka jezička"
 
-#: ../gtk/gtknotebook.c:762
+#: ../gtk/gtknotebook.c:761
 msgid "The string displayed on the child's tab label"
 msgstr "Tekst koji se prikazuje kao oznaka sadržanog jezička"
 
-#: ../gtk/gtknotebook.c:768
+#: ../gtk/gtknotebook.c:767
 msgid "Menu label"
 msgstr "Oznaka izbornika"
 
-#: ../gtk/gtknotebook.c:769
+#: ../gtk/gtknotebook.c:768
 msgid "The string displayed in the child's menu entry"
 msgstr "Tekst koji se prikazuje u sadržanom izborniku"
 
-#: ../gtk/gtknotebook.c:782
+#: ../gtk/gtknotebook.c:781
 msgid "Tab expand"
 msgstr "Razotkri jezičak"
 
-#: ../gtk/gtknotebook.c:783
+#: ../gtk/gtknotebook.c:782
 msgid "Whether to expand the child's tab"
 msgstr "Da li da proširi sadržanu karticu ili ne"
 
-#: ../gtk/gtknotebook.c:789
+#: ../gtk/gtknotebook.c:788
 msgid "Tab fill"
 msgstr "Popunjavanje jezičaka"
 
-#: ../gtk/gtknotebook.c:790
+#: ../gtk/gtknotebook.c:789
 msgid "Whether the child's tab should fill the allocated area"
 msgstr "Da li sadržani jezičci treba da popune obezbeđeni prostor ili ne"
 
-#: ../gtk/gtknotebook.c:797
+#: ../gtk/gtknotebook.c:796
 msgid "Tab reorderable"
 msgstr "Promenljivost redosleda jezičaka"
 
-#: ../gtk/gtknotebook.c:798
+#: ../gtk/gtknotebook.c:797
 msgid "Whether the tab is reorderable by user action"
 msgstr "Da li je redosled jezičaka promenljiv korisnikovim radnjama ili ne"
 
-#: ../gtk/gtknotebook.c:804
+#: ../gtk/gtknotebook.c:803
 msgid "Tab detachable"
 msgstr "Jezičak otkačiv"
 
-#: ../gtk/gtknotebook.c:805
+#: ../gtk/gtknotebook.c:804
 msgid "Whether the tab is detachable"
 msgstr "Da li se jezičak može otkačiti"
 
-#: ../gtk/gtknotebook.c:820 ../gtk/gtkscrollbar.c:101
+#: ../gtk/gtknotebook.c:819 ../gtk/gtkscrollbar.c:101
 msgid "Secondary backward stepper"
 msgstr "Druga koračnica unazad"
 
-#: ../gtk/gtknotebook.c:821
+#: ../gtk/gtknotebook.c:820
 msgid ""
 "Display a second backward arrow button on the opposite end of the tab area"
 msgstr "Prikaži drugu strelicu za nazad na drugom kraju zone sa jezičcima"
 
-#: ../gtk/gtknotebook.c:836 ../gtk/gtkscrollbar.c:108
+#: ../gtk/gtknotebook.c:835 ../gtk/gtkscrollbar.c:108
 msgid "Secondary forward stepper"
 msgstr "Druga koračnica unapred"
 
-#: ../gtk/gtknotebook.c:837
+#: ../gtk/gtknotebook.c:836
 msgid ""
 "Display a second forward arrow button on the opposite end of the tab area"
 msgstr "Prikaži drugu strelicu za napred na drugom kraju zone sa jezičcima"
 
-#: ../gtk/gtknotebook.c:851 ../gtk/gtkscrollbar.c:87
+#: ../gtk/gtknotebook.c:850 ../gtk/gtkscrollbar.c:87
 msgid "Backward stepper"
 msgstr "Koračnica unazad"
 
-#: ../gtk/gtknotebook.c:852 ../gtk/gtkscrollbar.c:88
+#: ../gtk/gtknotebook.c:851 ../gtk/gtkscrollbar.c:88
 msgid "Display the standard backward arrow button"
 msgstr "Prikaži obično dugme sa strelicom unazad"
 
-#: ../gtk/gtknotebook.c:866 ../gtk/gtkscrollbar.c:94
+#: ../gtk/gtknotebook.c:865 ../gtk/gtkscrollbar.c:94
 msgid "Forward stepper"
 msgstr "Koračnica unapred"
 
-#: ../gtk/gtknotebook.c:867 ../gtk/gtkscrollbar.c:95
+#: ../gtk/gtknotebook.c:866 ../gtk/gtkscrollbar.c:95
 msgid "Display the standard forward arrow button"
 msgstr "Prikaži obično dugme sa strelicom unapred"
 
-#: ../gtk/gtknotebook.c:881
+#: ../gtk/gtknotebook.c:880
 msgid "Tab overlap"
 msgstr "Preklapanje jzičaka"
 
-#: ../gtk/gtknotebook.c:882
+#: ../gtk/gtknotebook.c:881
 msgid "Size of tab overlap area"
 msgstr "Veličina oblasti preklapanja jezičaka"
 
-#: ../gtk/gtknotebook.c:897
+#: ../gtk/gtknotebook.c:896
 msgid "Tab curvature"
 msgstr "Iskrivljenost jezičaka"
 
-#: ../gtk/gtknotebook.c:898
+#: ../gtk/gtknotebook.c:897
 msgid "Size of tab curvature"
 msgstr "Veličina iskrivljenosti jezičaka"
 
-#: ../gtk/gtknotebook.c:914
+#: ../gtk/gtknotebook.c:913
 msgid "Arrow spacing"
 msgstr "Razmak strelice"
 
-#: ../gtk/gtknotebook.c:915
+#: ../gtk/gtknotebook.c:914
 msgid "Scroll arrow spacing"
 msgstr "Razmak između strelica za klizanje"
 
-#: ../gtk/gtknotebook.c:931
+#: ../gtk/gtknotebook.c:930
 msgid "Initial gap"
 msgstr "Početni razmak"
 
-#: ../gtk/gtknotebook.c:932
+#: ../gtk/gtknotebook.c:931
 msgid "Initial gap before the first tab"
 msgstr "Početni razmak koji prethodi prvom tabulatoru"
 
-#: ../gtk/gtknotebook.c:950
+#: ../gtk/gtknotebook.c:949
 msgid "Tab gap"
 msgstr "Razmak jezička"
 
-#: ../gtk/gtknotebook.c:951
+#: ../gtk/gtknotebook.c:950
 msgid "Active tab is drawn with a gap at the bottom"
 msgstr "Radni jezičak se iscrtava sa razmakom na dnu"
 

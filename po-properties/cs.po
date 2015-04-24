@@ -1465,7 +1465,7 @@ msgstr "Lišta nabídky"
 
 #: gtk/gtkapplication.c:950
 msgid "The GMenuModel for the menubar"
-msgstr "GMenuModel nabídkové lišty"
+msgstr "GMenuModel lišty nabídky"
 
 #: gtk/gtkapplication.c:956
 msgid "Active window"

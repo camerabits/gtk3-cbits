@@ -407,10 +407,6 @@
   initialResizeLocation.y -= initialResizeFrame.origin.y;
 }
 
-#ifdef AVAILABLE_MAC_OS_X_VERSION_10_7_AND_LATER
-
-#ifdef AVAILABLE_MAC_OS_X_VERSION_10_7_AND_LATER
-
 - (void)setStyleMask:(NSUInteger)styleMask
 {
   gboolean was_fullscreen;
@@ -425,7 +421,5 @@
   if (was_fullscreen != is_fullscreen)
     _gdk_quartz_window_update_fullscreen_state ([[self contentView] gdkWindow]);
 }
-
-#endif
 
 @end

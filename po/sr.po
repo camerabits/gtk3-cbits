@@ -6413,9 +6413,6 @@ msgstr "Штампај на пробном штампачу"
 #~ msgid "_Location:"
 #~ msgstr "_Путања:"
 
-#~ msgid "The license of the program"
-#~ msgstr "Лиценца програма"
-
 #~ msgid "Please select a folder below"
 #~ msgstr "Молим изаберите фасциклу испод"
 

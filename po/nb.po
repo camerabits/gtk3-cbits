@@ -1223,9 +1223,6 @@ msgstr "_Avbryt"
 
 #: ../gtk/deprecated/gtkcolorseldialog.c:195
 #: ../gtk/gtkprinteroptionwidget.c:546
-#: ../gtk/resources/ui/gtkappchooserdialog.ui.h:3
-#: ../gtk/resources/ui/gtkcolorchooserdialog.ui.h:3
-#: ../gtk/resources/ui/gtkfontchooserdialog.ui.h:3
 msgid "_Select"
 msgstr "Vel_g"
 

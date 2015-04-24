@@ -963,41 +963,41 @@ msgstr "Vybr_ať všetko"
 #. Sorting direction
 #: gtk/a11y/gtkimageaccessible.c:118 gtk/deprecated/gtkstock.c:443
 msgctxt "Stock label"
-msgid "_Index"
-msgstr "_Index"
+msgid "_Ascending"
+msgstr "_Vzostupne"
 
 #. Sorting direction
 #: gtk/a11y/gtkimageaccessible.c:119 gtk/deprecated/gtkstock.c:445
 msgctxt "Stock label"
-msgid "_No"
-msgstr "_Nie"
+msgid "_Descending"
+msgstr "_Zostupne"
 
 #: gtk/a11y/gtkimageaccessible.c:120 gtk/deprecated/gtkstock.c:446
 msgctxt "Stock label"
-msgid "_OK"
-msgstr "_Ok"
+msgid "_Spell Check"
+msgstr "_Kontrola preklepov"
 
 #: gtk/a11y/gtkimageaccessible.c:121 gtk/deprecated/gtkstock.c:447
 msgctxt "Stock label"
-msgid "Landscape"
-msgstr "Na šírku"
+msgid "_Stop"
+msgstr "_Zastaviť"
 
 #. Font variant
 #: gtk/a11y/gtkimageaccessible.c:122 gtk/deprecated/gtkstock.c:449
 msgctxt "Stock label"
-msgid "Portrait"
-msgstr "Na výšku"
+msgid "_Strikethrough"
+msgstr "_Prečiarknuté"
 
 #. Font variant
 #: gtk/a11y/gtkimageaccessible.c:123 gtk/deprecated/gtkstock.c:452
 msgctxt "Stock label"
-msgid "Reverse portrait"
-msgstr "Obrátene na výšku"
+msgid "_Underline"
+msgstr "Po_dčiarknuté"
 
 #: gtk/a11y/gtkimageaccessible.c:124 gtk/deprecated/gtkstock.c:453
 msgctxt "Stock label"
-msgid "Page Set_up"
-msgstr "Nastavenie _strany"
+msgid "_Undo"
+msgstr "Vrátiť _späť"
 
 #: gtk/a11y/gtkimageaccessible.c:125 gtk/deprecated/gtkstock.c:383
 msgctxt "Stock label"
@@ -1007,24 +1007,24 @@ msgstr "Zmenšiť odsadenie"
 #. Zoom
 #: gtk/a11y/gtkimageaccessible.c:126 gtk/deprecated/gtkstock.c:456
 msgctxt "Stock label"
-msgid "_Color"
-msgstr "_Farba"
+msgid "_Normal Size"
+msgstr "_Normálna veľkosť"
 
 #. Zoom
 #: gtk/a11y/gtkimageaccessible.c:127 gtk/deprecated/gtkstock.c:458
 msgctxt "Stock label"
-msgid "_Font"
-msgstr "_Písmo"
+msgid "Best _Fit"
+msgstr "_Prispôsobiť"
 
 #: gtk/a11y/gtkimageaccessible.c:128 gtk/deprecated/gtkstock.c:459
 msgctxt "Stock label"
-msgid "_Undelete"
-msgstr "_Zrušiť odstránenie"
+msgid "Zoom _In"
+msgstr "Z_väčšiť"
 
 #: gtk/a11y/gtkimageaccessible.c:129 gtk/deprecated/gtkstock.c:460
 msgctxt "Stock label"
-msgid "_Yes"
-msgstr "Án_o"
+msgid "Zoom _Out"
+msgstr "Z_menšiť"
 
 #: gtk/a11y/gtkmenubuttonaccessible.c:102 gtk/inspector/window.ui:356
 msgid "Menu"
@@ -6334,5 +6334,9 @@ msgstr "Vytlačiť na skúšobnej tlačiarni"
 #~ msgid "-"
 #~ msgstr "-"
 
-#~ msgid "The license of the program"
-#~ msgstr "Licencia programu"
+#~ msgid "Switches between on and off states"
+#~ msgstr "Prepína medzi zapnutým a vypnutým stavom"
+
+#~ msgctxt "light switch widget"
+#~ msgid "Switch"
+#~ msgstr "Prepínač"

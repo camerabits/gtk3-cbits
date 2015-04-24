@@ -32,6 +32,7 @@ GtkWidget *do_entry_completion (GtkWidget *do_widget);
 GtkWidget *do_event_axes (GtkWidget *do_widget);
 GtkWidget *do_expander (GtkWidget *do_widget);
 GtkWidget *do_gestures (GtkWidget *do_widget);
+GtkWidget *do_glarea (GtkWidget *do_widget);
 GtkWidget *do_headerbar (GtkWidget *do_widget);
 GtkWidget *do_hypertext (GtkWidget *do_widget);
 GtkWidget *do_iconview (GtkWidget *do_widget);
@@ -55,6 +56,7 @@ GtkWidget *do_revealer (GtkWidget *do_widget);
 GtkWidget *do_rotated_text (GtkWidget *do_widget);
 GtkWidget *do_search_entry (GtkWidget *do_widget);
 GtkWidget *do_search_entry2 (GtkWidget *do_widget);
+GtkWidget *do_sidebar (GtkWidget *do_widget);
 GtkWidget *do_sizegroup (GtkWidget *do_widget);
 GtkWidget *do_spinner (GtkWidget *do_widget);
 GtkWidget *do_stack (GtkWidget *do_widget);
@@ -134,6 +136,7 @@ Demo gtk_demos[] = {
   { "listbox", "List Box", "listbox.c", do_listbox, NULL }, 
   { "menus", "Menus", "menus.c", do_menus, NULL }, 
   { NULL, "Offscreen Windows", NULL, NULL, child5 }, 
+  { "glarea", "OpenGL Area", "glarea.c", do_glarea, NULL }, 
   { "overlay", "Overlay", "overlay.c", do_overlay, NULL }, 
   { "panes", "Paned Widgets", "panes.c", do_panes, NULL }, 
   { "pickers", "Pickers", "pickers.c", do_pickers, NULL }, 
@@ -145,6 +148,7 @@ Demo gtk_demos[] = {
   { "sizegroup", "Size Groups", "sizegroup.c", do_sizegroup, NULL }, 
   { "spinner", "Spinner", "spinner.c", do_spinner, NULL }, 
   { "stack", "Stack", "stack.c", do_stack, NULL }, 
+  { "sidebar", "Stack Sidebar", "sidebar.c", do_sidebar, NULL }, 
   { NULL, "Text Widget", NULL, NULL, child3 }, 
   { "toolpalette", "Tool Palette", "toolpalette.c", do_toolpalette, NULL }, 
   { "transparent", "Transparency", "transparent.c", do_transparent, NULL }, 
