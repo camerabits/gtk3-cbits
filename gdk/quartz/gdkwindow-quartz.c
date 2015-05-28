@@ -1077,11 +1077,20 @@ gdk_quartz_window_destroy (GdkWindow *window,
     {
       GDK_QUARTZ_ALLOC_POOL;
 
-      if (impl->toplevel)
-	[impl->toplevel close];
-      else if (impl->view)
-	[impl->view removeFromSuperview];
-
+      if (GDK_WINDOW_TYPE (window) != GDK_WINDOW_FOREIGN)
+        {
+          if (GDK_WINDOW_TYPE (window) == GDK_WINDOW_TOPLEVEL ||
+              GDK_WINDOW_TYPE (window) == GDK_WINDOW_TEMP)
+            {
+              if (impl->toplevel)
+                [impl->toplevel close];
+            }
+          else if (GDK_WINDOW_TYPE (window) == GDK_WINDOW_CHILD)
+            {
+              if (impl->view)
+                [impl->view removeFromSuperview];
+            }
+        }
       GDK_QUARTZ_RELEASE_POOL;
     }
 }
@@ -1100,10 +1109,12 @@ gdk_quartz_window_destroy_foreign (GdkWindow *window)
   gdk_window_hide (window);
   gdk_window_reparent (window, NULL, 0, 0);
   
+#if 0 // %%KAB: we don't own a foreign window, we just wrap it so we shouldn't manage its lifetime
   GDK_QUARTZ_ALLOC_POOL;
-  if (impl->toplevel)
+  if (impl->toplevel)  /* FOREIGN-FIXME */
     [impl->toplevel performClose:nil];
   GDK_QUARTZ_RELEASE_POOL;
+#endif
 }
 
 /* FIXME: This might be possible to simplify with client-side windows. Also
