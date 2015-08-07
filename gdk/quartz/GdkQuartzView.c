@@ -893,8 +893,13 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
 
 -(void)viewDidMoveToWindow
 {
-  if (![self window]) /* We are destroyed already */
+  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ (gdk_window->impl);
+  impl->toplevel = [self window];	/* nil is OK here, if the view doesn't have a window
+  									   then its impl shouldn't either. */
+
+  if (![self window]) /* We have no top-level window at this time */
     return;
+
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(windowDidBecomeKey:)
                                                name:NSWindowDidBecomeKeyNotification
@@ -930,6 +935,7 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
         [self windowDidResignKey:nil];
       [self windowDidMove:nil];
     }
+  
   haveBeenAddedToWindow = YES;
 }
 
