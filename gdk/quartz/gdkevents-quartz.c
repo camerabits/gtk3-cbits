@@ -482,21 +482,6 @@ get_toplevel_from_ns_event (NSEvent *nsevent,
           *y = view_point.y;
         }
     }
-#if 0
-  if (!toplevel)
-    {
-      /* Fallback used when no NSWindow set.  This happens e.g. when
-       * we allow motion events without a window set in gdk_event_translate()
-       * that occur immediately after the main menu bar was clicked/used.
-       * This fallback will not return coordinates contained in a window's
-       * titlebar.
-       */
-      *screen_point = [NSEvent mouseLocation];
-      toplevel = get_toplevel_under_pointer (_gdk_display,
-                                             *screen_point,
-                                             x, y);
-    }
-#endif
   return toplevel;
 }
 
@@ -1475,8 +1460,6 @@ gdk_event_translate (GdkEvent *event,
   window = find_window_for_ns_event (nsevent, &x, &y, &x_root, &y_root);
   if (!window)
     {
-//      NSLog(@"no window found for event:%@", nsevent);
-//      window = find_window_for_ns_event (nsevent, &x, &y, &x_root, &y_root);
       return FALSE;
     }
   /* Apply any window filters. */
@@ -1620,30 +1603,6 @@ gdk_event_translate (GdkEvent *event,
           }
       }
       break;
-
-#if 0
-    case NSMouseExited:
-      if (WINDOW_IS_TOPLEVEL (window))
-          [[NSCursor arrowCursor] set];
-      /* fall through */
-    case NSMouseEntered:
-      return_val = synthesize_crossing_event (window, event, nsevent, x, y, x_root, y_root);
-      break;
-
-    case NSKeyDown:
-    case NSKeyUp:
-    case NSFlagsChanged:
-      {
-        GdkEventType type;
-
-        type = _gdk_quartz_keys_event_type (nsevent);
-        if (type == GDK_NOTHING)
-          return_val = FALSE;
-        else
-          fill_key_event (window, event, nsevent, type);
-      }
-      break;
-#endif
 
     default:
       /* Ignore everything elsee. */

@@ -1356,6 +1356,7 @@ move_resize_window_internal (GdkWindow *window,
       content_rect = NSMakeRect (gx, gy, window->width, window->height);
 
       frame_rect = [impl->toplevel frameRectForContentRect:content_rect];
+      frame_rect.origin.y -= (frame_rect.size.height - content_rect.size.height); /* adjust for window titlebar height */
       [impl->toplevel setFrame:frame_rect display:YES];
     }
   else 
