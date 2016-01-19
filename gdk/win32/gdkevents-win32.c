@@ -1557,18 +1557,33 @@ modal_timer_proc (HWND     hwnd,
 		  UINT_PTR id,
 		  DWORD    time)
 {
-  int arbitrary_limit = 10;
+  static int timer_proc_nest_count = 0;
 
-  while (_modal_operation_in_progress &&
-	 g_main_context_pending (NULL) &&
-	 arbitrary_limit--)
-    g_main_context_iteration (NULL, FALSE);
+  // {char msgbuf[2048]; sprintf(msgbuf, "modal_timer_proc: [ modal=%d nest=%d\n", (int)_modal_operation_in_progress, timer_proc_nest_count); OutputDebugStringA(msgbuf);}
+
+  if (timer_proc_nest_count == 0)
+    {
+      int arbitrary_limit = 10;
+
+      ++timer_proc_nest_count;
+
+      while (_modal_operation_in_progress &&
+	     g_main_context_pending (NULL) &&
+	     arbitrary_limit--)
+	g_main_context_iteration (NULL, FALSE);  // hopefully neither C++ exceptions nor longjmp's make it out of here
+
+      --timer_proc_nest_count;
+    }
+
+  // {char msgbuf[2048]; sprintf(msgbuf, "modal_timer_proc: ] modal=%d nest=%d\n", (int)_modal_operation_in_progress, timer_proc_nest_count); OutputDebugStringA(msgbuf);}
 }
 
 void
 _gdk_win32_begin_modal_call (void)
 {
   g_assert (!_modal_operation_in_progress);
+
+  // {char msgbuf[2048]; sprintf(msgbuf, "_gdk_win32_begin_modal_call\n"); OutputDebugStringA(msgbuf);}
 
   _modal_operation_in_progress = TRUE;
 
@@ -1581,6 +1596,8 @@ void
 _gdk_win32_end_modal_call (void)
 {
   g_assert (_modal_operation_in_progress);
+
+  // {char msgbuf[2048]; sprintf(msgbuf, "_gdk_win32_end_modal_call\n"); OutputDebugStringA(msgbuf);}
 
   _modal_operation_in_progress = FALSE;
 
@@ -2809,7 +2826,11 @@ gdk_event_translate (MSG  *msg,
 
       /* Call modal timer immediate so that we repaint faster after a resize. */
       if (_modal_operation_in_progress)
-	modal_timer_proc (0,0,0,0);
+        {
+          //  {char msgbuf[2048]; sprintf(msgbuf, "gdk_event_translate: explicit modal_timer_proc call\n"); OutputDebugStringA(msgbuf);}
+
+	  modal_timer_proc (0,0,0,0);
+	}
 
       /* Claim as handled, so that WM_SIZE and WM_MOVE are avoided */
       return_val = TRUE;
@@ -3332,20 +3353,58 @@ done:
   return return_val;
 }
 
+static int
+retrieve_pending_win32_messages (MSG *msgs, const int buf_len)
+{
+  int msg_count = 0;
+
+  while (msg_count < buf_len)
+    {
+      int got_msg = PeekMessageW (&msgs[msg_count], NULL, 0, 0, PM_REMOVE) != 0;
+      if (! got_msg)
+        break;
+
+      ++msg_count;
+    }
+
+  return msg_count;
+}
+
 void
 _gdk_win32_display_queue_events (GdkDisplay *display)
 {
-  MSG msg;
+#define MSG_BUF_LEN 64 // arbitrary
+  MSG msgs[MSG_BUF_LEN];
+  int msg_count, msg_idx;
 
   if (modal_win32_dialog != NULL)
     return;
   
-  while (!_gdk_event_queue_find_first (display) &&
-	 PeekMessageW (&msg, NULL, 0, 0, PM_REMOVE))
+  if (_gdk_event_queue_find_first (display))
+    return;
+
+  // {char msgbuf[2048]; sprintf(msgbuf, "_gdk_win32_display_queue_events: [ modal=%d\n", (int)_modal_operation_in_progress); OutputDebugStringA(msgbuf);}
+
+  msg_count = retrieve_pending_win32_messages (msgs, MSG_BUF_LEN);
+
+  for (msg_idx = 0;  msg_idx < msg_count;  ++msg_idx)
     {
-      TranslateMessage (&msg);
-      DispatchMessageW (&msg);
+      MSG *msg = &msgs[msg_idx];
+      TranslateMessage (msg);
+
+/* #ifdef G_ENABLE_DEBUG
+      {char msgbuf[2048];
+	sprintf(msgbuf, "_gdk_win32_display_queue_events: modal=%d dispatch: msg=%s\n",
+		    (int)_modal_operation_in_progress, _gdk_win32_message_to_string(msg->message));
+	OutputDebugStringA(msgbuf);}
+#endif */
+
+      DispatchMessageW (msg);
     }
+
+  // {char msgbuf[2048]; sprintf(msgbuf, "_gdk_win32_display_queue_events: ] modal=%d\n", (int)_modal_operation_in_progress); OutputDebugStringA(msgbuf);}
+
+#undef MSG_BUF_LEN
 }
 
 static gboolean
