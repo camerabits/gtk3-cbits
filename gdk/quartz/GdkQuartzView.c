@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2005-2007 Imendio AB
  * Copyright (C) 2011 Hiroyuki Yamamoto
- * Copyright (C) 2015 Kirk A. Baker, Camera Bits, Inc.
+ * Copyright (C) 2015-2016 Kirk A. Baker, Camera Bits, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,642 +31,723 @@
 #include "gdkquartzdisplay.h"
 #include "gdkquartzdevicemanager-core.h"
 
+@interface GdkQuartzView (Private)
+- (void)postKeyEvent:(NSEvent *)theEvent;
+- (BOOL)didRedirectKeyEvent;
+@end
+
 @implementation GdkQuartzView
 
--(id)initWithFrame: (NSRect)frameRect
+- (id)initWithFrame:(NSRect)frameRect
 {
-  if ((self = [super initWithFrame: frameRect]))
-    {
-      markedRange = NSMakeRange (NSNotFound, 0);
-      selectedRange = NSMakeRange (NSNotFound, 0);
-      shouldTrackCursor = YES;
-      cursorIsInside = NO;
-      haveBeenAddedToWindow = NO;
-    }
-  return self;
+	if ((self = [super initWithFrame:frameRect])) {
+		shouldTrackCursor = YES;
+		cursorIsInside = NO;
+		haveBeenAddedToWindow = NO;
+		didRedirectKeyEvent = NO;
+	}
+	return self;
 }
 
--(BOOL)acceptsFirstResponder
+- (BOOL)acceptsFirstResponder
 {
-  GDK_NOTE (EVENTS, g_print ("acceptsFirstResponder\n"));
-  return YES;
+	GDK_NOTE (EVENTS, g_print ("acceptsFirstResponder\n"));
+	return YES;
 }
 
--(BOOL)becomeFirstResponder
+- (BOOL)becomeFirstResponder
 {
-  GDK_NOTE (EVENTS, g_print ("becomeFirstResponder\n"));
-  return YES;
+	GDK_NOTE (EVENTS, g_print ("becomeFirstResponder\n"));
+	return YES;
 }
 
--(BOOL)resignFirstResponder
+- (BOOL)resignFirstResponder
 {
-  GDK_NOTE (EVENTS, g_print ("resignFirstResponder\n"));
-  return YES;
+	GDK_NOTE (EVENTS, g_print ("resignFirstResponder\n"));
+	return YES;
 }
 
 - (BOOL)canBecomeKeyView
 {
-  GDK_NOTE (EVENTS, g_print ("canBecomeKeyView\n"));
-  return YES;
+	GDK_NOTE (EVENTS, g_print ("canBecomeKeyView\n"));
+	return YES;
 }
 
--(void) postKeyEvent:(NSEvent *)theEvent
+- (BOOL)didRedirectKeyEvent
 {
-  GdkWindow * window = _gdk_find_toplevel_for_keyboard_event(theEvent);
-  
-  if (window != NULL)
-    {
-      GdkEventType type;
-
-      type = _gdk_quartz_keys_event_type (theEvent);
-      if (type == GDK_NOTHING)
-        return;
-      else if (type == GDK_KEY_PRESS || type == GDK_KEY_RELEASE)
-        {
-          GdkEvent  *event;
-          GList *node;
-
-          event = gdk_event_new (GDK_NOTHING);
-
-          event->any.window = NULL;
-          event->any.send_event = FALSE;
-
-          node = _gdk_event_queue_append (_gdk_display, event);
-          _gdk_quartz_fill_key_event (window, event, theEvent, type);
-          if (event->any.window)
-            g_object_ref (event->any.window);
-          _gdk_windowing_got_event (_gdk_display, node, event, 0);
-          gtk_main_iteration();
-        }
-    }
+	BOOL result = didRedirectKeyEvent;
+	didRedirectKeyEvent = NO;
+	return result;
 }
 
--(void) keyDown: (NSEvent *) theEvent
+- (void)postKeyEvent:(NSEvent *)theEvent
 {
-  GDK_NOTE (EVENTS, g_print ("keyDown\n"));
+	GdkWindow * window = _gdk_find_toplevel_for_keyboard_event(theEvent);
 
-  [self interpretKeyEvents:[NSArray arrayWithObject: theEvent]];
-  [self postKeyEvent:theEvent];
+	if (window != NULL) {
+		GdkEventType type;
+
+		type = _gdk_quartz_keys_event_type(theEvent);
+		if (type == GDK_NOTHING)
+			return;
+		else if (type == GDK_KEY_PRESS || type == GDK_KEY_RELEASE) {
+			GdkEvent  *event;
+			GList *node;
+
+			event = gdk_event_new(GDK_NOTHING);
+
+			event->any.window = NULL;
+			event->any.send_event = FALSE;
+
+			node = _gdk_event_queue_append(_gdk_display, event);
+			_gdk_quartz_fill_key_event(window, event, theEvent, type);
+			if (event->any.window)
+				g_object_ref(event->any.window);
+			_gdk_windowing_got_event(_gdk_display, node, event, 0);
+			gtk_main_iteration();
+		}
+	}
 }
 
--(void) keyUp: (NSEvent *) theEvent
+- (void)keyDown:(NSEvent *)theEvent
 {
-  GDK_NOTE (EVENTS, g_print ("keyUp\n"));
-  [self postKeyEvent:theEvent];
+	GDK_NOTE (EVENTS, g_print ("keyDown\n"));
+
+	[self interpretKeyEvents:[NSArray arrayWithObject: theEvent]];
+	if (![self didRedirectKeyEvent]) {
+		[self postKeyEvent:theEvent];
+	}
 }
 
--(void)flagsChanged: (NSEvent *) theEvent
+- (void)keyUp:(NSEvent *)theEvent
+{
+	GDK_NOTE (EVENTS, g_print ("keyUp\n"));
+	[self postKeyEvent:theEvent];
+}
+
+- (void)flagsChanged:(NSEvent *)theEvent
 {
 }
 
--(NSUInteger)characterIndexForPoint: (NSPoint)aPoint
+/* NSTextInputClient protocol methods--start */
+
+/* Unfinished/Broken.  Must keep more state in actual GtkWidgets and not in this single NSView.  Since a single GdkQuartzView could potentially
+   contain multiple GtkWidgets that can accept text entry, the state must be maintained in the widget.  The plan for implementation as of this
+   date (1/25/2016) would be to have each GtkWidget that has text entry register with the GdkQuartzView so that the GdkQuartzView can query
+   the widget for the information that it needs--things like cursor location, character index at a given screen location, marking and unmarking
+   text, substituting composed text in place of existing text, etc.  Gdk can't in general know about Gtk widgets, but Gtk widgets can know about
+   Gdk underpinnings and thus the GtkWidgets should register/unregister themselves as they become realized/unrealized.
+ */
+
+#if 0
+/*
+ - (NSUInteger)characterIndexForPoint:(NSPoint)aPoint	Required
+
+  Returns the index of the character whose bounding rectangle includes the given point.
+ */
+- (NSUInteger)characterIndexForPoint:(NSPoint)aPoint
 {
-  GDK_NOTE (EVENTS, g_print ("characterIndexForPoint\n"));
-  return 0;
+	NSLog(@"characterIndexForPoint:(%f, %f)", aPoint.x, aPoint.y);
+	GDK_NOTE (EVENTS, g_print ("characterIndexForPoint\n"));
+	
+	return NSNotFound;
 }
 
--(NSRect)firstRectForCharacterRange: (NSRange)aRange actualRange: (NSRangePointer)actualRange
+/*
+ - (NSRect)firstRectForCharacterRange:(NSRange)aRange actualRange:(NSRangePointer)actualRange	Required
+
+  Returns the first logical boundary rectangle for characters in the given range.
+ */
+- (NSRect)firstRectForCharacterRange:(NSRange)aRange actualRange:(NSRangePointer)actualRange
 {
-  GDK_NOTE (EVENTS, g_print ("firstRectForCharacterRange\n"));
-  gint ns_x, ns_y;
-  GdkRectangle *rect;
+	if (actualRange != NULL) {
+		NSLog(@"firstRectForCharacterRange:(%u, %u) actualRange:(%u, %u)",
+				aRange.location, aRange.length, actualRange->location, actualRange->length);
+	}
+	else {
+		NSLog(@"firstRectForCharacterRange:(%u, %u) actualRange:(NULL)", aRange.location, aRange.length);
+	}
+	GDK_NOTE (EVENTS, g_print ("firstRectForCharacterRange\n"));
+	gint ns_x, ns_y;
+	GdkRectangle *rect;
 
-  rect = g_object_get_data (G_OBJECT (gdk_window), GIC_CURSOR_RECT);
-  if (rect)
-    {
-      _gdk_quartz_window_gdk_xy_to_xy (rect->x, rect->y + rect->height,
-				       &ns_x, &ns_y);
+	rect = g_object_get_data(G_OBJECT(gdk_window), GIC_CURSOR_RECT);
+	if (rect) {
+		_gdk_quartz_window_gdk_xy_to_xy(rect->x, rect->y + rect->height, &ns_x, &ns_y);
 
-      return NSMakeRect (ns_x, ns_y, rect->width, rect->height);
-    }
-  else
-    {
-      return NSMakeRect (0, 0, 0, 0);
-    }
+		return NSMakeRect(ns_x, ns_y, rect->width, rect->height);
+	}
+	else {
+		return NSMakeRect(0, 0, 0, 0);
+	}
 }
 
--(NSArray *)validAttributesForMarkedText
+/*
+ - (NSArray *)validAttributesForMarkedText	Required
+
+  Returns an array of attribute names recognized by the receiver.
+ */
+- (NSArray *)validAttributesForMarkedText
 {
-  GDK_NOTE (EVENTS, g_print ("validAttributesForMarkedText\n"));
-  return [NSArray arrayWithObjects: NSUnderlineStyleAttributeName, nil];
+	NSLog(@"validAttributesForMarkedText");
+	GDK_NOTE (EVENTS, g_print ("validAttributesForMarkedText\n"));
+	return [NSArray arrayWithObjects:NSUnderlineStyleAttributeName, nil];
 }
 
--(NSAttributedString *)attributedSubstringForProposedRange: (NSRange)aRange actualRange: (NSRangePointer)actualRange
+/*
+ - (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)aRange actualRange:(NSRangePointer)actualRange	Required
+
+  Returns an attributed string derived from the given range in the receiver's text storage.
+ */
+- (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)aRange actualRange:(NSRangePointer)actualRange
 {
-  GDK_NOTE (EVENTS, g_print ("attributedSubstringForProposedRange\n"));
-  return nil;
+	if (actualRange != NULL) {
+		NSLog(@"attributedSubstringForProposedRange:(%u, %u) actualRange:(%u, %u)",
+				aRange.location, aRange.length, actualRange->location, actualRange->length);
+	}
+	else {
+		NSLog(@"attributedSubstringForProposedRange:(%u, %u) actualRange:(NULL)", aRange.location, aRange.length);
+	}
+	GDK_NOTE (EVENTS, g_print ("attributedSubstringForProposedRange\n"));
+	return nil;
 }
 
--(BOOL)hasMarkedText
+/*
+ - (BOOL)hasMarkedText		Required
+
+  Returns a Boolean value indicating whether the receiver has marked text.
+ */
+- (BOOL)hasMarkedText
 {
-  GDK_NOTE (EVENTS, g_print ("hasMarkedText\n"));
-  return markedRange.location != NSNotFound && markedRange.length != 0;
+	NSLog(@"hasMarkedText");
+	GDK_NOTE (EVENTS, g_print ("hasMarkedText\n"));
+	return markedRange.location != NSNotFound && markedRange.length != 0;
 }
 
--(NSRange)markedRange
+/*
+ - (NSRange)markedRange		Required
+ 
+  Returns the range of the marked text.
+ */
+- (NSRange)markedRange
 {
-  GDK_NOTE (EVENTS, g_print ("markedRange\n"));
-  return markedRange;
+	NSLog(@"markedRange");
+	GDK_NOTE (EVENTS, g_print ("markedRange\n"));
+	return markedRange;
 }
 
--(NSRange)selectedRange
+/*
+ - (NSRange)selectedRange	Required
+
+  Returns the range of selected text.
+ */
+- (NSRange)selectedRange
 {
-  GDK_NOTE (EVENTS, g_print ("selectedRange\n"));
-  return selectedRange;
+	NSLog(@"selectedRange");
+	GDK_NOTE (EVENTS, g_print ("selectedRange\n"));
+	return selectedRange;
 }
 
--(void)unmarkText
-{
-  GDK_NOTE (EVENTS, g_print ("unmarkText\n"));
-  gchar *prev_str;
-  markedRange = selectedRange = NSMakeRange (NSNotFound, 0);
+/*
+ - (void)unmarkText			Required
 
-  g_object_set_data_full (G_OBJECT (gdk_window), TIC_MARKED_TEXT, NULL, g_free);
+  Unmarks the marked text.
+ */
+- (void)unmarkText
+{
+	NSLog(@"unmarkText");
+	GDK_NOTE (EVENTS, g_print ("unmarkText\n"));
+	gchar *prev_str;
+	markedRange = selectedRange = NSMakeRange(NSNotFound, 0);
+
+	g_object_set_data_full(G_OBJECT(gdk_window), TIC_MARKED_TEXT, NULL, g_free);
 }
 
--(void)setMarkedText: (id)aString selectedRange: (NSRange)newSelection replacementRange: (NSRange)replacementRange
+/*
+ - (void)setMarkedText:(id)aString selectedRange:(NSRange)newSelection replacementRange:(NSRange)replacementRange	Required
+  Replaces a specified range in the receiver’s text storage with the given string and sets the selection.
+ */
+- (void)setMarkedText:(id)aString selectedRange:(NSRange)newSelection replacementRange:(NSRange)replacementRange
 {
-  GDK_NOTE (EVENTS, g_print ("setMarkedText\n"));
-  const char *str;
-  gchar *prev_str;
+	NSLog(@"setMarkedText:(%@) selectedRange:(%u, %u) replacementRange:(%u, %u)",
+			aString, newSelection.location, newSelection.length, replacementRange.location, replacementRange.length);
+	GDK_NOTE (EVENTS, g_print ("setMarkedText\n"));
+	const char *str;
+	gchar *prev_str;
 
-  if (replacementRange.location == NSNotFound)
-    {
-      markedRange = NSMakeRange (newSelection.location, [aString length]);
-      selectedRange = NSMakeRange (newSelection.location, newSelection.length);
-    }
-  else {
-      markedRange = NSMakeRange (replacementRange.location, [aString length]);
-      selectedRange = NSMakeRange (replacementRange.location + newSelection.location, newSelection.length);
-    }
+	if (replacementRange.location == NSNotFound) {
+		markedRange = NSMakeRange(newSelection.location, [aString length]);
+		selectedRange = NSMakeRange(newSelection.location, newSelection.length);
+	}
+	else {
+		markedRange = NSMakeRange(replacementRange.location, [aString length]);
+		selectedRange = NSMakeRange(replacementRange.location + newSelection.location, newSelection.length);
+	}
 
-  if ([aString isKindOfClass: [NSAttributedString class]])
-    {
-      str = [[aString string] UTF8String];
-    }
-  else {
-      str = [aString UTF8String];
-    }
+	if ([aString isKindOfClass:[NSAttributedString class]]) {
+		str = [[aString string] UTF8String];
+	}
+	else {
+		str = [aString UTF8String];
+	}
 
-  g_object_set_data_full (G_OBJECT (gdk_window), TIC_MARKED_TEXT, g_strdup (str), g_free);
-  g_object_set_data (G_OBJECT (gdk_window), TIC_SELECTED_POS,
-		     GUINT_TO_POINTER (selectedRange.location));
-  g_object_set_data (G_OBJECT (gdk_window), TIC_SELECTED_LEN,
-		     GUINT_TO_POINTER (selectedRange.length));
+	g_object_set_data_full(G_OBJECT(gdk_window), TIC_MARKED_TEXT, g_strdup(str), g_free);
+	g_object_set_data(G_OBJECT(gdk_window), TIC_SELECTED_POS, GUINT_TO_POINTER(selectedRange.location));
+	g_object_set_data(G_OBJECT(gdk_window), TIC_SELECTED_LEN, GUINT_TO_POINTER(selectedRange.length));
 
-  GDK_NOTE (EVENTS, g_print ("setMarkedText: set %s (%p, nsview %p): %s\n",
-			     TIC_MARKED_TEXT, gdk_window, self,
-			     str ? str : "(empty)"));
+	GDK_NOTE (EVENTS, g_print ("setMarkedText: set %s (%p, nsview %p): %s\n",
+			 TIC_MARKED_TEXT, gdk_window, self, str ? str : "(empty)"));
 
-  /* handle text input changes by mouse events */
-  if (!GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (gdk_window),
-                                            TIC_IN_KEY_DOWN)))
-    {
-//      _gdk_quartz_synthesize_null_key_event(gdk_window);
-    }
+	/* handle text input changes by mouse events */
+	if (!GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(gdk_window), TIC_IN_KEY_DOWN))) {
+//		_gdk_quartz_synthesize_null_key_event(gdk_window);
+	}
 }
 
--(void)doCommandBySelector: (SEL)aSelector
+/*
+ - (void)insertText:(id)aString replacementRange:(NSRange)replacementRange	Required
+
+  Inserts the given string into the receiver, replacing the specified content.
+ */
+- (void)insertText:(id)aString replacementRange:(NSRange)replacementRange
 {
-  GDK_NOTE (EVENTS, g_print ("doCommandBySelector\n"));
-  if ([self respondsToSelector: aSelector])
-    [self performSelector: aSelector];
+	NSLog(@"insertText:(%@) replacementRange:(%u, %u)",
+			aString, replacementRange.location, replacementRange.length);
+	GDK_NOTE (EVENTS, g_print ("insertText\n"));
+	const char *str;
+	NSString *string;
+	gchar *prev_str;
+
+	if ([self hasMarkedText])
+		[self unmarkText];
+
+	if ([aString isKindOfClass:[NSAttributedString class]])
+		string = [aString string];
+	else
+		string = aString;
+
+	NSCharacterSet *ctrlChars = [NSCharacterSet controlCharacterSet];
+	NSCharacterSet *wsnlChars = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+	if ([string rangeOfCharacterFromSet:ctrlChars].length && [string rangeOfCharacterFromSet:wsnlChars].length == 0) {
+		/* discard invalid text input with Chinese input methods */
+		str = "";
+		[self unmarkText];
+		NSInputManager *currentInputManager = [NSInputManager currentInputManager];
+		[currentInputManager markedTextAbandoned:self];
+	}
+	else {
+		str = [string UTF8String];
+	}
+
+	g_object_set_data_full(G_OBJECT(gdk_window), TIC_INSERT_TEXT, g_strdup(str), g_free);
+	GDK_NOTE (EVENTS, g_print ("insertText: set %s (%p, nsview %p): %s\n",
+			 TIC_INSERT_TEXT, gdk_window, self,
+			 str ? str : "(empty)"));
+	//  NSLog(@"insertText:%@", string);
+
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY, GUINT_TO_POINTER(GIC_FILTER_FILTERED));
+
+	/* handle text input changes by mouse events */
+	if (!GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(gdk_window), TIC_IN_KEY_DOWN))) {
+	//      _gdk_quartz_synthesize_null_key_event(gdk_window);
+	}
+}
+#else
+- (void)insertText:(id)aString
+{
+}
+#endif
+
+/*
+ - (NSInteger)windowLevel	Optional
+
+  Returns the window level of the receiver.
+ */
+- (NSInteger)windowLevel
+{
+	return [[self window] level];
 }
 
--(void)insertText: (id)aString replacementRange: (NSRange)replacementRange
+/*
+ - (BOOL)drawsVerticallyForCharacterAtIndex:(NSUInteger)charIndex	Optional
+
+  Informs the text input management system whether the protocol-conforming client renders the character at the given index vertically.
+ */
+- (BOOL)drawsVerticallyForCharacterAtIndex:(NSUInteger)charIndex
 {
-  GDK_NOTE (EVENTS, g_print ("insertText\n"));
-  const char *str;
-  NSString *string;
-  gchar *prev_str;
-
-  if ([self hasMarkedText])
-    [self unmarkText];
-
-  if ([aString isKindOfClass: [NSAttributedString class]])
-      string = [aString string];
-  else
-      string = aString;
-
-  NSCharacterSet *ctrlChars = [NSCharacterSet controlCharacterSet];
-  NSCharacterSet *wsnlChars = [NSCharacterSet whitespaceAndNewlineCharacterSet];
-  if ([string rangeOfCharacterFromSet:ctrlChars].length &&
-      [string rangeOfCharacterFromSet:wsnlChars].length == 0)
-    {
-      /* discard invalid text input with Chinese input methods */
-      str = "";
-      [self unmarkText];
-      NSInputManager *currentInputManager = [NSInputManager currentInputManager];
-      [currentInputManager markedTextAbandoned:self];
-    }
-  else
-   {
-      str = [string UTF8String];
-   }
-
-  g_object_set_data_full (G_OBJECT (gdk_window), TIC_INSERT_TEXT, g_strdup (str), g_free);
-  GDK_NOTE (EVENTS, g_print ("insertText: set %s (%p, nsview %p): %s\n",
-			     TIC_INSERT_TEXT, gdk_window, self,
-			     str ? str : "(empty)"));
-//  NSLog(@"insertText:%@", string);
-
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_FILTERED));
-
-  /* handle text input changes by mouse events */
-  if (!GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (gdk_window),
-                                            TIC_IN_KEY_DOWN)))
-    {
-//      _gdk_quartz_synthesize_null_key_event(gdk_window);
-    }
+	return NO;
 }
 
--(void)deleteBackward: (id)sender
+/*
+ - (void)doCommandBySelector:(SEL)aSelector	Required
+
+  Invokes the action specified by the given selector.
+ */
+- (void)doCommandBySelector:(SEL)aSelector
+{
+	NSLog(@"doCommandBySelector");
+	GDK_NOTE (EVENTS, g_print ("doCommandBySelector\n"));
+	if ([self respondsToSelector:aSelector])
+		[self performSelector:aSelector];
+}
+
+/* NSTextInputClient protocol methods--end */
+
+#define k_VK_ANSI_X      0x07
+#define k_VK_ANSI_C      0x08
+#define k_VK_ANSI_V      0x09
+#define k_VK_LeftArrow   0x7B
+#define k_VK_RightArrow  0x7C
+#define k_VK_DownArrow   0x7D
+#define k_VK_UpArrow     0x7E
+
+- (void)redirectEditWithKeyCode:(int)key_code modifiers:(unsigned int)modFlags characters:(NSString *)chars
+{
+	NSEvent *theEvent = [NSEvent keyEventWithType:NSKeyDown
+                                         location:NSMakePoint(0,0)
+                                    modifierFlags:modFlags
+                                        timestamp:[[NSProcessInfo processInfo] systemUptime]
+                                     windowNumber:[[self window] windowNumber]
+                                          context:[NSGraphicsContext currentContext]
+                                       characters:chars
+                      charactersIgnoringModifiers:chars
+                                        isARepeat:NO
+                                          keyCode:key_code];
+	[self postKeyEvent:theEvent];
+	didRedirectKeyEvent = YES;
+}
+
+- (void)moveToBeginningOfDocument:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToBeginningOfDocument\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_UpArrow modifiers:NSCommandKeyMask characters:@""];
+}
+
+- (void)moveToBeginningOfDocumentAndModifySelection:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToBeginningOfDocumentAndModifySelection\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_UpArrow modifiers:NSCommandKeyMask|NSShiftKeyMask characters:@""];
+}
+
+- (void)moveToEndOfDocument:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToEndOfDocument\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_DownArrow modifiers:NSCommandKeyMask characters:@""];
+}
+
+- (void)moveToEndOfDocumentAndModifySelection:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToEndOfDocumentAndModifySelection\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_DownArrow modifiers:NSCommandKeyMask|NSShiftKeyMask characters:@""];
+}
+
+- (void)moveToRightEndOfLine:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToRightEndOfLine\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+					  GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_RightArrow modifiers:NSCommandKeyMask characters:@""];
+}
+
+- (void)moveToRightEndOfLineAndModifySelection:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToRightEndOfLineAndModifySelection\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+					  GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_RightArrow modifiers:NSCommandKeyMask|NSShiftKeyMask characters:@""];
+}
+
+- (void)moveToLeftEndOfLine:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToLeftEndOfLine\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+					  GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_LeftArrow modifiers:NSCommandKeyMask characters:@""];
+}
+
+- (void)moveToLeftEndOfLineAndModifySelection:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("moveToLeftEndOfLineAndModifySelection\n"));
+	g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+					  GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+	[self redirectEditWithKeyCode:k_VK_LeftArrow modifiers:NSCommandKeyMask|NSShiftKeyMask characters:@""];
+}
+
+#if 0
+- (void)deleteBackward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("deleteBackward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)deleteForward: (id)sender
+- (void)deleteForward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("deleteForward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)deleteToBeginningOfLine: (id)sender
+- (void)deleteToBeginningOfLine:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("deleteToBeginningOfLine\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)deleteToEndOfLine: (id)sender
+- (void)deleteToEndOfLine:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("deleteToEndOfLine\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)deleteWordBackward: (id)sender
+- (void)deleteWordBackward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("deleteWordBackward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)deleteWordForward: (id)sender
+- (void)deleteWordForward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("deleteWordForward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)insertBacktab: (id)sender
+- (void)insertBacktab:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("insertBacktab\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)insertNewline: (id)sender
+- (void)insertNewline:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("insertNewline\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY, GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+             GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)insertTab: (id)sender
+- (void)insertTab:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("insertTab\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveBackward: (id)sender
+- (void)moveBackward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveBackward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveBackwardAndModifySelection: (id)sender
+- (void)moveBackwardAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveBackwardAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveDown: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveDown\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveDownAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveDownAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveForward: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveForward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveForwardAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveForwardAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveLeft: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveLeft\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveLeftAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveLeftAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveRight: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveRight\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveRightAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveRightAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToBeginningOfDocument: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToBeginningOfDocument\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToBeginningOfDocumentAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToBeginningOfDocumentAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToBeginningOfLine: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToBeginningOfLine\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToBeginningOfLineAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToBeginningOfLineAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToEndOfDocument: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToEndOfDocument\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToEndOfDocumentAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToEndOfDocumentAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToEndOfLine: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToEndOfLine\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveToEndOfLineAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveToEndOfLineAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveUp: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveUp\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveUpAndModifySelection: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("moveUpAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
-}
-
--(void)moveWordBackward: (id)sender
+- (void)moveWordBackward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordBackward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordBackwardAndModifySelection: (id)sender
+- (void)moveWordBackwardAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordBackwardAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordForward: (id)sender
+- (void)moveWordForward:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordForward\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordForwardAndModifySelection: (id)sender
+- (void)moveWordForwardAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordForwardAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordLeft: (id)sender
+- (void)moveWordLeft:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordLeft\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordLeftAndModifySelection: (id)sender
+- (void)moveWordLeftAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordLeftAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordRight: (id)sender
+- (void)moveWordRight:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordRight\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)moveWordRightAndModifySelection: (id)sender
+- (void)moveWordRightAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("moveWordRightAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)pageDown: (id)sender
+- (void)pageDown:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("pageDown\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)pageDownAndModifySelection: (id)sender
+- (void)pageDownAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("pageDownAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)pageUp: (id)sender
+- (void)pageUp:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("pageUp\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)pageUpAndModifySelection: (id)sender
+- (void)pageUpAndModifySelection:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("pageUpAndModifySelection\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)selectAll: (id)sender
+- (void)selectAll:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("selectAll\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)selectLine: (id)sender
+- (void)selectLine:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("selectLine\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
 }
 
--(void)selectWord: (id)sender
+- (void)selectWord:(id)sender
 {
   GDK_NOTE (EVENTS, g_print ("selectWord\n"));
-  g_object_set_data (G_OBJECT (gdk_window), GIC_FILTER_KEY,
-		     GUINT_TO_POINTER (GIC_FILTER_PASSTHRU));
+  g_object_set_data(G_OBJECT(gdk_window), GIC_FILTER_KEY,
+		     GUINT_TO_POINTER(GIC_FILTER_PASSTHRU));
+}
+#endif
+
+- (void)cut:(id)sender
+{
+	GDK_NOTE (EVENTS, g_print ("cut\n"));
+
+	[self redirectEditWithKeyCode:k_VK_ANSI_X modifiers:NSCommandKeyMask characters:@"x"];
 }
 
--(void)cut: (id)sender
+- (void)copy:(id)sender
 {
-  GDK_NOTE (EVENTS, g_print ("cut\n"));
+	GDK_NOTE (EVENTS, g_print ("copy\n"));
+
+	[self redirectEditWithKeyCode:k_VK_ANSI_C modifiers:NSCommandKeyMask characters:@"c"];
 }
 
--(void)copy: (id)sender
+- (void)paste:(id)sender
 {
-  GDK_NOTE (EVENTS, g_print ("copy\n"));
+	GDK_NOTE (EVENTS, g_print ("paste\n"));
+	
+	[self redirectEditWithKeyCode:k_VK_ANSI_V modifiers:NSCommandKeyMask characters:@"v"];
 }
 
--(void)paste: (id)sender
+- (void)noop:(id)sender
 {
-  GDK_NOTE (EVENTS, g_print ("paste\n"));
-}
-
--(void)noop: (id)sender
-{
-  GDK_NOTE (EVENTS, g_print ("noop\n"));
+	GDK_NOTE (EVENTS, g_print ("noop\n"));
 }
 
 /* --------------------------------------------------------------- */
 
--(void)dealloc
+- (void)dealloc
 {
-  [super dealloc];
+	[super dealloc];
 }
 
--(void)setGdkWindow: (GdkWindow *)window
+- (void)setGdkWindow:(GdkWindow *)window
 {
-  gdk_window = window;
+	gdk_window = window;
 }
 
--(GdkWindow *)gdkWindow
+- (GdkWindow *)gdkWindow
 {
-  return gdk_window;
+	return gdk_window;
 }
 
-- (void)setShouldTrackCursor: (BOOL)flag;
+- (void)setShouldTrackCursor:(BOOL)flag;
 {
-  shouldTrackCursor = flag;
+	shouldTrackCursor = flag;
 }
 
--(BOOL)isFlipped
+- (BOOL)isFlipped
 {
-  return YES;
+	return YES;
 }
 
--(BOOL)isOpaque
+- (BOOL)isOpaque
 {
-  if (GDK_WINDOW_DESTROYED (gdk_window))
-    return YES;
+	if (GDK_WINDOW_DESTROYED(gdk_window))
+		return YES;
 
-  /* A view is opaque if its GdkWindow doesn't have the RGBA visual */
-  return gdk_window_get_visual (gdk_window) !=
-    gdk_screen_get_rgba_visual (_gdk_screen);
+	/* A view is opaque if its GdkWindow doesn't have the RGBA visual */
+	return gdk_window_get_visual(gdk_window) != gdk_screen_get_rgba_visual(_gdk_screen);
 }
 
--(void)drawRect: (NSRect)rect
+- (void)drawRect:(NSRect)rect
 {
-  GdkRectangle gdk_rect;
-  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ (gdk_window->impl);
-  const NSRect *drawn_rects;
-  NSInteger count;
-  int i;
-  cairo_region_t *region;
+	GdkRectangle gdk_rect;
+	GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ(gdk_window->impl);
+	const NSRect *drawn_rects;
+	NSInteger count;
+	int i;
+	cairo_region_t *region;
 
 //  GDK_NOTE (DRAW, g_print ("GdkQuartzView drawRect:\n"));
 
-  if (GDK_WINDOW_DESTROYED (gdk_window))
-    return;
+	if (GDK_WINDOW_DESTROYED(gdk_window))
+		return;
 
-  if (! (gdk_window->event_mask & GDK_EXPOSURE_MASK))
-    return;
+	if (!(gdk_window->event_mask & GDK_EXPOSURE_MASK))
+		return;
 
-  if (NSEqualRects (rect, NSZeroRect))
-    return;
+	if (NSEqualRects(rect, NSZeroRect))
+		return;
 
-  if (!GDK_WINDOW_IS_MAPPED (gdk_window))
-    {
+	if (!GDK_WINDOW_IS_MAPPED(gdk_window)) {
       /* If the window is not yet mapped, clip_region_with_children
        * will be empty causing the usual code below to draw nothing.
        * To not see garbage on the screen, we draw an aesthetic color
@@ -674,52 +755,49 @@
        * the NSView's CALayer in order to add sublayers for custom
        * native rendering.
        */
-      [NSGraphicsContext saveGraphicsState];
+		[NSGraphicsContext saveGraphicsState];
 
-      [[NSColor windowBackgroundColor] setFill];
-      [NSBezierPath fillRect: rect];
+		[[NSColor windowBackgroundColor] setFill];
+		[NSBezierPath fillRect:rect];
 
-      [NSGraphicsContext restoreGraphicsState];
+		[NSGraphicsContext restoreGraphicsState];
 
-      return;
+		return;
     }
 
-  /* Clear our own bookkeeping of regions that need display */
-  if (impl->needs_display_region)
-    {
-      cairo_region_destroy (impl->needs_display_region);
-      impl->needs_display_region = NULL;
-    }
+	/* Clear our own bookkeeping of regions that need display */
+	if (impl->needs_display_region) {
+		cairo_region_destroy(impl->needs_display_region);
+		impl->needs_display_region = NULL;
+	}
 
-  [self getRectsBeingDrawn: &drawn_rects count: &count];
-  region = cairo_region_create ();
+	[self getRectsBeingDrawn:&drawn_rects count:&count];
+	region = cairo_region_create();
 
-  for (i = 0; i < count; i++)
-    {
-      gdk_rect.x = drawn_rects[i].origin.x;
-      gdk_rect.y = drawn_rects[i].origin.y;
-      gdk_rect.width = drawn_rects[i].size.width;
-      gdk_rect.height = drawn_rects[i].size.height;
+	for (i = 0; i < count; i++) {
+		gdk_rect.x = drawn_rects[i].origin.x;
+		gdk_rect.y = drawn_rects[i].origin.y;
+		gdk_rect.width = drawn_rects[i].size.width;
+		gdk_rect.height = drawn_rects[i].size.height;
 
-      cairo_region_union_rectangle (region, &gdk_rect);
-    }
+		cairo_region_union_rectangle(region, &gdk_rect);
+	}
 
-  impl->in_paint_rect_count++;
-  _gdk_window_process_updates_recurse (gdk_window, region);
-  impl->in_paint_rect_count--;
+	impl->in_paint_rect_count++;
+	_gdk_window_process_updates_recurse(gdk_window, region);
+	impl->in_paint_rect_count--;
 
-  cairo_region_destroy (region);
+	cairo_region_destroy(region);
 
-  if (needsInvalidateShadow)
-    {
-      [[self window] invalidateShadow];
-      needsInvalidateShadow = NO;
-    }
+	if (needsInvalidateShadow) {
+		[[self window] invalidateShadow];
+		needsInvalidateShadow = NO;
+	}
 }
 
--(void)setNeedsInvalidateShadow: (BOOL)invalidate
+- (void)setNeedsInvalidateShadow:(BOOL)invalidate
 {
-  needsInvalidateShadow = invalidate;
+	needsInvalidateShadow = invalidate;
 }
 
 extern void
@@ -744,62 +822,61 @@ queue_tracking_event (GdkWindow * gdk_window, NSEvent * nsevent, NSPoint local_p
   if (_gdk_display == NULL)
       return;
 
-  _gdk_quartz_window_nspoint_to_gdk_xy (screen_point, &x_root, &y_root);
+  _gdk_quartz_window_nspoint_to_gdk_xy(screen_point, &x_root, &y_root);
 
   x = local_point.x;
   y = gdk_window->height - local_point.y;
 
-  event = gdk_event_new (GDK_NOTHING);
+  event = gdk_event_new(GDK_NOTHING);
 
-  node = _gdk_event_queue_append (_gdk_display, event);
+  node = _gdk_event_queue_append(_gdk_display, event);
 
-  fill_crossing_event (gdk_window, event, nsevent,
-                       x, y,
-                       x_root, y_root,
-                       entered? GDK_ENTER_NOTIFY : GDK_LEAVE_NOTIFY,
-                       GDK_CROSSING_NORMAL,
-                       GDK_NOTIFY_NONLINEAR);
+  fill_crossing_event(gdk_window, event, nsevent,
+                      x, y,
+                      x_root, y_root,
+                      entered? GDK_ENTER_NOTIFY : GDK_LEAVE_NOTIFY,
+                      GDK_CROSSING_NORMAL,
+                      GDK_NOTIFY_NONLINEAR);
 
   if (event->any.window)
-    g_object_ref (event->any.window);
+    g_object_ref(event->any.window);
   if (((event->any.type == GDK_ENTER_NOTIFY) ||
        (event->any.type == GDK_LEAVE_NOTIFY)) &&
        (event->crossing.subwindow != NULL))
-    g_object_ref (event->crossing.subwindow);
+    g_object_ref(event->crossing.subwindow);
   GDK_NOTE (EVENTS, g_print ("sent %s\n", entered? "GDK_ENTER_NOTIFY" : "GDK_LEAVE_NOTIFY"));
-  _gdk_windowing_got_event (_gdk_display, node, event, 0);
+  _gdk_windowing_got_event(_gdk_display, node, event, 0);
 }
 
 GdkWindow *
 get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
 {
-  GdkDeviceGrabInfo *grab;
-  GdkDisplay *display = gdk_window_get_display (toplevel);
+	GdkDeviceGrabInfo *grab;
+	GdkDisplay *display = gdk_window_get_display(toplevel);
 
-  if (display == NULL)
-    return NULL;
+	if (display == NULL)
+		return NULL;
 
-  /* From the docs for XGrabPointer:
-   *
-   * If owner_events is true and if a generated pointer event
-   * would normally be reported to this client, it is reported
-   * as usual. Otherwise, the event is reported with respect to
-   * the grab_window and is reported only if selected by
-   * event_mask. For either value of owner_events, unreported
-   * events are discarded.
-   */
-  grab = _gdk_display_get_last_device_grab (display,
-                                            display->core_pointer);
-  if (grab != NULL)
-    {
-      /* check the grab window. */
-      GdkWindow *grab_toplevel;
+	/* From the docs for XGrabPointer:
+	 *
+	 * If owner_events is true and if a generated pointer event
+	 * would normally be reported to this client, it is reported
+	 * as usual. Otherwise, the event is reported with respect to
+	 * the grab_window and is reported only if selected by
+	 * event_mask. For either value of owner_events, unreported
+	 * events are discarded.
+	 */
+	grab = _gdk_display_get_last_device_grab(display, display->core_pointer);
 
-      grab_toplevel = gdk_window_get_effective_toplevel (grab->window);
+	if (grab != NULL) {
+		/* check the grab window. */
+		GdkWindow *grab_toplevel;
 
-      return grab_toplevel;
-    }
-  return NULL;
+		grab_toplevel = gdk_window_get_effective_toplevel(grab->window);
+
+		return grab_toplevel;
+	}
+	return NULL;
 }
 
 - (void)trackMouseMovement:(NSPoint)screen_pt event:(NSEvent *)nsevent hitView:(NSView *)hit_view
@@ -883,17 +960,16 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
   queue_tracking_event(gdk_window, nsevent, local_pt, screen_pt, in_view);
 }
 
--(BOOL)shouldRespondToWindowNotifications
+- (BOOL)shouldRespondToWindowNotifications
 {
-  if ([[self window] isKindOfClass:[GdkQuartzNSWindow class]] &&
-      [[self window] contentView] == self)
-    return NO;
-  return YES;
+	if ([[self window] isKindOfClass:[GdkQuartzNSWindow class]] && [[self window] contentView] == self)
+		return NO;
+	return YES;
 }
 
--(void)viewDidMoveToWindow
+- (void)viewDidMoveToWindow
 {
-  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ (gdk_window->impl);
+  GdkWindowImplQuartz *impl = GDK_WINDOW_IMPL_QUARTZ(gdk_window->impl);
   impl->toplevel = [self window];	/* nil is OK here, if the view doesn't have a window
   									   then its impl shouldn't either. */
 
@@ -939,25 +1015,25 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
   haveBeenAddedToWindow = YES;
 }
 
--(void)windowDidBecomeKey:(NSNotification *)notification
+- (void)windowDidBecomeKey:(NSNotification *)notification
 {
   if ([self shouldRespondToWindowNotifications])
     {
       GDK_NOTE (EVENTS, g_print ("windowDidBecomeKey %p, gdk_window:%p\n", self, gdk_window));
-      _gdk_quartz_events_update_focus_window (gdk_window, TRUE);
+      _gdk_quartz_events_update_focus_window(gdk_window, TRUE);
     }
 }
 
--(void)windowDidResignKey:(NSNotification *)notification
+- (void)windowDidResignKey:(NSNotification *)notification
 {
   if ([self shouldRespondToWindowNotifications])
     {
       GDK_NOTE (EVENTS, g_print ("windowDidResignKey %p, gdk_window:%p\n", self, gdk_window));
-      _gdk_quartz_events_update_focus_window (gdk_window, FALSE);
+      _gdk_quartz_events_update_focus_window(gdk_window, FALSE);
     }
 }
 
--(void)windowDidBecomeMain:(NSNotification *)notification
+- (void)windowDidBecomeMain:(NSNotification *)notification
 {
   if (![self shouldRespondToWindowNotifications])
     return;
@@ -972,19 +1048,19 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
     }
 
   GDK_NOTE (EVENTS, g_print ("windowDidBecomeMain %p, gdk_window:%p\n", self, gdk_window));
-  _gdk_quartz_window_did_become_main (gdk_window);
+  _gdk_quartz_window_did_become_main(gdk_window);
 }
 
--(void)windowDidResignMain:(NSNotification *)notification
+- (void)windowDidResignMain:(NSNotification *)notification
 {
   if ([self shouldRespondToWindowNotifications])
     {
       GDK_NOTE (EVENTS, g_print ("windowDidBecomeMain %p, gdk_window:%p\n", self, gdk_window));
-      _gdk_quartz_window_did_resign_main (gdk_window);
+      _gdk_quartz_window_did_resign_main(gdk_window);
     }
 }
 
--(void)windowDidMove:(NSNotification *)aNotification
+- (void)windowDidMove:(NSNotification *)aNotification
 {
   GdkWindow *window = gdk_window;
   GdkEvent *event;
@@ -993,44 +1069,44 @@ get_grab_toplevel (GdkWindow * toplevel, GdkEventMask event_mask)
     return;
 
   GDK_NOTE (EVENTS, g_print ("windowDidMove %p, gdk_window:%p\n", self, gdk_window));
-  _gdk_quartz_window_update_position (window);
+  _gdk_quartz_window_update_position(window);
 
   /* Synthesize a configure event */
-  event = gdk_event_new (GDK_CONFIGURE);
-  event->configure.window = g_object_ref (window);
+  event = gdk_event_new(GDK_CONFIGURE);
+  event->configure.window = g_object_ref(window);
   event->configure.x = window->x;
   event->configure.y = window->y;
   event->configure.width = window->width;
   event->configure.height = window->height;
 
-  _gdk_event_queue_append (gdk_display_get_default (), event);
+  _gdk_event_queue_append(gdk_display_get_default(), event);
 }
 
--(void)viewWillMoveToWindow: (NSWindow *)newWindow
+- (void)viewWillMoveToWindow:(NSWindow *)newWindow
 {
   haveBeenAddedToWindow = NO;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
--(void)setFrame: (NSRect)frame
+- (void)setFrame:(NSRect)frame
 {
   GdkWindow *window = gdk_window;
   GdkEvent *event;
 
   [super setFrame: frame];
 
-  _gdk_quartz_window_update_position (window);
-  _gdk_window_update_size (window);
+  _gdk_quartz_window_update_position(window);
+  _gdk_window_update_size(window);
 
   /* Synthesize a configure event */
-  event = gdk_event_new (GDK_CONFIGURE);
-  event->configure.window = g_object_ref (window);
+  event = gdk_event_new(GDK_CONFIGURE);
+  event->configure.window = g_object_ref(window);
   event->configure.x = window->x;
   event->configure.y = window->y;
   event->configure.width = window->width;
   event->configure.height = window->height;
 
-  _gdk_event_queue_append (gdk_display_get_default (), event);
+  _gdk_event_queue_append(gdk_display_get_default(), event);
 }
 
 - (void)adjustDragLocation:(NSPoint *)point
@@ -1106,8 +1182,8 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
 {
   g_assert (current_context != NULL);
 
-  GDK_QUARTZ_DRAG_CONTEXT (current_context)->dragging_info = sender;
-  current_context->suggested_action = drag_operation_to_drag_action ([sender draggingSourceOperationMask]);
+  GDK_QUARTZ_DRAG_CONTEXT(current_context)->dragging_info = sender;
+  current_context->suggested_action = drag_operation_to_drag_action([sender draggingSourceOperationMask]);
   current_context->actions = current_context->suggested_action;
 }
 
@@ -1121,28 +1197,28 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
   GdkWindow *window;
 
   if (current_context)
-    g_object_unref (current_context);
+    g_object_unref(current_context);
 
-  current_context = g_object_new (GDK_TYPE_QUARTZ_DRAG_CONTEXT, NULL);
-  update_context_from_dragging_info (sender);
+  current_context = g_object_new(GDK_TYPE_QUARTZ_DRAG_CONTEXT, NULL);
+  update_context_from_dragging_info(sender);
 
   window = [self gdkWindow];
 
-  device_manager = gdk_display_get_device_manager (gdk_display_get_default ());
-  gdk_drag_context_set_device (current_context,
-                               gdk_device_manager_get_client_pointer (device_manager));
+  device_manager = gdk_display_get_device_manager(gdk_display_get_default());
+  gdk_drag_context_set_device(current_context,
+                              gdk_device_manager_get_client_pointer(device_manager));
 
-  event = gdk_event_new (GDK_DRAG_ENTER);
-  event->dnd.window = g_object_ref (window);
+  event = gdk_event_new(GDK_DRAG_ENTER);
+  event->dnd.window = g_object_ref(window);
   event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
+  event->dnd.context = g_object_ref(current_context);
   event->dnd.time = GDK_CURRENT_TIME;
 
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
+  gdk_event_set_device(event, gdk_drag_context_get_device(current_context));
 
-  _gdk_event_emit (event);
+  _gdk_event_emit(event);
 
-  gdk_event_free (event);
+  gdk_event_free(event);
 
   return NSDragOperationNone;
 }
@@ -1155,7 +1231,7 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
    _gdk_quartz_drag_source_context->action = current_context->action;
 
   if (current_context)
-    g_object_unref (current_context);
+    g_object_unref(current_context);
   current_context = NULL;
 }
 
@@ -1164,19 +1240,19 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
 //NSLog(@"draggingExited:%@", sender);
   GdkEvent *event;
 
-  event = gdk_event_new (GDK_DRAG_LEAVE);
-  event->dnd.window = g_object_ref ([self gdkWindow]);
+  event = gdk_event_new(GDK_DRAG_LEAVE);
+  event->dnd.window = g_object_ref([self gdkWindow]);
   event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
+  event->dnd.context = g_object_ref(current_context);
   event->dnd.time = GDK_CURRENT_TIME;
 
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
+  gdk_event_set_device(event, gdk_drag_context_get_device(current_context));
 
-  _gdk_event_emit (event);
+  _gdk_event_emit(event);
 
-  gdk_event_free (event);
+  gdk_event_free(event);
 
-  g_object_unref (current_context);
+  g_object_unref(current_context);
   current_context = NULL;
 }
 
@@ -1189,24 +1265,24 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
   int gx, gy;
   NSDragOperation operation;
 
-  update_context_from_dragging_info (sender);
-  _gdk_quartz_window_nspoint_to_gdk_xy (screen_point, &gx, &gy);
+  update_context_from_dragging_info(sender);
+  _gdk_quartz_window_nspoint_to_gdk_xy(screen_point, &gx, &gy);
 
-  event = gdk_event_new (GDK_DRAG_MOTION);
-  event->dnd.window = g_object_ref ([self gdkWindow]);
+  event = gdk_event_new(GDK_DRAG_MOTION);
+  event->dnd.window = g_object_ref([self gdkWindow]);
   event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
+  event->dnd.context = g_object_ref(current_context);
   event->dnd.time = GDK_CURRENT_TIME;
   event->dnd.x_root = gx;
   event->dnd.y_root = gy;
 
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
+  gdk_event_set_device(event, gdk_drag_context_get_device(current_context));
 
-  _gdk_event_emit (event);
+  _gdk_event_emit(event);
 
-  gdk_event_free (event);
+  gdk_event_free(event);
 
-  operation = drag_action_to_drag_operation (current_context->action);
+  operation = drag_action_to_drag_operation(current_context->action);
 
 //NSLog(@"draggingUpdated: operation is %lu", (unsigned long)operation);
   return operation;
@@ -1220,24 +1296,24 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
   GdkEvent *event;
   int gy, gx;
 
-  update_context_from_dragging_info (sender);
-  _gdk_quartz_window_nspoint_to_gdk_xy (screen_point, &gx, &gy);
+  update_context_from_dragging_info(sender);
+  _gdk_quartz_window_nspoint_to_gdk_xy(screen_point, &gx, &gy);
 
-  event = gdk_event_new (GDK_DROP_START);
-  event->dnd.window = g_object_ref ([self gdkWindow]);
+  event = gdk_event_new(GDK_DROP_START);
+  event->dnd.window = g_object_ref([self gdkWindow]);
   event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (current_context);
+  event->dnd.context = g_object_ref(current_context);
   event->dnd.time = GDK_CURRENT_TIME;
   event->dnd.x_root = gx;
   event->dnd.y_root = gy;
 
-  gdk_event_set_device (event, gdk_drag_context_get_device (current_context));
+  gdk_event_set_device(event, gdk_drag_context_get_device(current_context));
 
-  _gdk_event_emit (event);
+  _gdk_event_emit(event);
 
-  gdk_event_free (event);
+  gdk_event_free(event);
 
-  g_object_unref (current_context);
+  g_object_unref(current_context);
   current_context = NULL;
 
   return YES;
@@ -1262,21 +1338,20 @@ update_context_from_dragging_info (id <NSDraggingInfo> sender)
 {
   GdkEvent *event;
 
-  g_assert (_gdk_quartz_drag_source_context != NULL);
+  g_assert(_gdk_quartz_drag_source_context != NULL);
 
-  event = gdk_event_new (GDK_DROP_FINISHED);
-  event->dnd.window = g_object_ref ([self gdkWindow]);
+  event = gdk_event_new(GDK_DROP_FINISHED);
+  event->dnd.window = g_object_ref([self gdkWindow]);
   event->dnd.send_event = FALSE;
-  event->dnd.context = g_object_ref (_gdk_quartz_drag_source_context);
+  event->dnd.context = g_object_ref(_gdk_quartz_drag_source_context);
 
-  gdk_event_set_device (event,
-                        gdk_drag_context_get_device (_gdk_quartz_drag_source_context));
+  gdk_event_set_device(event, gdk_drag_context_get_device(_gdk_quartz_drag_source_context));
 
-  _gdk_event_emit (event);
+  _gdk_event_emit(event);
 
-  gdk_event_free (event);
+  gdk_event_free(event);
 
-  g_object_unref (_gdk_quartz_drag_source_context);
+  g_object_unref(_gdk_quartz_drag_source_context);
   _gdk_quartz_drag_source_context = NULL;
 }
 
